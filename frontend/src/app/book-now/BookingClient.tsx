@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { isSameDay, endOfDay, parseISO, addMonths, addDays, setHours, setMinutes } from 'date-fns'
-import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle } from 'lucide-react'
+import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +35,8 @@ import { StudentValidation } from '@/components/book-now-sections/StudentValidat
 
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
+import { useBooking } from '@/hooks/useBooking'
+import { manualUserSync } from '@/lib/syncUser'
 
 // Test voucher constants
 const TEST_VOUCHERS = {
@@ -106,6 +108,9 @@ export default function BookingClient() {
   const router = useRouter()
   // Auth state
   const { user, loading: isLoadingAuth } = useAuth()
+  
+  // Booking API hook
+  const { createBooking, isLoading: isCreatingBooking } = useBooking()
 
   const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo'>('package')
   const [selectedPackage, setSelectedPackage] = useState<string>('')
@@ -251,6 +256,9 @@ export default function BookingClient() {
   // UI state
   const [isLoading, setIsLoading] = useState(false)
   const [bookingStep, setBookingStep] = useState(1) // 1: Details, 2: Payment, 3: Confirmation
+  
+  // Store created booking data
+  const [createdBooking, setCreatedBooking] = useState<any>(null)
 
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
@@ -355,10 +363,12 @@ export default function BookingClient() {
     }
   }
 
-  const handleStartChange = (date: Date) => {
-    setStartDate(date)
-    // Clear end date when start date changes to force reselection
-    setEndDate(null)
+  const handleStartChange = (date: Date | null) => {
+    if (date) {
+      setStartDate(date)
+      // Clear end date when start date changes to force reselection
+      setEndDate(null)
+    }
   }
 
   // Get constraints for end date selection
@@ -544,18 +554,64 @@ export default function BookingClient() {
       alert(validation.message)
       return
     }
-    // Log selected seats before you eventually wire up your real booking API:
-    console.log('Booking these seats:', selectedSeats)
-    console.log('Applied voucher:', appliedVoucher)
-    console.log('Selected package:', selectedPackage)
-    console.log('Validated students:', validatedStudents)
+
     setIsLoading(true)
 
-    // Simulate API call for payment HITPAY INTEGRATION
-    setTimeout(() => {
+    try {
+      // Log user information for debugging
+      console.log('User object:', user);
+      console.log('User ID:', user.id);
+      console.log('User email:', user.email);
+      
+      // Use the correct user ID from Supabase (UUID format)
+      // This is what your backend expects for the foreign key constraint
+      const userId = user.id; // Supabase UUID: "1ee65305-b084-4f8f-8afd-074a2c5770cc"
+      
+      // Prepare booking data according to your API structure
+      const bookingData = {
+        userId: userId,
+        location: selectedLocation?.name || '',
+        startAt: startDate?.toISOString() || '',
+        endAt: endDate?.toISOString() || '',
+        specialRequests: specialRequests || undefined,
+        seatNumbers: selectedSeats,
+        pax: people,
+        students: peopleBreakdown.coStudents,
+        members: peopleBreakdown.coWorkers,
+        tutors: peopleBreakdown.coTutors,
+        totalCost: baseSubtotal,
+        discountId: appliedVoucher?.id || null,
+        totalAmount: total,
+        memberType: 'STUDENT', // You can make this dynamic based on user type
+        bookedForEmails: [customerEmail],
+        // Generate a temporary booking reference if backend requires it
+        bookingRef: `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        // Add current timestamp for bookedAt if backend requires it
+        bookedAt: new Date().toISOString(),
+        // Set confirmedPayment to false initially since payment hasn't been processed yet
+        confirmedPayment: false,
+      }
+
+      console.log('Submitting booking data:', bookingData)
+
+      // Create the booking using the real API
+      const result = await createBooking(bookingData)
+
+      if (result.success && result.data) {
+        console.log('Booking created successfully:', result.data)
+        setCreatedBooking(result.data)
+        setIsLoading(false)
+        setBookingStep(2) // Move to payment step
+      } else {
+        console.error('Booking failed:', result.error)
+        alert(`Booking failed: ${result.error}`)
+        setIsLoading(false)
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error)
+      alert('An error occurred while creating your booking. Please try again.')
       setIsLoading(false)
-      setBookingStep(2)
-    }, 2000)
+    }
   }
 
 
@@ -608,6 +664,25 @@ export default function BookingClient() {
                   Sign in now
                 </Button>
                 to continue with your booking.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Manual User Sync Alert - Only show when user is logged in but might have sync issues */}
+          {user && (
+            <Alert className="mb-6 border-yellow-200 bg-yellow-50">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertTitle className="text-yellow-800">Database Sync Required</AlertTitle>
+              <AlertDescription className="text-yellow-700">
+                If you encounter a "foreign key constraint" error when booking, click the button below to get the SQL command to fix it.
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-3 border-yellow-600 text-yellow-700 hover:bg-yellow-100"
+                  onClick={() => manualUserSync(user.id)}
+                >
+                  Get Fix Command
+                </Button>
               </AlertDescription>
             </Alert>
           )}
@@ -883,7 +958,7 @@ export default function BookingClient() {
                           !isFormValid ||
                           (entitlementMode === 'package' && !selectedPackage) ||
                           (entitlementMode === 'promo' && !promoValid) ||
-                          isLoading ||
+                          (isLoading || isCreatingBooking) ||
                           !user
                         }
                       >
@@ -891,7 +966,7 @@ export default function BookingClient() {
                           ? 'Sign In Required'
                           : selectedSeats.length !== people
                             ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
-                            : (isLoading ? 'Processing...' : 'Continue to Payment')
+                            : (isLoading || isCreatingBooking ? 'Creating Booking...' : 'Continue to Payment')
                         }
                       </Button>
 
@@ -952,7 +1027,9 @@ export default function BookingClient() {
                         Your booking has been confirmed. You will receive a confirmation email shortly.
                       </p>
                       <div className="bg-gray-50 p-4 rounded-lg text-left">
-                        <p className="text-sm text-gray-600">Booking Reference: #BK{Date.now().toString().slice(-6)}</p>
+                        <p className="text-sm text-gray-600">
+                          Booking Reference: {createdBooking?.bookingRef || `#BK${Date.now().toString().slice(-6)}`}
+                        </p>
                       </div>
                       <Button
                         onClick={() => router.push('/dashboard')}

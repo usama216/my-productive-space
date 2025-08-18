@@ -34,6 +34,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import { EntitlementHistory } from '@/components/dashboard/EntitlementHistory'
+import { UserSyncButton } from '@/components/UserSyncButton'
 
 // Mock data types
 interface Booking {
@@ -308,8 +309,13 @@ export default function UAMDashboard() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-            <p className="text-gray-600">Manage your bookings and account settings</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
+                <p className="text-gray-600">Manage your bookings and account settings</p>
+              </div>
+              <UserSyncButton />
+            </div>
           </div>
 
           {/* Quick Stats */}

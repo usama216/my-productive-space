@@ -8,6 +8,7 @@ import 'slick-carousel/slick/slick-theme.css'
 import WhatsappLive from "@/components/whatsapp-logo/WhatsappLive";
 import { Toaster } from "@/components/ui/toaster"
 import HomeToast from "@/components/HomeToast"
+import { ReduxProvider } from "@/providers/ReduxProvider"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,16 +33,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistMono.variable} antialiased`}
       >
-        <div className="mx-auto">
-          {children}
-          <WhatsappLive />
-        </div>
-        
-        {/* Toast components for authentication notifications */}
-        <Toaster />
-        <HomeToast />
+        <ReduxProvider>
+          <div className="mx-auto">
+            {children}
+            <WhatsappLive />
+          </div>
+          
+          {/* Toast components for authentication notifications */}
+          <Toaster />
+          <HomeToast />
+        </ReduxProvider>
       </body>
     </html>
   );

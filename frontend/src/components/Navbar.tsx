@@ -55,7 +55,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [logoutLoading, setLogoutLoading] = useState(false)
 
-  const avatarUrl = user?.user_metadata?.avatar_url || '/profilepic/default-avatar.png'
+  const avatarUrl = '/profilepic/default-avatar.png'
 
   const handleLogout = async () => {
     setLogoutLoading(true)

@@ -181,8 +181,8 @@ export const syncUserToPrisma = async (supabaseUser: any) => {
         data: {
           id: supabaseUser.id,
           email: supabaseUser.email,
-          firstName: supabaseUser.user_metadata?.firstName || null,
-          lastName: supabaseUser.user_metadata?.lastName || null,
+          firstName: supabaseUser.user_metadata?.firstName || 'Unknown',
+          lastName: supabaseUser.user_metadata?.lastName || 'Unknown',
           memberType: mapMemberTypeToPrisma(supabaseUser.user_metadata?.memberType || 'professional'),
           contactNumber: supabaseUser.user_metadata?.contactNumber || null,
           studentVerificationStatus: supabaseUser.user_metadata?.memberType === 'student' ? 'PENDING' : 'NA',
@@ -194,6 +194,43 @@ export const syncUserToPrisma = async (supabaseUser: any) => {
     return { success: true }
   } catch (error) {
     console.error('Error syncing user to Prisma:', error)
+    return { success: false, error }
+  }
+}
+
+// Function to ensure user exists in Prisma database
+export const ensureUserExists = async (userId: string) => {
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+
+    if (!existingUser) {
+      // Get user from Supabase Auth
+      const client = await createClient()
+      const { data: { user }, error } = await client.auth.admin.getUserById(userId)
+      
+      if (error || !user) {
+        throw new Error('User not found in Supabase Auth')
+      }
+
+      // Create user in Prisma
+      await prisma.user.create({
+        data: {
+          id: user.id,
+          email: user.email || '',
+          firstName: user.user_metadata?.firstName || 'Unknown',
+          lastName: user.user_metadata?.lastName || 'Unknown',
+          memberType: mapMemberTypeToPrisma(user.user_metadata?.memberType || 'professional'),
+          contactNumber: user.user_metadata?.contactNumber || null,
+          studentVerificationStatus: user.user_metadata?.memberType === 'student' ? 'PENDING' : 'NA',
+        },
+      })
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error ensuring user exists:', error)
     return { success: false, error }
   }
 }

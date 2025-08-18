@@ -16,6 +16,7 @@ import HCaptcha from '@hcaptcha/react-hcaptcha'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/hooks/use-toast'
+import { useReduxUser } from '@/hooks/useReduxUser'
 
 import 'react-international-phone/style.css'
 
@@ -38,6 +39,7 @@ export function AuthForm({ type }: Props) {
   const isLoginForm = type === 'login'
   const router = useRouter()
   const { toast } = useToast()
+  const { loginUser } = useReduxUser()
   
   // Form state
   const [loading, setLoading] = useState(false)
@@ -97,6 +99,16 @@ export function AuthForm({ type }: Props) {
       })
 
       if (error) throw error
+
+      // Store user data in Redux store
+      if (data.user && data.session) {
+        loginUser({
+          user: data.user,
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+          expiresAt: data.session.expires_at || 0,
+        })
+      }
 
       resetCaptcha()
       router.push(`/?toastType=login`)
@@ -199,7 +211,8 @@ export function AuthForm({ type }: Props) {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      // Use the server action instead of calling Supabase directly
+      const result = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
         options: {
@@ -207,15 +220,32 @@ export function AuthForm({ type }: Props) {
             firstName: signupData.firstName,
             lastName: signupData.lastName,
             contactNumber: signupData.contactNumber,
-            memberType: signupData.memberType
+            memberType: signupData.memberType,
           },
-          captchaToken
-        }
+          captchaToken,
+        },
       })
 
-      if (error) throw error
+      if (result.error) {
+        throw result.error
+      }
+
+      // If signup successful, also store user data in Redux
+      if (result.data.user) {
+        loginUser({
+          user: result.data.user,
+          accessToken: '', // Will be set when user logs in
+          refreshToken: '',
+          expiresAt: 0,
+        })
+      }
 
       resetCaptcha()
+      toast({
+        title: "Success",
+        description: "Account created successfully! Please check your email to confirm your account. After login, use the 'Sync User to DB' button in your dashboard to complete setup.",
+        variant: "default",
+      })
       router.push(`/?toastType=signUp`)
     } catch (error: any) {
       toast({
