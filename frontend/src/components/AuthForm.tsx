@@ -235,12 +235,7 @@ export function AuthForm({ type }: Props) {
       <form onSubmit={handleBasicSignup}>
         <CardContent className="grid w-full items-center gap-4">
           {/* hCaptcha */}
-          <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
+          
 
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="signup-email">Email</Label>
@@ -315,6 +310,12 @@ export function AuthForm({ type }: Props) {
               </Link>
             </Label>
           </div>
+          <HCaptcha
+            ref={hcaptchaRef}
+            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+            onVerify={setCaptchaToken}
+            onError={(err) => console.error('hCaptcha error:', err)}
+          />
         </CardContent>
 
         <CardFooter className="mt-4 flex flex-col gap-6">
@@ -346,13 +347,7 @@ export function AuthForm({ type }: Props) {
       <form onSubmit={handleFullSignup}>
         <CardContent className="grid w-full items-center gap-4">
           {/* hCaptcha */}
-          <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
-
+    
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="first-name">First Name</Label>
@@ -427,6 +422,14 @@ export function AuthForm({ type }: Props) {
               </SelectContent>
             </Select>
           </div>
+                <HCaptcha
+            ref={hcaptchaRef}
+            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+            onVerify={setCaptchaToken}
+            onError={(err) => console.error('hCaptcha error:', err)}
+          />
+
+
         </CardContent>
 
         <CardFooter className="mt-4 flex flex-col gap-6">
@@ -467,14 +470,7 @@ export function AuthForm({ type }: Props) {
   return (
     <form onSubmit={handleLogin}>
       <CardContent className="grid w-full items-center gap-4">
-        {/* hCaptcha */}
-        <HCaptcha
-          ref={hcaptchaRef}
-          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-          onVerify={setCaptchaToken}
-          onError={(err) => console.error('hCaptcha error:', err)}
-        />
-
+    
         <div className="flex flex-col space-y-1.5">
           <Label htmlFor="login-email">Email</Label>
           <div className="relative">
@@ -515,6 +511,7 @@ export function AuthForm({ type }: Props) {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          
         </div>
 
         {/* <div className="flex flex-col space-y-1.5">
@@ -543,6 +540,15 @@ export function AuthForm({ type }: Props) {
           />
           <Label htmlFor="remember-me" className="text-sm">Remember me</Label>
         </div>
+
+            {/* hCaptcha */}
+        <HCaptcha
+          ref={hcaptchaRef}
+          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+          onVerify={setCaptchaToken}
+          onError={(err) => console.error('hCaptcha error:', err)}
+        />
+
       </CardContent>
 
       <CardFooter className="mt-4 flex flex-col gap-6">

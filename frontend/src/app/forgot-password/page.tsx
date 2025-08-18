@@ -72,12 +72,7 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {/* hCaptcha */}
-            <HCaptcha
-              ref={hcaptchaRef}
-              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-              onVerify={setCaptchaToken}
-              onError={(err) => console.error('hCaptcha error:', err)}
-            />
+        
 
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="forgot-email">Email Address</Label>
@@ -95,6 +90,13 @@ export default function ForgotPasswordPage() {
                 />
               </div>
             </div>
+                <HCaptcha
+              ref={hcaptchaRef}
+              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+              onVerify={setCaptchaToken}
+              onError={(err) => console.error('hCaptcha error:', err)}
+            />
+            <br/>
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4">
