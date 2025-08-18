@@ -1,0 +1,63 @@
+# version: '3.8'
+# services:
+#   nextjs-app:
+#     image: nextjs-app-tst
+#     container_name: nextjs-app-tst
+#     build:
+#       context: . #current directory
+#       # dockerfile: Dockerfile
+#     ports:
+#       - '${APP_PORT}:${APP_PORT}' #not initialized, will be set by .env
+#     volumes:
+#       - ./frontend:/frontend
+#       - node_modules:/frontend/node_modules #managed by docker
+#       - build:/frontend/.next #managed by docker
+#     env_file:
+#       - .env
+
+# volumes:
+#   node_modules:
+#     # driver: local
+#   build:
+#     # driver: local
+
+# docker/docker-compose.yml
+version: '3.8'
+
+services:
+  # ───── Dev service ─────
+  dev-frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: mps-frontend:dev
+    container_name: mps-frontend-dev
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - HOST=${APP_HOST}
+      - PORT=${APP_PORT}
+    volumes:
+      - ../frontend:/frontend:rw
+      - node-modules:/frontend/node_modules
+    command: npm run dev -- --hostname 0.0.0.0 --port ${APP_PORT}
+    env_file:
+      - .env
+
+
+  # ───── Prod service ────
+  prod-frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    image: mps-frontend:prod
+    container_name: mps-frontend-prod
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - PORT=${APP_PORT}
+    env_file:
+      - .env
+    # no volumes: sealed container
+volumes:
+  node-modules:

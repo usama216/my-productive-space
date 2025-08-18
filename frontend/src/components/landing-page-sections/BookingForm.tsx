@@ -1,0 +1,378 @@
+// src/components/BookingForm.tsx
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+import Image from 'next/image'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
+
+// date‐fns helpers to compare dates & get end of day
+import { isSameDay, endOfDay, addMonths, addDays, setHours, setMinutes } from 'date-fns'
+
+import { ChevronDown } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+
+import { PeopleSelector } from '@/components/PeopleSelector'
+import { useAuth } from '@/hooks/useAuth'
+
+export default function BookingForm() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
+
+  const [location, setLocation] = useState<string>('')
+  const [people, setPeople] = useState<number>(1)
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+
+  // Add state for people breakdown
+  const [peopleBreakdown, setPeopleBreakdown] = useState<{
+    coWorkers: number
+    coTutors: number
+    coStudents: number
+    total: number
+  }>({
+    coWorkers: 1,
+    coTutors: 0,
+    coStudents: 0,
+    total: 1
+  })
+
+  // Calculate max date (2 months from today)
+  const maxBookingDate = addMonths(new Date(), 2)
+
+  const handleStartChange = (date: Date) => {
+    setStartDate(date)
+    // // if previously picked end was on a different day or before new start, clear it
+    // if (!date || !endDate || !isSameDay(date, endDate) || endDate <= date) {
+    //   setEndDate(null)
+    // }
+    setEndDate(null)
+  }
+  const getEndDateConstraints = () => {
+    if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
+
+    // End date can be same day or next day
+    const minEndDate = startDate
+    const maxEndDate = addDays(startDate, 1) // Allow booking until next day
+
+    return {
+      minDate: minEndDate,
+      maxDate: maxEndDate > maxBookingDate ? maxBookingDate : maxEndDate
+    }
+  }
+
+  const getEndTimeConstraints = () => {
+    if (!startDate || !endDate) {
+      return {
+        minTime: setHours(setMinutes(new Date(), 0), 0),
+        maxTime: setHours(setMinutes(new Date(), 59), 23)
+      }
+    }
+
+    // Minimum end time is start time + 30 minutes
+    const minEndTime = new Date(startDate.getTime() + 30 * 60 * 1000)
+
+    // If end date is same day as start date
+    if (isSameDay(startDate, endDate)) {
+      return {
+        minTime: minEndTime, // Must be at least 30 minutes after start time
+        maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
+      }
+    }
+
+    // If end date is next day
+    const nextDay = addDays(startDate, 1)
+    if (isSameDay(endDate, nextDay)) {
+      return {
+        minTime: setHours(setMinutes(endDate, 0), 0), // From 12:00 AM next day
+        maxTime: setHours(setMinutes(endDate, 0), 12) // Until 12:00 PM next day
+      }
+    }
+
+    // Default fallback
+    return {
+      minTime: setHours(setMinutes(new Date(), 0), 0),
+      maxTime: setHours(setMinutes(new Date(), 59), 23)
+    }
+  }
+
+  const getStartTimeConstraints = () => {
+    const selectedDate = startDate || new Date()
+    const today = new Date()
+
+    // If booking for today, minimum time is current time
+    if (isSameDay(selectedDate, today)) {
+      return {
+        minTime: new Date(),
+        maxTime: setHours(setMinutes(new Date(), 59), 23) // Until 11:59 PM
+      }
+    }
+
+    // For future dates, allow full day
+    return {
+      minTime: setHours(setMinutes(new Date(), 0), 0), // From 12:00 AM
+      maxTime: setHours(setMinutes(new Date(), 59), 23) // Until 11:59 PM
+    }
+  }
+
+
+  const getInitialEndTimeConstraints = () => {
+    if (!startDate) {
+      return {
+        minTime: setHours(setMinutes(new Date(), 0), 0),
+        maxTime: setHours(setMinutes(new Date(), 59), 23)
+      }
+    }
+
+    // Minimum end time is start time + 30 minutes
+    const minEndTime = new Date(startDate.getTime() + 30 * 60 * 1000)
+
+    // For today's date, start from the start time + 30 min
+    const today = new Date()
+    if (isSameDay(startDate, today)) {
+      return {
+        minTime: minEndTime,
+        maxTime: setHours(setMinutes(today, 59), 23)
+      }
+    }
+
+    // For future dates, still need 30 min minimum
+    return {
+      minTime: minEndTime,
+      maxTime: setHours(setMinutes(new Date(), 59), 23)
+    }
+  }
+
+  const handleBookNow = () => {
+    // Validate required fields
+    if (!location || !startDate || !endDate) {
+      alert('Please fill in all required fields')
+      return
+    }
+    // Validate booking time constraints
+    if (endDate <= startDate) {
+      alert('End time must be after start time')
+      return
+    }
+    // Check if it is a valid cross-day booking
+    const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+    const daysDifference = Math.floor(timeDifferenceHours / 24)
+
+    if (daysDifference > 1) {
+      alert('Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)')
+      return
+    }
+
+    // If it's a next-day booking, validate time constraints
+    if (daysDifference === 1) {
+      const startHour = startDate.getHours()
+      const endHour = endDate.getHours()
+
+      // Business rule: Cross-day bookings only allowed from 5 PM to 12 PM next day
+      if (startHour < 17 || endHour > 12) {
+        alert('Cross-day bookings are only allowed from 5 PM to 12 PM next day')
+        return
+      }
+    }
+
+    // Check if user is logged in, redirect to login if not logged in
+    if (!user) {
+      // Redirect to login page instead of showing modal
+      router.push('/login')
+      return
+    }
+
+    // If user is logged in, continue to booking
+    handleContinueToBooking()
+  }
+
+  const handleContinueToBooking = () => {
+    // Create URL with prefilled data
+    const params = new URLSearchParams({
+      location: location.toString(),
+      people: people.toString(),
+      start: startDate!.toISOString(),
+      end: endDate!.toISOString(),
+      coWorkers: peopleBreakdown.coWorkers.toString(),
+      coTutors: peopleBreakdown.coTutors.toString(),
+      coStudents: peopleBreakdown.coStudents.toString()
+    })
+
+    router.push(`/book-now?${params.toString()}`)
+  }
+
+  // Handle people count changes - this prevents circular updates
+  const handlePeopleChange = (newPeople: number) => {
+    if (people !== newPeople) {
+      setPeople(newPeople)
+      // Only update breakdown if it's different to prevent loops
+      if (peopleBreakdown.total !== newPeople) {
+        setPeopleBreakdown(prev => ({
+          ...prev,
+          total: newPeople,
+          // Adjust coWorkers to match the new total if needed
+          coWorkers: Math.max(1, newPeople - prev.coTutors - prev.coStudents)
+        }))
+      }
+    }
+  }
+
+  // Handle breakdown changes - this prevents circular updates
+  const handleBreakdownChange = (newBreakdown: typeof peopleBreakdown) => {
+    // Only update if there's an actual change
+    if (JSON.stringify(peopleBreakdown) !== JSON.stringify(newBreakdown)) {
+      setPeopleBreakdown(newBreakdown)
+      // Only update people count if it's different to prevent loops
+      if (people !== newBreakdown.total) {
+        setPeople(newBreakdown.total)
+      }
+    }
+  }
+  const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
+  const endTimeConstraints = endDate ? getEndTimeConstraints() : getInitialEndTimeConstraints()
+
+  return (
+    <section id="BookNow" className="pt-24">
+      <div className="relative h-[600px]">
+        <Image src="/mock_img/hero-bg.png" alt="Hero" fill className="object-cover" />
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white">
+          <h1 className="text-5xl font-serif">
+            Start your unforgettable co-working journey with us.
+          </h1>
+          <p className="mt-4">Where Community meets Productivity</p>
+
+          {/*  THE WHITE BAR  */}
+          <div className="mt-8 bg-white p-6 rounded-lg flex space-x-8 items-end">
+
+            {/* LOCATION */}
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-500 uppercase mb-1">Location</label>
+              <Select
+                value={location}
+                onValueChange={setLocation}
+              >
+                <SelectTrigger className="flex h-10 w-40 items-center justify-between rounded-none border-b border-gray-300 bg-transparent px-3 py-2 text-left text-sm focus:ring-0 text-black">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bukit">Bukit Panjang</SelectItem>
+                  <SelectItem value="kovan">Kovan</SelectItem>
+                  <SelectItem value="amk">Ang Mo Kio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* PEOPLE */}
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-500 uppercase">People</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="w-32 text-black border-b border-gray-300 pb-1 text-left focus:outline-none"
+                  >
+                    {people} {people === 1 ? 'Person' : 'People'}
+                    {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓
+                      </div>
+                    ) : null}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="bottom" className="w-auto">
+                  <PeopleSelector
+                    value={people}
+                    min={1}
+                    max={15}
+                    onChange={handlePeopleChange}
+                    showBreakdown={true}
+                    onBreakdownChange={handleBreakdownChange}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* DATE & TIME RANGE */}
+            <div className="flex space-x-6">
+              {/* From */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 uppercase mb-1">From</label>
+                {/* For START date picker: */}
+                <DatePicker
+                  selected={startDate}
+                  onChange={handleStartChange}
+                  selectsStart
+                  startDate={startDate}
+                  endDate={endDate}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  placeholderText="Start"
+                  className="w-48 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                  minDate={new Date()}
+                  maxDate={maxBookingDate}
+                  {...getStartTimeConstraints()}
+                />
+              </div>
+
+              {/* To */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 uppercase mb-1">To</label>
+                {/* For END date picker */}
+                <DatePicker
+                  selected={endDate}
+                  onChange={setEndDate}
+                  selectsEnd
+                  startDate={startDate}
+                  endDate={endDate}
+                  minDate={endMinDate}
+                  maxDate={endMaxDate}
+                  // maxDate={startDate}
+                  // only allow same-day selection:
+                  // filterDate={(d) => startDate ? isSameDay(d, startDate) : true}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  placeholderText="End"
+                  className="w-48 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                  // // enforce time > start
+                  // minTime={startDate || undefined}
+                  // maxTime={startDate ? endOfDay(startDate) : undefined}
+                  disabled={!startDate} // Disable until start date is selected
+                  {...endTimeConstraints}
+                />
+              </div>
+            </div>
+
+            {/* BOOK BUTTON */}
+            <Button
+              onClick={handleBookNow}
+              className="bg-orange-500 text-white ml-auto transition-colors duration-200"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : 'Book Now →'}
+            </Button>
+          </div>
+
+          {/* Helper text for cross-day bookings */}
+          {startDate && (
+            <div className="mt-4 text-sm text-white/80 max-w-md text-center">
+              <p>💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)</p>
+              <p>Bookings are limited to 2 months in advance</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}

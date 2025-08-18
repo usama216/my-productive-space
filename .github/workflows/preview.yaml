@@ -1,0 +1,216 @@
+# name: Vercel Preview Deployment
+
+# env:
+#   VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+#   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_PREVIEW }}
+#   VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+
+# on:
+#   push:
+#     branches-ignore:
+#       - main
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+
+#       - name: Install & Test
+#         run: |
+#           cd frontend
+#           npm ci
+#           npm run test:prod
+          
+
+#   deploy-preview:
+#     needs: test
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+
+#       - name: Install Vercel CLI
+#         run: |
+#           cd frontend
+#           npm install --global vercel
+
+#       - name: Pull Vercel Environment
+#         run: |
+#           cd frontend
+#           vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+
+#       - name: Build Project Artifacts
+#         run: |
+#           vercel build --token=$VERCEL_TOKEN
+
+#       - name: Deploy Preview
+#         run: |
+#           cd frontend
+#           vercel deploy --prebuilt --token=$VERCEL_TOKEN
+
+
+# #############Test preview scritps################
+# name: Vercel Preview Deployment
+# # any push except main -> run preview
+# on:
+#   push:
+#     branches-ignore:
+#       - main
+
+# # run all `run:` commands from ./frontend
+# # defaults:
+# #   run:
+# #     working-directory: frontend
+
+# env:
+#   VERCEL_ORG_ID:      ${{ secrets.VERCEL_ORG_ID }}
+#   VERCEL_PROJECT_ID:  ${{ secrets.VERCEL_PROJECT_ID_PREVIEW }}
+#   VERCEL_TOKEN:       ${{ secrets.VERCEL_TOKEN }}
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         working-directory: frontend
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+
+#       - name: Install dependencies
+#         run: npm ci
+
+#       - name: Run tests
+#         run: npm test
+
+#   deploy-preview:
+#     needs: test
+#     runs-on: ubuntu-latest
+
+#     defaults:
+#       run:
+#         working-directory: frontend
+
+#     steps:
+#       - uses: actions/checkout@v3
+      
+#       # install Node so `npm` and `vercel` work
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+
+#       - name: Install Vercel CLI
+#         run: npm install --global vercel
+      
+#       # Create .vercel directory with project configuration
+#       - name: Setup Vercel Project Configuration
+#         run: |
+#           mkdir -p .vercel
+#           cat > .vercel/project.json <<EOF
+#           {
+#             "orgId": "${{ env.VERCEL_ORG_ID }}",
+#             "projectId": "${{ env.VERCEL_PROJECT_ID }}"
+#           }
+#           EOF
+      
+#       # # Clean out any old project metadata
+#       # - name: Remove stale Vercel link and metadata
+#       #   run: |
+#       #     rm -rf .vercel
+#       #     rm -rf frontend/.vercel
+
+#       # - name: Link Vercel Project
+#       #   run: |
+#       #     vercel link \
+#       #       --token=$VERCEL_TOKEN \
+#       #       --project=$VERCEL_PROJECT_ID \
+#       #       --yes
+
+#       # Deploy directly without linking - let Vercel use env vars
+#       - name: Pull Vercel Environment Information
+#         run: |
+#           vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+
+#       # - name: “Where am I?”
+#       #   run: |
+#       #     pwd
+#       #     ls -R .
+
+#       - name: Build Project Artifacts
+#         run: |
+#           vercel build --token=$VERCEL_TOKEN
+      
+#       # Deploy the built project
+#       - name: Deploy to Vercel Preview
+#         run: |
+#           echo "::group::Deploying to Vercel..."
+#           vercel deploy --prebuilt --token=$VERCEL_TOKEN | tee deployment-url.txt
+#           echo "::endgroup::"
+#           echo "✅ Preview deployment successful!"
+#           echo "Preview deployed to:"
+#           echo "📎 Preview URL: $(cat deployment-url.txt)"
+# #############################
+# name: Vercel Preview Deployment
+
+# env:
+#   VERCEL_ORG_ID:      ${{ secrets.VERCEL_ORG_ID }}
+#   VERCEL_PROJECT_ID:  ${{ secrets.VERCEL_PROJECT_ID_PREVIEW }}
+#   VERCEL_TOKEN:       ${{ secrets.VERCEL_TOKEN }}
+
+# on:
+#   push:
+#     branches-ignore:
+#       - main
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+#       - name: Install & Test
+#         run: |
+#           cd frontend
+#           npm ci
+#           npm run test:prod
+
+#   deploy-preview:
+#     needs: test
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+
+#       - name: Install Vercel CLI
+#         run: |
+#           cd frontend
+#           npm install --global vercel
+
+#       - name: Pull Vercel Env
+#         run: |
+#           cd frontend
+#           vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+
+#       - name: Build
+#         run: |
+#           cd frontend
+#           vercel build --token=$VERCEL_TOKEN
+
+#       - name: Deploy Preview
+#         run: |
+#           cd frontend
+#           vercel deploy --prebuilt --token=$VERCEL_TOKEN   
