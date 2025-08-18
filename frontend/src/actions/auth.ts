@@ -2,7 +2,7 @@
 "use server"
 
 import { createClient } from "@/auth/server"
-import { prisma } from "@/db/prisma"
+import  prisma  from "@/db/prisma"
 import { PhoneNumberUtil } from 'google-libphonenumber'
 
 const phoneUtil = PhoneNumberUtil.getInstance()
@@ -101,7 +101,7 @@ export const signUpAction = async (
           contactNumber,
           memberType
         },
-        captchaToken
+        captchaToken,
       }
     })
 
