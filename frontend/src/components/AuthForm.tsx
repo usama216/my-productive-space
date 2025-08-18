@@ -38,13 +38,13 @@ export function AuthForm({ type }: Props) {
   const isLoginForm = type === 'login'
   const router = useRouter()
   const { toast } = useToast()
-
+  
   // Form state
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [signupStep, setSignupStep] = useState(1)
   const [phoneTouched, setPhoneTouched] = useState(false)
-
+  
   // hCaptcha
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const hcaptchaRef = useRef<HCaptcha>(null)
@@ -114,7 +114,7 @@ export function AuthForm({ type }: Props) {
 
   const handleBasicSignup = (e: React.FormEvent) => {
     e.preventDefault()
-
+    
     if (!captchaToken) {
       toast({
         title: "Error",
@@ -133,16 +133,16 @@ export function AuthForm({ type }: Props) {
       })
       return
     }
-
+    
     if (signupData.password !== signupData.confirmPassword) {
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Passwords do not match",
         variant: "destructive",
       })
       return
     }
-
+    
     if (signupData.password.length < 6) {
       toast({
         title: "Error",
@@ -151,7 +151,7 @@ export function AuthForm({ type }: Props) {
       })
       return
     }
-
+    
     if (!signupData.acceptedTerms) {
       toast({
         title: "Error",
@@ -209,7 +209,7 @@ export function AuthForm({ type }: Props) {
             contactNumber: signupData.contactNumber,
             memberType: signupData.memberType
           },
-          captchaToken,
+          captchaToken
         }
       })
 
@@ -235,7 +235,12 @@ export function AuthForm({ type }: Props) {
       <form onSubmit={handleBasicSignup}>
         <CardContent className="grid w-full items-center gap-4">
           {/* hCaptcha */}
-
+          <HCaptcha
+            ref={hcaptchaRef}
+            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+            onVerify={setCaptchaToken}
+            onError={(err) => console.error('hCaptcha error:', err)}
+          />
 
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="signup-email">Email</Label>
@@ -310,23 +315,17 @@ export function AuthForm({ type }: Props) {
               </Link>
             </Label>
           </div>
-          <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
         </CardContent>
 
         <CardFooter className="mt-4 flex flex-col gap-6">
-          <Button
-            type="submit"
+          <Button 
+            type="submit" 
             className="w-full bg-orange-500 hover:bg-orange-600"
             disabled={loading || !captchaToken}
           >
             {loading ? <Loader2 className="animate-spin" /> : "Continue"}
           </Button>
-
+          
           <p className="text-xs">
             Already have an account?{' '}
             <Link
@@ -347,7 +346,12 @@ export function AuthForm({ type }: Props) {
       <form onSubmit={handleFullSignup}>
         <CardContent className="grid w-full items-center gap-4">
           {/* hCaptcha */}
-
+          <HCaptcha
+            ref={hcaptchaRef}
+            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+            onVerify={setCaptchaToken}
+            onError={(err) => console.error('hCaptcha error:', err)}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -423,14 +427,6 @@ export function AuthForm({ type }: Props) {
               </SelectContent>
             </Select>
           </div>
-
-          <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
-
         </CardContent>
 
         <CardFooter className="mt-4 flex flex-col gap-6">
@@ -472,7 +468,12 @@ export function AuthForm({ type }: Props) {
     <form onSubmit={handleLogin}>
       <CardContent className="grid w-full items-center gap-4">
         {/* hCaptcha */}
-
+        <HCaptcha
+          ref={hcaptchaRef}
+          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
+          onVerify={setCaptchaToken}
+          onError={(err) => console.error('hCaptcha error:', err)}
+        />
 
         <div className="flex flex-col space-y-1.5">
           <Label htmlFor="login-email">Email</Label>
@@ -542,12 +543,6 @@ export function AuthForm({ type }: Props) {
           />
           <Label htmlFor="remember-me" className="text-sm">Remember me</Label>
         </div>
-        <HCaptcha
-          ref={hcaptchaRef}
-          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-          onVerify={setCaptchaToken}
-          onError={(err) => console.error('hCaptcha error:', err)}
-        />
       </CardContent>
 
       <CardFooter className="mt-4 flex flex-col gap-6">

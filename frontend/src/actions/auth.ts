@@ -101,7 +101,7 @@ export const signUpAction = async (
           contactNumber,
           memberType
         },
-        captchaToken,
+        captchaToken
       }
     })
 
