@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar'
 import { ContactSection } from '@/components/landing-page-sections/ContactSection'
 import { Tab } from '@headlessui/react'
 import { Carousel } from '@/components/Carousel'
+import { useRouter } from 'next/navigation'
 const rateHeaders = ['1 hr', '> 1 hr']
 const rateRows = [
   { label: 'Student', values: ['3', '3'] },
@@ -69,6 +70,7 @@ const perks = [
 ]
 
 export default function CoTutorPage() {
+  const router = useRouter()
   return (
     <>
       <Navbar />
@@ -240,7 +242,10 @@ export default function CoTutorPage() {
                                        <li key={d}>{d}</li>
                                      ))}
                                    </ul>
-                                   <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded">
+                                   <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded"
+                      onClick={() => router.push(`/buy-pass?package=${encodeURIComponent(pkg.title)}&type=colearn`)}
+                                   
+                                   >
                                      Buy Now
                                    </button>
                                  </div>

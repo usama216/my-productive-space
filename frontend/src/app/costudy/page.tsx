@@ -8,6 +8,7 @@ import { Tab } from '@headlessui/react'
 import { Carousel } from '@/components/Carousel'
 
 import { ContactSection } from '@/components/landing-page-sections/ContactSection'
+import { useRouter } from 'next/navigation'
 const rateHeaders = ['1 hr', '> 1 hr']
 const rateRows = [
   { label: 'Student', values: ['3', '3'] },
@@ -58,7 +59,7 @@ export default function CoLearningPage() {
   //   { label: 'Productive Session (4h)', price: 'SGD 55.00' },
   //   { label: 'Day–Night Session (12h)', price: 'SGD 150.00' },
   // ]
-
+const router = useRouter()
   const packages = [
     {
       title: 'Student Semester Bundle',
@@ -249,7 +250,10 @@ export default function CoLearningPage() {
                                        <li key={d}>{d}</li>
                                      ))}
                                    </ul>
-                                   <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded">
+                                   <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded"
+                      onClick={() => router.push(`/buy-pass?package=${encodeURIComponent(pkg.title)}&type=costudy`)}
+                                   
+                                   >
                                      Buy Now
                                    </button>
                                  </div>
