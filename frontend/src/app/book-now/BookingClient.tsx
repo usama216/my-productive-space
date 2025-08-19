@@ -35,6 +35,7 @@ import { StudentValidation } from '@/components/book-now-sections/StudentValidat
 
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
+import { getApiUrl } from '@/lib/config'
 
 // Test voucher constants
 const TEST_VOUCHERS = {
@@ -355,10 +356,14 @@ export default function BookingClient() {
     }
   }
 
-  const handleStartChange = (date: Date) => {
+  const handleStartChange = (date: Date | null) => {
     setStartDate(date)
     // Clear end date when start date changes to force reselection
     setEndDate(null)
+  }
+
+  const handleEndChange = (date: Date | null) => {
+    setEndDate(date)
   }
 
   // Get constraints for end date selection
@@ -544,18 +549,71 @@ export default function BookingClient() {
       alert(validation.message)
       return
     }
-    // Log selected seats before you eventually wire up your real booking API:
-    console.log('Booking these seats:', selectedSeats)
-    console.log('Applied voucher:', appliedVoucher)
-    console.log('Selected package:', selectedPackage)
-    console.log('Validated students:', validatedStudents)
+
     setIsLoading(true)
 
-    // Simulate API call for payment HITPAY INTEGRATION
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      // Prepare booking payload
+      const locationData = locations.find(loc => loc.id === location)
+      const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : 
+                        peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+      
+      const bookingPayload = {
+        userId: user.id,
+        location: locationData?.name || location,
+        startAt: startDate?.toISOString(),
+        endAt: endDate?.toISOString(),
+        specialRequests: specialRequests || null,
+        seatNumbers: selectedSeats,
+        pax: people,
+        students: peopleBreakdown.coStudents,
+        members: peopleBreakdown.coWorkers,
+        tutors: peopleBreakdown.coTutors,
+        totalCost: total,
+        discountId: appliedVoucher?.id || null,
+        totalAmount: total,
+        memberType: memberType,
+        // memberType: 'STUDENT',
+        bookedForEmails: [customerEmail],
+        confirmedPayment: false,
+         bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
+        paymentId: null,
+        bookedAt: new Date().toISOString()
+      }
+
+      // Call the create booking API
+      const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
+
+      // Call the create booking API
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create booking')
+      }
+
+      const result = await response.json()
+      console.log('Booking created successfully:', result)
+      
+      // Store booking data for payment step
+      // You might want to store this in state or context
+      localStorage.setItem('currentBooking', JSON.stringify(result.booking))
+      
+      // Move to payment step
       setBookingStep(2)
-    }, 2000)
+      
+    } catch (error) {
+      console.error('Error creating booking:', error)
+      alert(`Failed to create booking: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
 
@@ -726,7 +784,7 @@ export default function BookingClient() {
                           {/* Get end time constraints */}
                           <DatePicker
                             selected={endDate}
-                            onChange={setEndDate}
+                            onChange={handleEndChange}
                             selectsEnd
                             startDate={startDate}
                             endDate={endDate}
