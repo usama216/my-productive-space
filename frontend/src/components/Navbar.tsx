@@ -75,6 +75,8 @@ export default function Navbar() {
     }
   }
 
+  console.log('first', user)
+
   return (
     <nav className="fixed top-0 left-0 right-0 bg-[#efefe7]/80 backdrop-blur z-50">
       <div className="container mx-auto max-w-7xl px-6 flex items-center justify-between py-4">
@@ -128,36 +130,44 @@ export default function Navbar() {
           {authLoading ? (
             <Loader2 className="animate-spin h-5 w-5" />
           ) : user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Image
-                  src={avatarUrl}
-                  alt="Profile"
-                  width={32}
-                  height={32}
-                  className="rounded-full cursor-pointer"
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard">Dashboard</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleLogout}
-                  disabled={logoutLoading}
-                  className="cursor-pointer"
-                >
-                  {logoutLoading ? (
-                    <div className="flex items-center">
-                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                      Logging out...
-                    </div>
-                  ) : (
-                    "Logout"
-                  )}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <div className="flex items-center gap-2 cursor-pointer">
+      <Image
+        src={avatarUrl}
+        alt="Profile"
+        width={32}
+        height={32}
+        className="rounded-full"
+      />
+<span className="text-sm font-medium">
+  {user?.user_metadata?.firstName && user?.user_metadata?.lastName
+    ? `${user.user_metadata.firstName} ${user.user_metadata.lastName}`
+    : "User"}
+</span>
+    </div>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent align="end">
+    <DropdownMenuItem asChild>
+      <Link href="/dashboard">Dashboard</Link>
+    </DropdownMenuItem>
+    <DropdownMenuItem
+      onClick={handleLogout}
+      disabled={logoutLoading}
+      className="cursor-pointer"
+    >
+      {logoutLoading ? (
+        <div className="flex items-center">
+          <Loader2 className="animate-spin h-4 w-4 mr-2" />
+          Logging out...
+        </div>
+      ) : (
+        "Logout"
+      )}
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+
           ) : (
             <>
               <Button variant="ghost" asChild>

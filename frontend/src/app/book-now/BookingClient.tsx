@@ -977,7 +977,7 @@ export default function BookingClient() {
                         className="w-full bg-orange-500 hover:bg-orange-600"
                         disabled={
                           !isFormValid ||
-                          (entitlementMode === 'package' && !selectedPackage) ||
+                          // (entitlementMode === 'package' && !selectedPackage) ||
                           (entitlementMode === 'promo' && !promoValid) ||
                           isLoading ||
                           !user
@@ -1012,7 +1012,7 @@ export default function BookingClient() {
                       <h3 className="text-lg font-medium">Payment Information</h3>
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <p className="text-sm text-gray-600 mb-4">
-                          hitpay demo integration here...
+                       
                           <PaymentStep
                             subtotal={subtotal}
                             tax={tax}
@@ -1026,12 +1026,12 @@ export default function BookingClient() {
                             onComplete={() => setBookingStep(3)}
                           />
                         </p>
-                        <Button
+                        {/* <Button
                           onClick={() => setBookingStep(3)}
                           className="w-full bg-orange-500 hover:bg-orange-600"
                         >
                           Complete Booking (Demo)
-                        </Button>
+                        </Button> */}
                       </div>
                     </div>
 

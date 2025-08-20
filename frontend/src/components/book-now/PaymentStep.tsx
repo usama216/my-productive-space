@@ -67,7 +67,7 @@ export default function PaymentStep({
   
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-medium">Payment</h3>
+      {/* <h3 className="text-lg font-medium">Payment</h3> */}
 
       <Card>
         <CardContent className="space-y-2 pt-4">
