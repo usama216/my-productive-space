@@ -13,6 +13,7 @@ type Props = {
   appliedVoucher?: { code: string } | null
   selectedPackage?: string
   customer: { name: string; email: string; phone: string }
+  bookingId?: string // Add booking ID for confirmation
   onBack: () => void
   onComplete: () => void
 }
@@ -25,17 +26,17 @@ export default function PaymentStep({
   appliedVoucher,
   selectedPackage,
   customer,
+  bookingId,
   onBack,
   onComplete,
 }: Props) {
   const [loading, setLoading] = useState(false)
 
-
   const handlePay = async () => {
     setLoading(true)
     try {
-      const redirectUrl = `${window.location.origin}${window.location.pathname}${window.location.search}&step=3`
-
+      // Include booking ID in the redirect URL for confirmation
+      const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&bookingId=${bookingId}`
 
       const body = {
         amount: total.toFixed(2),
@@ -43,10 +44,9 @@ export default function PaymentStep({
         email: customer.email,
         name: customer.name,
         purpose: 'Test Order Payment for My Productive Space',
-        reference_number: 'ORDER123',
+        reference_number: `BOOKING_${bookingId || 'DEMO'}`,
         redirect_url: redirectUrl,
         webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
-
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {

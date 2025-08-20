@@ -35,7 +35,6 @@ import { StudentValidation } from '@/components/book-now-sections/StudentValidat
 
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
-import { getApiUrl } from '@/lib/config'
 
 // Test voucher constants
 const TEST_VOUCHERS = {
@@ -120,10 +119,13 @@ export default function BookingClient() {
   const [studentsValidated, setStudentsValidated] = useState(false)
   const [validatedStudents, setValidatedStudents] = useState<any[]>([])
   useEffect(() => {
-  if (searchParams.get('step') === '3') {
-    setBookingStep(3)
-  }
-}, [searchParams])
+    if (searchParams.get('step') === '3') {
+      setBookingStep(3)
+    }
+  }, [searchParams])
+
+
+
   // A quick demo layout matching your SVG coords:
   const DEMO_LAYOUT: SeatMeta[] = [
     // ← Left column (near T1–T4)
@@ -252,9 +254,70 @@ export default function BookingClient() {
   // UI state
   const [isLoading, setIsLoading] = useState(false)
   const [bookingStep, setBookingStep] = useState(1) // 1: Details, 2: Payment, 3: Confirmation
+  const [bookingId, setBookingId] = useState<string | null>(null) // Store the created booking ID
+  const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
 
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
+
+  // Function to confirm booking
+  const confirmBooking = useCallback(async () => {
+    try {
+      setConfirmationStatus('loading')
+      setConfirmationError(null)
+      
+      // Get booking ID from URL params or state
+      const urlBookingId = searchParams.get('bookingId')
+      const currentBookingId = urlBookingId || bookingId
+      
+      if (!currentBookingId) {
+        throw new Error('No booking ID found for confirmation')
+      }
+
+                // Call the confirm booking API
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              bookingId: currentBookingId
+            })
+          })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to confirm booking')
+      }
+
+      const result = await response.json()
+      console.log('Booking confirmed successfully:', result)
+      
+      // Store the confirmed booking data
+      setConfirmedBookingData(result.booking)
+      
+      // Update local storage with confirmed booking
+      const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
+      const updatedBooking = { ...currentBooking, confirmedPayment: true, status: 'confirmed' }
+      localStorage.setItem('currentBooking', JSON.stringify(updatedBooking))
+      
+      setConfirmationStatus('success')
+      
+    } catch (error) {
+      console.error('Error confirming booking:', error)
+      setConfirmationStatus('error')
+      setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm booking')
+    }
+  }, [searchParams, bookingId])
+
+  // Handle booking confirmation when step 3 loads
+  useEffect(() => {
+    if (bookingStep === 3) {
+      confirmBooking()
+    }
+  }, [bookingStep, searchParams, bookingId])
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -308,36 +371,9 @@ export default function BookingClient() {
 
     setPeopleBreakdown({ coWorkers: cW, coTutors: cT, coStudents: cS, total })
     setPeople(total)
-
-
-    // // Set breakdown if any of the parameters do not exist
-    // if (!coWorkers || !coTutors || !coStudents) {
-    //   const newBreakdown = {
-    //     coWorkers: coWorkersParam ? parseInt(coWorkersParam) : 1,
-    //     coTutors: coTutorsParam ? parseInt(coTutorsParam) : 0,
-    //     coStudents: coStudentsParam ? parseInt(coStudentsParam) : 0,
-    //     total: 0
-    //   }
-    //   newBreakdown.total = newBreakdown.coWorkers + newBreakdown.coTutors + newBreakdown.coStudents
-    //   setPeopleBreakdown(newBreakdown)
-
-    //   // Set people count to match breakdown total when loading from URL
-    //   setPeople(newBreakdown.total)
-    // }
-    // else{
-    //   setPeopleBreakdown({ coWorkers: cW, coTutors: cT, coStudents: cS, total })
-    //   setPeople(total)
-
-    // }
   }, [searchParams])
 
 
-
-  // useEffect(() => {
-  //   if (peopleBreakdown.total !== people) {
-  //     setPeople(peopleBreakdown.total)
-  //   }
-  // }, [peopleBreakdown.total, people])
   const handlePeopleChange = (newPeople: number) => {
     setPeople(newPeople)
     if (peopleBreakdown.total !== newPeople) {
@@ -601,9 +637,11 @@ export default function BookingClient() {
       const result = await response.json()
       console.log('Booking created successfully:', result)
       
+      // Store the booking ID for payment and confirmation
+      setBookingId(result.booking?.id || result.id)
+      
       // Store booking data for payment step
-      // You might want to store this in state or context
-      localStorage.setItem('currentBooking', JSON.stringify(result.booking))
+      localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
       
       // Move to payment step
       setBookingStep(2)
@@ -983,6 +1021,7 @@ export default function BookingClient() {
                             appliedVoucher={appliedVoucher}
                             selectedPackage={selectedPackage}
                             customer={{ name: customerName, email: customerEmail, phone: customerPhone }}
+                            bookingId={bookingId || undefined}
                             onBack={() => setBookingStep(1)}
                             onComplete={() => setBookingStep(3)}
                           />
@@ -1000,24 +1039,85 @@ export default function BookingClient() {
 
                   {bookingStep === 3 && (
                     <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
-                      <p className="text-gray-600 mb-6">
-                        Your booking has been confirmed. You will receive a confirmation email shortly.
-                      </p>
-                      <div className="bg-gray-50 p-4 rounded-lg text-left">
-                        <p className="text-sm text-gray-600">Booking Reference: #BK{Date.now().toString().slice(-6)}</p>
-                      </div>
-                      <Button
-                        onClick={() => router.push('/dashboard')}
-                        className="mt-6 bg-orange-500 hover:bg-orange-600"
-                      >
-                        View My Bookings
-                      </Button>
+                      {confirmationStatus === 'loading' && (
+                        <>
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirming Your Booking...</h3>
+                          <p className="text-gray-600 mb-6">
+                            Please wait while we confirm your booking.
+                          </p>
+                        </>
+                      )}
+
+                      {confirmationStatus === 'error' && (
+                        <>
+                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirmation Failed</h3>
+                          <p className="text-red-600 mb-4">
+                            {confirmationError || 'An error occurred while confirming your booking.'}
+                          </p>
+                          <div className="space-y-3">
+                            <Button
+                              onClick={() => {
+                                setConfirmationStatus('idle')
+                                setConfirmationError(null)
+                                confirmBooking()
+                              }}
+                              className="bg-orange-500 hover:bg-orange-600"
+                            >
+                              Try Again
+                            </Button>
+                            <Button
+                              onClick={() => router.push('/dashboard')}
+                              variant="outline"
+                              className="ml-3"
+                            >
+                              Go to Dashboard
+                            </Button>
+                          </div>
+                        </>
+                      )}
+
+                      {confirmationStatus === 'success' && (
+                        <>
+                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
+                          <p className="text-gray-600 mb-6">
+                            Your booking has been confirmed. You will receive a confirmation email shortly.
+                          </p>
+                          <div className="bg-gray-50 p-4 rounded-lg text-left">
+                            <p className="text-sm text-gray-600">
+                              Booking Reference: {(() => {
+                                try {
+                                  const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
+                                  return currentBooking.bookingRef || `#BK${Date.now().toString().slice(-6)}`
+                                } catch {
+                                  return `#BK${Date.now().toString().slice(-6)}`
+                                }
+                              })()}
+                            </p>
+                            {bookingId && (
+                              <p className="text-sm text-gray-600 mt-1">Booking ID: {bookingId}</p>
+                            )}
+                          </div>
+                          <Button
+                            onClick={() => router.push('/dashboard')}
+                            className="mt-6 bg-orange-500 hover:bg-orange-600"
+                          >
+                            View My Bookings
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -1040,86 +1140,158 @@ export default function BookingClient() {
                       <p className="text-xs text-orange-700 mt-1">Sign in to view pricing</p>
                     </div>
                   )}
-                  {selectedLocation && user && (
-                    <div className="space-y-3">
-                      <div className="flex items-start space-x-3">
-                        <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="font-medium">{selectedLocation.name}</p>
-                          <p className="text-sm text-gray-600">{selectedLocation.address}</p>
-                        </div>
-                      </div>
+                                     {confirmedBookingData ? (
+                     // Show confirmed booking data
+                     <div className="space-y-3">
+                       <div className="flex items-start space-x-3">
+                         <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                         <div>
+                           <p className="font-medium">{confirmedBookingData.location}</p>
+                           <p className="text-sm text-gray-600">Confirmed Booking</p>
+                         </div>
+                       </div>
 
-                      <div className="flex items-center space-x-3">
-                        <Users className="w-5 h-5 text-gray-400" />
-                        <span>{people} {people === 1 ? 'Person' : 'People'}</span>
-                      </div>
+                       <div className="flex items-center space-x-3">
+                         <Users className="w-5 h-5 text-gray-400" />
+                         <span>{confirmedBookingData.pax} {confirmedBookingData.pax === 1 ? 'Person' : 'People'}</span>
+                       </div>
 
-                      {startDate && endDate && (
-                        <div className="flex items-center space-x-3">
-                          <Clock className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm">
-                              {startDate.toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                              {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                       <div className="flex items-center space-x-3">
+                         <Clock className="w-5 h-5 text-gray-400" />
+                         <div>
+                           <p className="text-sm">
+                             {new Date(confirmedBookingData.startAt).toLocaleDateString()}
+                           </p>
+                           <p className="text-sm text-gray-600">
+                             {new Date(confirmedBookingData.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                             {new Date(confirmedBookingData.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                           </p>
+                         </div>
+                       </div>
 
-                  {totalHours > 0 && user && (
-                    <div className="border-t pt-4 space-y-2">
-                      <div className="flex justify-between">
-                        <span>Rate (${selectedLocation?.price}/hour)</span>
-                        <span>${selectedLocation?.price}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Duration</span>
-                        <span>{totalHours} hours</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>People</span>
-                        <span>{people}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Base Subtotal</span>
-                        <span>${baseSubtotal}</span>
-                      </div>
+                       {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
+                         <div className="flex items-center space-x-3">
+                           <div className="w-5 h-5 text-gray-400">🪑</div>
+                           <span className="text-sm">Seats: {confirmedBookingData.seatNumbers.join(', ')}</span>
+                         </div>
+                       )}
 
-                      {/* Show discount if applied */}
-                      {appliedVoucher && discountAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Discount ({appliedVoucher.code})</span>
-                          <span>-${discountAmount.toFixed(2)}</span>
-                        </div>
-                      )}
+                       {confirmedBookingData.specialRequests && (
+                         <div className="flex items-start space-x-3">
+                           <div className="w-5 h-5 text-gray-400">📝</div>
+                           <div>
+                             <p className="text-sm font-medium">Special Requests</p>
+                             <p className="text-sm text-gray-600">{confirmedBookingData.specialRequests}</p>
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   ) : selectedLocation && user ? (
+                     // Show form data when not yet confirmed
+                     <div className="space-y-3">
+                       <div className="flex items-start space-x-3">
+                         <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                         <div>
+                           <p className="font-medium">{selectedLocation.name}</p>
+                           <p className="text-sm text-gray-600">{selectedLocation.address}</p>
+                         </div>
+                       </div>
 
-                      {selectedPackage && (
-                        <div className="flex justify-between text-blue-600">
-                          <span>Package Applied</span>
-                          <span>Pass Used</span>
-                        </div>
-                      )}
+                       <div className="flex items-center space-x-3">
+                         <Users className="w-5 h-5 text-gray-400" />
+                         <span>{people} {people === 1 ? 'Person' : 'People'}</span>
+                       </div>
 
-                      <div className="flex justify-between">
-                        <span>Subtotal</span>
-                        <span>${subtotal}</span>
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>GST (9%)</span>
-                        <span>${tax.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-lg border-t pt-2">
-                        <span>Total</span>
-                        <span>${total.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  )}
+                       {startDate && endDate && (
+                         <div className="flex items-center space-x-3">
+                           <Clock className="w-5 h-5 text-gray-400" />
+                           <div>
+                             <p className="text-sm">
+                               {startDate.toLocaleDateString()}
+                             </p>
+                             <p className="text-sm text-gray-600">
+                               {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                               {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                             </p>
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   ) : null}
+
+                                     {confirmedBookingData ? (
+                     // Show confirmed booking pricing
+                     <div className="border-t pt-4 space-y-2">
+                       <div className="flex justify-between">
+                         <span>Booking Reference</span>
+                         <span className="font-mono text-sm">{confirmedBookingData.bookingRef}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>Member Type</span>
+                         <span className="capitalize">{confirmedBookingData.memberType.toLowerCase()}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>Total Amount</span>
+                         <span className="font-bold">${confirmedBookingData.totalAmount.toFixed(2)}</span>
+                       </div>
+                       <div className="flex justify-between text-sm text-gray-600">
+                         <span>Status</span>
+                         <span className="text-green-600 font-medium">✓ Confirmed</span>
+                       </div>
+                       <div className="flex justify-between text-sm text-gray-600">
+                         <span>Confirmed At</span>
+                         <span>{new Date(confirmedBookingData.updatedAt).toLocaleString()}</span>
+                       </div>
+                     </div>
+                   ) : totalHours > 0 && user ? (
+                     // Show form pricing when not yet confirmed
+                     <div className="border-t pt-4 space-y-2">
+                       <div className="flex justify-between">
+                         <span>Rate (${selectedLocation?.price}/hour)</span>
+                         <span>${selectedLocation?.price}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>Duration</span>
+                         <span>{totalHours} hours</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>People</span>
+                         <span>{people}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>Base Subtotal</span>
+                         <span>${baseSubtotal}</span>
+                       </div>
+
+                       {/* Show discount if applied */}
+                       {appliedVoucher && discountAmount > 0 && (
+                         <div className="flex justify-between text-green-600">
+                           <span>Discount ({appliedVoucher.code})</span>
+                           <span>-${discountAmount.toFixed(2)}</span>
+                         </div>
+                       )}
+
+                       {selectedPackage && (
+                         <div className="flex justify-between text-blue-600">
+                           <span>Package Applied</span>
+                           <span>Pass Used</span>
+                         </div>
+                       )}
+
+                       <div className="flex justify-between">
+                         <span>Subtotal</span>
+                         <span>${subtotal}</span>
+                       </div>
+                       <div className="flex justify-between text-sm text-gray-600">
+                         <span>GST (9%)</span>
+                         <span>${tax.toFixed(2)}</span>
+                       </div>
+                       <div className="flex justify-between font-bold text-lg border-t pt-2">
+                         <span>Total</span>
+                         <span>${total.toFixed(2)}</span>
+                       </div>
+                     </div>
+                   ) : null}
                 </CardContent>
               </Card>
             </div>
