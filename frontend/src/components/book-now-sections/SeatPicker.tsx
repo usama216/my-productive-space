@@ -147,7 +147,7 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
           const isDisabled = isBooked || (isMaxReached && !isSelected)
 
           const fill = isBooked
-            ? '#ccc'
+            ? '#FF0000'  // Pure red color for booked seats
             : isSelected
               ? '#f97316'
               : isDisabled

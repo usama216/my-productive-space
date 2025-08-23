@@ -114,6 +114,8 @@ export default function BookingClient() {
   const [appliedVoucher, setAppliedVoucher] = useState<typeof TEST_VOUCHERS[keyof typeof TEST_VOUCHERS] | null>(null)
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
+  const [bookedSeats, setBookedSeats] = useState<string[]>([])
+  const [isLoadingSeats, setIsLoadingSeats] = useState(false)
 
 
   const [studentsValidated, setStudentsValidated] = useState(false)
@@ -258,6 +260,8 @@ export default function BookingClient() {
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
+  const [finalTotal, setFinalTotal] = useState(0) // Will be set after total is calculated
 
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
@@ -318,6 +322,8 @@ export default function BookingClient() {
       confirmBooking()
     }
   }, [bookingStep, searchParams, bookingId])
+
+
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -543,13 +549,57 @@ export default function BookingClient() {
 
   //
 
+  // Function to fetch booked seats
+  const fetchBookedSeats = useCallback(async () => {
+    if (!location || !startDate || !endDate) {
+      setBookedSeats([])
+      return
+    }
+
+    setIsLoadingSeats(true)
+    try {
+      const locationData = locations.find(loc => loc.id === location)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          location: locationData?.name || location,
+          startAt: startDate.toISOString().replace('T', ' ').replace('Z', ''),
+          endAt: endDate.toISOString().replace('T', ' ').replace('Z', '')
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setBookedSeats(data.bookedSeats || [])
+        console.log('Booked seats fetched:', data.bookedSeats)
+      } else {
+        console.error('Failed to fetch booked seats')
+        setBookedSeats([])
+      }
+    } catch (error) {
+      console.error('Error fetching booked seats:', error)
+      setBookedSeats([])
+    } finally {
+      setIsLoadingSeats(false)
+    }
+  }, [location, startDate, endDate])
+
+  // Fetch booked seats when location, start date, or end date changes
+  useEffect(() => {
+    fetchBookedSeats()
+    // Clear selected seats when booking details change
+    setSelectedSeats([])
+  }, [fetchBookedSeats])
+
   // memoize to keep identity stable
   const handleStudentValidationChange = useCallback((allValid: boolean, students: any[]) => {
     setStudentsValidated(allValid)
     setValidatedStudents(students)
     console.log('Student validation changed:', { allValid, students })
   }, [])
-
 
 
   const selectedLocation = locations.find(loc => loc.id === location)
@@ -563,6 +613,17 @@ export default function BookingClient() {
 
   const tax = subtotal * 0.09 // 9% tax
   const total = subtotal + tax
+  
+  // Update finalTotal when total changes
+  useEffect(() => {
+    setFinalTotal(total)
+  }, [total])
+
+  // Handle payment method change
+  const handlePaymentMethodChange = (method: 'payNow' | 'creditCard', newTotal: number) => {
+    setSelectedPaymentMethod(method)
+    setFinalTotal(newTotal)
+  }
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -576,6 +637,13 @@ export default function BookingClient() {
     // Validate seat selection
     if (selectedSeats.length !== people) {
       alert(`Please select exactly ${people} seat${people !== 1 ? 's' : ''} for your booking.`)
+      return
+    }
+
+    // Check if there are enough available seats
+    const availableSeats = DEMO_LAYOUT.length - bookedSeats.length
+    if (availableSeats < people) {
+      alert(`Sorry, only ${availableSeats} seat${availableSeats !== 1 ? 's are' : ' is'} available for this time slot. Please select a different time or reduce the number of people.`)
       return
     }
 
@@ -614,6 +682,7 @@ export default function BookingClient() {
         confirmedPayment: false,
          bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
         paymentId: null,
+        // paymentMethod will be updated when user selects payment method in step 2
         bookedAt: new Date().toISOString()
       }
 
@@ -916,29 +985,49 @@ export default function BookingClient() {
                           <Label>Select Your Seat(s)</Label>
                           <p className="text-sm text-gray-600 mb-2">
                             Please select exactly {people} seat{people !== 1 ? 's' : ''} for your booking.
-                          </p>
-                          <SeatPicker
-                            layout={DEMO_LAYOUT}
-                            tables={DEMO_TABLES}
-                            labels={DEMO_LABELS}
-                            bookedSeats={[]}
-                            overlays={OVERLAYS}
-                            maxSeats={people} //Pass the number of people as max seats
-                            onSelectionChange={setSelectedSeats}
-                          />
-                          <div className="flex justify-between items-center mt-2">
-                            <p className="text-sm text-gray-600">
-                              Selected: {selectedSeats.join(', ') || 'none'}
-                            </p>
-                            {selectedSeats.length !== people && (
-                              <p className="text-sm text-orange-600">
-                                {selectedSeats.length < people
-                                  ? `Please select ${people - selectedSeats.length} more seat${people - selectedSeats.length !== 1 ? 's' : ''}`
-                                  : `Please deselect ${selectedSeats.length - people} seat${selectedSeats.length - people !== 1 ? 's' : ''}`
-                                }
-                              </p>
+                            {!isLoadingSeats && (
+                              <span className="ml-2 text-blue-600">
+                                ({DEMO_LAYOUT.length - bookedSeats.length} seats available)
+                              </span>
                             )}
-                          </div>
+                          </p>
+                          
+                          {isLoadingSeats ? (
+                            <div className="flex items-center justify-center p-8 border rounded-lg">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+                              <span className="ml-3 text-gray-600">Loading available seats...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <SeatPicker
+                                layout={DEMO_LAYOUT}
+                                tables={DEMO_TABLES}
+                                labels={DEMO_LABELS}
+                                bookedSeats={bookedSeats}
+                                overlays={OVERLAYS}
+                                maxSeats={people}
+                                onSelectionChange={setSelectedSeats}
+                              />
+                              <div className="flex justify-between items-center mt-2">
+                                <p className="text-sm text-gray-600">
+                                  Selected: {selectedSeats.join(', ') || 'none'}
+                                </p>
+                                {selectedSeats.length !== people && (
+                                  <p className="text-sm text-orange-600">
+                                    {selectedSeats.length < people
+                                      ? `Please select ${people - selectedSeats.length} more seat${people - selectedSeats.length !== 1 ? 's' : ''}`
+                                      : `Please deselect ${selectedSeats.length - people} seat${selectedSeats.length - people !== 1 ? 's' : ''}`
+                                    }
+                                  </p>
+                                )}
+                              </div>
+                              {bookedSeats.length > 0 && (
+                                <p className="text-sm text-red-600 mt-2">
+                                  ⚠️ {bookedSeats.length} seat{bookedSeats.length !== 1 ? 's are' : ' is'} already booked for this time slot
+                                </p>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
 
@@ -1024,6 +1113,7 @@ export default function BookingClient() {
                             bookingId={bookingId || undefined}
                             onBack={() => setBookingStep(1)}
                             onComplete={() => setBookingStep(3)}
+                            onPaymentMethodChange={handlePaymentMethodChange}
                           />
                         </p>
                         {/* <Button
@@ -1202,6 +1292,20 @@ export default function BookingClient() {
                          <span>{people} {people === 1 ? 'Person' : 'People'}</span>
                        </div>
 
+                       {bookingStep >= 2 && (
+                         <div className="flex items-center space-x-3">
+                           <CreditCard className="w-5 h-5 text-gray-400" />
+                           <div>
+                             <span className="text-sm font-medium">
+                               {selectedPaymentMethod === 'payNow' ? 'Pay Now (Scan & Pay)' : 'Credit Card Payment'}
+                             </span>
+                             {selectedPaymentMethod === 'creditCard' && (
+                               <p className="text-xs text-amber-600">+5% processing fee</p>
+                             )}
+                           </div>
+                         </div>
+                       )}
+
                        {startDate && endDate && (
                          <div className="flex items-center space-x-3">
                            <Clock className="w-5 h-5 text-gray-400" />
@@ -1286,9 +1390,15 @@ export default function BookingClient() {
                          <span>GST (9%)</span>
                          <span>${tax.toFixed(2)}</span>
                        </div>
+                       {selectedPaymentMethod === 'creditCard' && (
+                         <div className="flex justify-between text-amber-600">
+                           <span>Credit Card Fee (5%)</span>
+                           <span>${(total * 0.05).toFixed(2)}</span>
+                         </div>
+                       )}
                        <div className="flex justify-between font-bold text-lg border-t pt-2">
                          <span>Total</span>
-                         <span>${total.toFixed(2)}</span>
+                         <span>${finalTotal > 0 ? finalTotal.toFixed(2) : total.toFixed(2)}</span>
                        </div>
                      </div>
                    ) : null}
