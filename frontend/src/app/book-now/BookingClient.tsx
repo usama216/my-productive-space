@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { isSameDay, endOfDay, parseISO, addMonths, addDays, setHours, setMinutes } from 'date-fns'
-import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle } from 'lucide-react'
+import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -266,11 +266,26 @@ export default function BookingClient() {
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
 
+  // Helper function to check if payment failed
+  const isPaymentFailed = useCallback((status: string | null) => {
+    return status === 'canceled' || status === 'cancelled' || status === 'failed' || 
+           status === 'declined' || status === 'rejected' || status === 'expired'
+  }, [])
+
   // Function to confirm booking
   const confirmBooking = useCallback(async () => {
     try {
       setConfirmationStatus('loading')
       setConfirmationError(null)
+      
+      // Check if payment was canceled or failed
+      const paymentStatus = searchParams.get('status')
+      if (isPaymentFailed(paymentStatus)) {
+        console.log('Payment status indicates failure:', paymentStatus)
+        setConfirmationStatus('error')
+        setConfirmationError('Payment was not completed. Your booking has not been confirmed.')
+        return
+      }
       
       // Get booking ID from URL params or state
       const urlBookingId = searchParams.get('bookingId')
@@ -280,16 +295,16 @@ export default function BookingClient() {
         throw new Error('No booking ID found for confirmation')
       }
 
-                // Call the confirm booking API
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              bookingId: currentBookingId
-            })
-          })
+      // Call the confirm booking API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId: currentBookingId
+        })
+      })
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -319,6 +334,13 @@ export default function BookingClient() {
   // Handle booking confirmation when step 3 loads
   useEffect(() => {
     if (bookingStep === 3) {
+      // Check if payment was canceled or failed before attempting confirmation
+      const paymentStatus = searchParams.get('status')
+      if (isPaymentFailed(paymentStatus)) {
+        setConfirmationStatus('error')
+        setConfirmationError('Payment was not completed. Your booking has not been confirmed.')
+        return
+      }
       confirmBooking()
     }
   }, [bookingStep, searchParams, bookingId])
@@ -1148,28 +1170,63 @@ export default function BookingClient() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirmation Failed</h3>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                            {isPaymentFailed(searchParams.get('status')) ? 'Payment Not Completed' : 'Confirmation Failed'}
+                          </h3>
                           <p className="text-red-600 mb-4">
                             {confirmationError || 'An error occurred while confirming your booking.'}
                           </p>
+                          {isPaymentFailed(searchParams.get('status')) && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                              <div className="flex items-start space-x-2">
+                                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm text-amber-800">
+                                  <p className="font-medium">What happened?</p>
+                                  <p>Your payment was not completed successfully.</p>
+                                  
+                                  <p className="mt-2">Your booking has not been confirmed and no charges were made to your account.</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="space-y-3">
-                            <Button
-                              onClick={() => {
-                                setConfirmationStatus('idle')
-                                setConfirmationError(null)
-                                confirmBooking()
-                              }}
-                              className="bg-orange-500 hover:bg-orange-600"
-                            >
-                              Try Again
-                            </Button>
-                            <Button
-                              onClick={() => router.push('/dashboard')}
-                              variant="outline"
-                              className="ml-3"
-                            >
-                              Go to Dashboard
-                            </Button>
+                            {isPaymentFailed(searchParams.get('status')) ? (
+                              <>
+                                <Button
+                                  onClick={() => router.push('/')}
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                >
+                                  Try Booking Again
+                                </Button>
+                                <Button
+                                  onClick={() => router.push('/dashboard')}
+                                  variant="outline"
+                                  className="ml-3"
+                                >
+                                  Go to Dashboard
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  onClick={() => {
+                                    setConfirmationStatus('idle')
+                                    setConfirmationError(null)
+                                    confirmBooking()
+                                  }}
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                >
+                                  Try Again
+                                </Button>
+                                <Button
+                                  onClick={() => router.push('/dashboard')}
+                                  variant="outline"
+                                  className="ml-3"
+                                >
+                                  Go to Dashboard
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </>
                       )}

@@ -1,9 +1,9 @@
 // src/app/buy-pass/BuyPassClient.tsx  (Client Component)
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle } from 'lucide-react'
+import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 
@@ -111,6 +111,8 @@ export default function BuyNowPage() {
   // UI state
   const [isLoading, setIsLoading] = useState(false)
   const [purchaseStep, setPurchaseStep] = useState(1) // 1: Details, 2: Payment, 3: Confirmation
+  const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
 
 
   // Redirect to login if not authenticated
@@ -164,6 +166,40 @@ export default function BuyNowPage() {
   const tax = subtotal * 0.09 // 9% GST rn
   const total = subtotal + tax
 
+  // Helper function to check if payment failed
+  const isPaymentFailed = useCallback((status: string | null) => {
+    return status === 'canceled' || status === 'cancelled' || status === 'failed' || 
+           status === 'declined' || status === 'rejected' || status === 'expired'
+  }, [])
+
+  // Function to confirm purchase
+  const confirmPurchase = useCallback(async () => {
+    try {
+      setConfirmationStatus('loading')
+      setConfirmationError(null)
+      
+      // Check if payment was canceled or failed
+      const paymentStatus = searchParams.get('status')
+      if (isPaymentFailed(paymentStatus)) {
+        console.log('Payment status indicates failure:', paymentStatus)
+        setConfirmationStatus('error')
+        setConfirmationError('Payment was not completed. Your purchase has not been confirmed.')
+        return
+      }
+
+      // Simulate API call for purchase confirmation
+      // In a real implementation, you would call your confirm purchase API here
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      setConfirmationStatus('success')
+      
+    } catch (error) {
+      console.error('Error confirming purchase:', error)
+      setConfirmationStatus('error')
+      setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm purchase')
+    }
+  }, [searchParams, isPaymentFailed])
+
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -185,10 +221,18 @@ export default function BuyNowPage() {
   }
 
   useEffect(() => {
-  if (searchParams.get('step') === '3') {
-    setPurchaseStep(3)
-  }
-}, [searchParams])
+    if (searchParams.get('step') === '3') {
+      setPurchaseStep(3)
+      // Check if payment was canceled or failed before attempting confirmation
+      const paymentStatus = searchParams.get('status')
+      if (isPaymentFailed(paymentStatus)) {
+        setConfirmationStatus('error')
+        setConfirmationError('Payment was not completed. Your purchase has not been confirmed.')
+        return
+      }
+      confirmPurchase()
+    }
+  }, [searchParams, confirmPurchase])
 
   const isFormValid =
     selectedPackage &&
@@ -512,26 +556,109 @@ export default function BuyNowPage() {
 
                   {purchaseStep === 3 && (
                     <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h3>
-                      <p className="text-gray-600 mb-6">
-                        Your package has been activated. Check your email for activation details.
-                      </p>
-                      <div className="bg-gray-50 p-4 rounded-lg text-left space-y-2">
-                        <p className="text-sm text-gray-600">Order Reference: #PKG{Date.now().toString().slice(-6)}</p>
-                        <p className="text-sm text-gray-600">Package: {selectedPackage}</p>
-                        <p className="text-sm text-gray-600">Valid for: {currentPackage?.validity}</p>
-                      </div>
-                      <Button
-                        onClick={() => router.push('/book-now')}
-                        className="mt-6 bg-orange-500 hover:bg-orange-600"
-                      >
-                        Book Your First Session
-                      </Button>
+                      {confirmationStatus === 'loading' && (
+                        <>
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirming Your Purchase...</h3>
+                          <p className="text-gray-600 mb-6">
+                            Please wait while we confirm your purchase.
+                          </p>
+                        </>
+                      )}
+
+                      {confirmationStatus === 'error' && (
+                        <>
+                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                            {isPaymentFailed(searchParams.get('status')) ? 'Payment Not Completed' : 'Confirmation Failed'}
+                          </h3>
+                          <p className="text-red-600 mb-4">
+                            {confirmationError || 'An error occurred while confirming your purchase.'}
+                          </p>
+                          {isPaymentFailed(searchParams.get('status')) && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                              <div className="flex items-start space-x-2">
+                                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm text-amber-800">
+                                  <p className="font-medium">What happened?</p>
+                                  <p>Your payment was not completed successfully.</p>
+                                  <p className="mt-2">Your purchase has not been confirmed and no charges were made to your account.</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          <div className="space-y-3">
+                            {isPaymentFailed(searchParams.get('status')) ? (
+                              <>
+                                <Button
+                                  onClick={() => router.push('/')}
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                >
+                                  Try Purchase Again
+                                </Button>
+                                <Button
+                                  onClick={() => router.push('/dashboard')}
+                                  variant="outline"
+                                  className="ml-3"
+                                >
+                                  Go to Dashboard
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  onClick={() => {
+                                    setConfirmationStatus('idle')
+                                    setConfirmationError(null)
+                                    confirmPurchase()
+                                  }}
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                >
+                                  Try Again
+                                </Button>
+                                <Button
+                                  onClick={() => router.push('/dashboard')}
+                                  variant="outline"
+                                  className="ml-3"
+                                >
+                                  Go to Dashboard
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {confirmationStatus === 'success' && (
+                        <>
+                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h3>
+                          <p className="text-gray-600 mb-6">
+                            Your package has been activated.
+                          </p>
+                          <div className="bg-gray-50 p-4 rounded-lg text-left space-y-2">
+                            <p className="text-sm text-gray-600">Order Reference: #PKG{Date.now().toString().slice(-6)}</p>
+                            <p className="text-sm text-gray-600">Package: {selectedPackage}</p>
+                            <p className="text-sm text-gray-600">Valid for: {currentPackage?.validity}</p>
+                          </div>
+                          <Button
+                            onClick={() => router.push('/book-now')}
+                            className="mt-6 bg-orange-500 hover:bg-orange-600"
+                          >
+                            Book Your First Session
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </CardContent>
