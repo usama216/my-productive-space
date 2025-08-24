@@ -1400,9 +1400,21 @@ export default function BookingClient() {
                          <span className="text-green-600 font-medium">✓ Confirmed</span>
                        </div>
                        <div className="flex justify-between text-sm text-gray-600">
-                         <span>Confirmed At</span>
-                         <span>{new Date(confirmedBookingData.updatedAt).toLocaleString()}</span>
-                       </div>
+  <span>Confirmed At</span>
+  <span>
+    {new Date(
+      new Date(confirmedBookingData.updatedAt).getTime() + 8 * 60 * 60 * 1000
+    ).toLocaleString("en-SG", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })}
+  </span>
+</div>
+
                      </div>
                    ) : totalHours > 0 && user ? (
                      // Show form pricing when not yet confirmed
