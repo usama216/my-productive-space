@@ -25,6 +25,7 @@ type Props = {
   onBack: () => void
   onComplete: () => void
   user?: any
+  bookingId?: string // Add bookingId for package purchases
 }
 
 export default function PaymentStep({
@@ -37,7 +38,8 @@ export default function PaymentStep({
   order,
   onBack,
   onComplete,
-  user
+  user,
+  bookingId
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
@@ -71,18 +73,12 @@ export default function PaymentStep({
         email: user?.email ?? 'guest@gmail.com',  // safe access
         name: user?.user_metadata?.firstName ?? 'Guest',
         purpose: 'Test Order Payment for My Productive Space',
-        reference_number: 'ORDER123',
+        reference_number: `${bookingId || 'DEMO'}`,
         redirect_url: redirectUrl,
         webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
         payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)], // Array of strings
+        bookingId: bookingId || null, // Add bookingId field
       }
-
-      console.log('Sending payment request with:', {
-        payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)],
-        selectedPaymentMethod,
-        finalTotal
-      })
-
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

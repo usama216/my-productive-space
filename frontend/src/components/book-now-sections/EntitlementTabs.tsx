@@ -64,16 +64,16 @@ const mockActivePackages: UserPackage[] = [
     package_type: 'half-day',
     is_expired: false
   },
-  {
-    id: 'pkg3',
-    name: 'Student Semester Bundle',
-    total_passes: 20,
-    passes_used: 8,
-    purchased_at: '2025-01-10T00:00:00Z',
-    expires_at: '2025-03-10T23:59:59Z',
-    package_type: 'study-hour',
-    is_expired: false
-  }
+  // {
+  //   id: 'pkg3',
+  //   name: 'Student Semester Bundle',
+  //   total_passes: 20,
+  //   passes_used: 8,
+  //   purchased_at: '2025-01-10T00:00:00Z',
+  //   expires_at: '2025-03-10T23:59:59Z',
+  //   package_type: 'study-hour',
+  //   is_expired: false
+  // }
 ]
 
 const mockExpiredPackages: UserPackage[] = [

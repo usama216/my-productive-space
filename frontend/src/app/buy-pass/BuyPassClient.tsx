@@ -53,16 +53,16 @@ const packageDetails = {
     highlights: ['Best value for full-time workers', 'Extended hours access', 'Priority booking']
   },
   // Costudy package
-  'Student Semester Bundle': {
-    price: 129,
-    originalPrice: 180,
-    description: '20 Study-Hour Pass',
-    bonus: 'Includes 5 Project-Room Credits',
-    validity: '60 days from activation',
-    addon: 0,
-    type: 'costudy',
-    highlights: ['Student-exclusive pricing', 'Group study room access', 'Extended validity']
-  },
+  // 'Student Semester Bundle': {
+  //   price: 129,
+  //   originalPrice: 180,
+  //   description: '20 Study-Hour Pass',
+  //   bonus: 'Includes 5 Project-Room Credits',
+  //   validity: '60 days from activation',
+  //   addon: 0,
+  //   type: 'costudy',
+  //   highlights: ['Student-exclusive pricing', 'Group study room access', 'Extended validity']
+  // },
   // Colearn packages (same as cowork in the original files)
   'Half-Day Productivity Boost (Colearn)': {
     price: 109,
@@ -113,6 +113,7 @@ export default function BuyNowPage() {
   const [purchaseStep, setPurchaseStep] = useState(1) // 1: Details, 2: Payment, 3: Confirmation
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  const [orderId, setOrderId] = useState<string>('') // Generate unique order ID for package purchases
 
 
   // Redirect to login if not authenticated
@@ -212,6 +213,10 @@ export default function BuyNowPage() {
     }
 
     setIsLoading(true)
+
+    // Generate unique order ID for this purchase
+    const newOrderId = `PKG${Date.now().toString().slice(-6)}`
+    setOrderId(newOrderId)
 
     // Simulate API call for payments HITPAY
     setTimeout(() => {
@@ -508,6 +513,7 @@ export default function BuyNowPage() {
                         onBack={() => setPurchaseStep(1)}
                         onComplete={() => setPurchaseStep(3)}
                         user={user}
+                        bookingId={orderId} // Pass orderId as bookingId for payment API
                       />
 
                       {/* <h3 className="text-lg font-medium">Payment Method</h3>
@@ -647,7 +653,7 @@ export default function BuyNowPage() {
                             Your package has been activated.
                           </p>
                           <div className="bg-gray-50 p-4 rounded-lg text-left space-y-2">
-                            <p className="text-sm text-gray-600">Order Reference: #PKG{Date.now().toString().slice(-6)}</p>
+                            <p className="text-sm text-gray-600">Order Reference: {orderId}</p>
                             <p className="text-sm text-gray-600">Package: {selectedPackage}</p>
                             <p className="text-sm text-gray-600">Valid for: {currentPackage?.validity}</p>
                           </div>
