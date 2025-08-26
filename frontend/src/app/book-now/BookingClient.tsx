@@ -9,6 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { isSameDay, endOfDay, parseISO, addMonths, addDays, setHours, setMinutes } from 'date-fns'
+import { formatDateTimeToGMT8, formatDateToGMT8, formatTimeToGMT8 } from '@/lib/utils'
 import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -1304,18 +1305,17 @@ export default function BookingClient() {
                         <span>{confirmedBookingData.pax} {confirmedBookingData.pax === 1 ? 'Person' : 'People'}</span>
                       </div>
 
-                      <div className="flex items-center space-x-3">
-                        <Clock className="w-5 h-5 text-gray-400" />
-                        <div>
-                          <p className="text-sm">
-                            {new Date(confirmedBookingData.startAt).toLocaleDateString()}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {new Date(confirmedBookingData.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                            {new Date(confirmedBookingData.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
+                                             <div className="flex items-center space-x-3">
+                         <Clock className="w-5 h-5 text-gray-400" />
+                         <div>
+                           <p className="text-sm">
+                             {formatDateToGMT8(confirmedBookingData.startAt)}
+                           </p>
+                           <p className="text-sm text-gray-600">
+                             {formatTimeToGMT8(confirmedBookingData.startAt)} - {formatTimeToGMT8(confirmedBookingData.endAt)}
+                           </p>
+                         </div>
+                       </div>
 
                       {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
                         <div className="flex items-center space-x-3">
@@ -1364,20 +1364,19 @@ export default function BookingClient() {
                         </div>
                       )}
 
-                      {startDate && endDate && (
-                        <div className="flex items-center space-x-3">
-                          <Clock className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm">
-                              {startDate.toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                              {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                                             {startDate && endDate && (
+                         <div className="flex items-center space-x-3">
+                           <Clock className="w-5 h-5 text-gray-400" />
+                           <div>
+                             <p className="text-sm">
+                               {formatDateToGMT8(startDate)}
+                             </p>
+                             <p className="text-sm text-gray-600">
+                               {formatTimeToGMT8(startDate)} - {formatTimeToGMT8(endDate)}
+                             </p>
+                           </div>
+                         </div>
+                       )}
                     </div>
                   ) : null}
 
@@ -1403,16 +1402,7 @@ export default function BookingClient() {
                       <div className="flex justify-between text-sm text-gray-600">
                         <span>Confirmed At</span>
                         <span>
-                          {new Date(
-                            new Date(confirmedBookingData.updatedAt).getTime() + 8 * 60 * 60 * 1000
-                          ).toLocaleString("en-SG", {
-                            year: "numeric",
-                            month: "short",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: true,
-                          })}
+                          {formatDateTimeToGMT8(confirmedBookingData.updatedAt)}
                         </span>
                       </div>
 
