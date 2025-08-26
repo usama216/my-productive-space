@@ -34,7 +34,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import { EntitlementHistory } from '@/components/dashboard/EntitlementHistory'
-import { formatDateToGMT8, formatDateTimeToGMT8 } from '@/lib/utils'
 
 // Mock data types
 interface Booking {
@@ -253,7 +252,7 @@ export default function UAMDashboard() {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="flex items-center">
             <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                                    <span>{formatDateToGMT8(booking.date)}</span>
+                                    <span>{new Date(booking.date).toLocaleDateString()}</span>
           </div>
           <div className="flex items-center">
             <Clock className="w-4 h-4 mr-2 text-gray-400" />
@@ -413,7 +412,7 @@ export default function UAMDashboard() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span>Member Since</span>
-                                              <span>{formatDateToGMT8(user.joinDate)}</span>
+                                              <span>{new Date(user.joinDate).toLocaleDateString()}</span>
                     </div>
                     <Button
                       variant="outline"
@@ -663,11 +662,11 @@ export default function UAMDashboard() {
                               <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                                 <div className="flex items-center text-green-700">
                                   <Calendar className="w-4 h-4 mr-2" />
-                                  <span>Purchased: {formatDateToGMT8(pkg.purchased_at)}</span>
+                                  <span>Purchased: {new Date(pkg.purchased_at).toLocaleDateString()}</span>
                                 </div>
                                 <div className="flex items-center text-green-700">
                                   <Clock className="w-4 h-4 mr-2" />
-                                  <span>Expires: {formatDateToGMT8(pkg.expires_at)}</span>
+                                  <span>Expires: {new Date(pkg.expires_at).toLocaleDateString()}</span>
                                 </div>
                               </div>
 
@@ -740,7 +739,7 @@ export default function UAMDashboard() {
               <div className="bg-gray-50 p-4 rounded-md">
                 <h4 className="font-semibold mb-2">Booking Details:</h4>
                 <p><strong>Location:</strong> {cancellingBooking.locationName}</p>
-                <p><strong>Date:</strong> {formatDateToGMT8(cancellingBooking.date)}</p>
+                <p><strong>Date:</strong> {new Date(cancellingBooking.date).toLocaleDateString()}</p>
                 <p><strong>Time:</strong> {cancellingBooking.startTime} - {cancellingBooking.endTime}</p>
                 <p><strong>Amount:</strong> ${cancellingBooking.totalAmount}</p>
                 <p><strong>Reference:</strong> {cancellingBooking.bookingReference}</p>
@@ -790,7 +789,7 @@ export default function UAMDashboard() {
               <div className="bg-gray-50 p-4 rounded-md">
                 <h4 className="font-semibold mb-2">Current Booking:</h4>
                 <p><strong>Location:</strong> {editingBooking.locationName}</p>
-                <p><strong>Date:</strong> {formatDateToGMT8(editingBooking.date)}</p>
+                <p><strong>Date:</strong> {new Date(editingBooking.date).toLocaleDateString()}</p>
                 <p><strong>Time:</strong> {editingBooking.startTime} - {editingBooking.endTime}</p>
                 <p><strong>People:</strong> {editingBooking.numberOfPeople}</p>
                 <p><strong>Seats:</strong> {editingBooking.selectedSeats.join(', ')}</p>

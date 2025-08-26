@@ -3,7 +3,6 @@
 
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDateToGMT8 } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -231,11 +230,11 @@ export function EntitlementHistory() {
           <div className="grid grid-cols-2 gap-4 text-sm mb-3">
             <div className="flex items-center">
               <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-              <span>Purchased: {formatDateToGMT8(packageData.purchased_at)}</span>
+              <span>Purchased: {new Date(packageData.purchased_at).toLocaleDateString()}</span>
             </div>
             <div className="flex items-center">
               <Clock className="w-4 h-4 mr-2 text-gray-400" />
-              <span>Expired: {formatDateToGMT8(packageData.expires_at)}</span>
+              <span>Expired: {new Date(packageData.expires_at).toLocaleDateString()}</span>
             </div>
           </div>
 

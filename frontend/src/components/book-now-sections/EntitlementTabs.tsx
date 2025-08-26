@@ -17,7 +17,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Package, Ticket, Clock, AlertCircle, ExternalLink } from 'lucide-react'
-import { formatDateToGMT8 } from '@/lib/utils'
 
 export type UserPackage = {
   id: string
@@ -128,7 +127,7 @@ export function EntitlementTabs({
     const found = Object.values(testVouchers).find(v => v.code === upperCode && v.is_active)
 
     if (found) {
-              setPromoFeedback(`${found.description} - Expires ${formatDateToGMT8(found.expires_at)}`)
+              setPromoFeedback(`${found.description} - Expires ${new Date(found.expires_at).toLocaleDateString()}`)
       onChange('promo', found.code)
     } else {
       setPromoFeedback('Invalid or expired code')
@@ -137,7 +136,11 @@ export function EntitlementTabs({
   }
 
       const formatExpiryDate = (dateString: string) => {
-      return formatDateToGMT8(dateString)
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })
     }
 
   const getPackageTypeIcon = (type: string) => {

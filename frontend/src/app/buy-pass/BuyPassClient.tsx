@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle } from 'lucide-react'
-import { formatDateTimeToGMT8 } from '@/lib/utils'
 
 import { useAuth } from '@/hooks/useAuth'
 
