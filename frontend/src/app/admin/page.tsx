@@ -31,6 +31,7 @@ import CancellationReviewModal from '@/components/admin/CancellationReviewModal'
 import UserVerificationModal from '@/components/admin/UserVerificationModal'
 
 
+
 // Mock data types
 interface CancellationRequest {
   id: string
@@ -208,6 +209,9 @@ export default function AdminDashboard() {
       <div className="pt-32 pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <AdminHeader />
         <AdminStats cancellations={cancellations} users={users} />
+        
+
+        
         <AdminTabs
           activeTab={activeTab}
           setActiveTab={setActiveTab}

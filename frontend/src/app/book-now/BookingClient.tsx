@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { isSameDay, endOfDay, parseISO, addMonths, addDays, setHours, setMinutes } from 'date-fns'
-import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle } from 'lucide-react'
+import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle, Ticket } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -32,67 +32,15 @@ import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 
 import { StudentValidation } from '@/components/book-now-sections/StudentValidation'
+import type { StudentValidationStatus } from '@/components/book-now-sections/StudentValidation'
 
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
+import { PromoCode } from '@/lib/promoCodeService'
 
-// Test voucher constants
-const TEST_VOUCHERS = {
-  'SAVE20': {
-    id: 'promo_save20',
-    code: 'SAVE20',
-    discount_type: 'percentage',
-    discount_value: 20, // 20% off
-    expires_at: '2025-12-31T23:59:59Z',
-    max_uses_per_user: 3,
-    max_uses_total: 1000,
-    description: '20% off your booking',
-    is_active: true
-  },
-  'SAVE30': {
-    id: 'promo_save30',
-    code: 'SAVE30',
-    discount_type: 'percentage',
-    discount_value: 30, // 30% off
-    expires_at: '2025-12-31T23:59:59Z',
-    max_uses_per_user: 3,
-    max_uses_total: 1000,
-    description: '30% off your booking',
-    is_active: true
-  },
-  'GET15OFF': {
-    id: 'promo_get15off',
-    code: 'GET15OFF',
-    discount_type: 'fixed_amount',
-    discount_value: 15, // $15 off
-    expires_at: '2025-12-31T23:59:59Z',
-    max_uses_per_user: 1,
-    max_uses_total: 500,
-    description: '$15 off your booking',
-    is_active: true
-  }
-} as const;
 
-// Helper function to calculate discount
-function calculateDiscount(
-  originalPrice: number,
-  voucher: typeof TEST_VOUCHERS[keyof typeof TEST_VOUCHERS]
-): { discountAmount: number; finalPrice: number } {
-  let discountAmount = 0;
 
-  if (voucher.discount_type === 'percentage') {
-    discountAmount = (originalPrice * voucher.discount_value) / 100;
-  } else if (voucher.discount_type === 'fixed_amount') {
-    discountAmount = Math.min(voucher.discount_value, originalPrice); // Don't exceed original price
-  }
 
-  const finalPrice = Math.max(0, originalPrice - discountAmount);
-
-  return {
-    discountAmount: Math.round(discountAmount * 100) / 100, // Round to 2 decimal places
-    finalPrice: Math.round(finalPrice * 100) / 100
-  };
-}
 
 // Location data with pricing
 const locations = [
@@ -105,13 +53,20 @@ export default function BookingClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   // Auth state
-  const { user, loading: isLoadingAuth } = useAuth()
+  const { user, userId, isLoggedIn, loading: isLoadingAuth } = useAuth()
 
   const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo'>('package')
   const [selectedPackage, setSelectedPackage] = useState<string>('')
   const [promoCode, setPromoCode] = useState<string>('')
   const [promoValid, setPromoValid] = useState<boolean>(false)
-  const [appliedVoucher, setAppliedVoucher] = useState<typeof TEST_VOUCHERS[keyof typeof TEST_VOUCHERS] | null>(null)
+
+  const [promoCodeInfo, setPromoCodeInfo] = useState<{
+    type: string
+    id: string
+    discountAmount: number
+    finalAmount: number
+    promoCode?: PromoCode
+  } | null>(null)
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [bookedSeats, setBookedSeats] = useState<string[]>([])
@@ -119,7 +74,7 @@ export default function BookingClient() {
 
 
   const [studentsValidated, setStudentsValidated] = useState(false)
-  const [validatedStudents, setValidatedStudents] = useState<any[]>([])
+  const [validatedStudents, setValidatedStudents] = useState<StudentValidationStatus[]>([])
   useEffect(() => {
     if (searchParams.get('step') === '3') {
       setBookingStep(3)
@@ -645,12 +600,27 @@ export default function BookingClient() {
   const baseSubtotal = selectedLocation ? selectedLocation.price * totalHours * people : 0
 
   // Calculate discount if voucher is applied
-  const discountInfo = appliedVoucher ? calculateDiscount(baseSubtotal, appliedVoucher) : null
-  const subtotal = discountInfo ? discountInfo.finalPrice : baseSubtotal
-  const discountAmount = discountInfo ? discountInfo.discountAmount : 0
+  const discountInfo = null // Removed test voucher calculation
+  const promoDiscountInfo = promoCodeInfo
+  const subtotal = promoDiscountInfo ? promoDiscountInfo.finalAmount : baseSubtotal
+  const discountAmount = promoDiscountInfo ? promoDiscountInfo.discountAmount : 0
 
   const tax = subtotal * 0.09 // 9% tax
   const total = subtotal + tax
+
+  // Debug logging for pricing calculations
+  console.log('Pricing calculations:', {
+    location: selectedLocation?.name,
+    pricePerHour: selectedLocation?.price,
+    totalHours,
+    people,
+    baseSubtotal,
+    promoCodeInfo,
+    subtotal,
+    discountAmount,
+    tax,
+    total
+  });
 
   // Update finalTotal when total changes
   useEffect(() => {
@@ -711,8 +681,8 @@ export default function BookingClient() {
         students: peopleBreakdown.coStudents,
         members: peopleBreakdown.coWorkers,
         tutors: peopleBreakdown.coTutors,
-        totalCost: total,
-        discountId: appliedVoucher?.id || null,
+        totalCost: baseSubtotal,
+                                    // discountId: promoCodeInfo?.id || null,
         totalAmount: total,
         memberType: memberType,
         // memberType: 'STUDENT',
@@ -1075,26 +1045,53 @@ export default function BookingClient() {
                       {user && (
                         <EntitlementTabs
                           mode={entitlementMode}
-                          onChange={(mode, val) => {
-                            setEntitlementMode(mode)
-                            if (mode === 'package') {
-                              setSelectedPackage(val)
+                          onModeChange={(newMode) => {
+                            console.log('Mode changed to:', newMode);
+                            setEntitlementMode(newMode);
+                            // Clear any existing discounts when switching modes
+                            setSelectedPackage('');
+                            setPromoCode('');
+                            setPromoValid(false);
+                    
+                            setPromoCodeInfo(null);
+                          }}
+                          onChange={(discountInfo) => {
+                            console.log('BookingClient received discountInfo:', discountInfo);
+                            
+                            if (discountInfo && discountInfo.type === 'package') {
+                              setEntitlementMode('package')
+                              setSelectedPackage(discountInfo.id)
                               setPromoCode('')
                               setPromoValid(false)
-                              setAppliedVoucher(null)
-                            } else {
-                              setPromoCode(val)
-                              setPromoValid(!!val)
+                              setPromoCodeInfo(null)
+                            } else if (discountInfo && discountInfo.type === 'promo') {
+                              console.log('Setting promo code info:', {
+                                originalAmount: baseSubtotal,
+                                discountAmount: discountInfo.discountAmount,
+                                finalAmount: discountInfo.finalAmount,
+                                expectedFinal: baseSubtotal - discountInfo.discountAmount
+                              });
+                              
+                              setEntitlementMode('promo')
+                              setPromoCode(discountInfo.promoCode?.code || '')
+                              setPromoValid(true)
                               setSelectedPackage('')
-                              // Set applied voucher if valid promo code
-                              const voucher = Object.values(TEST_VOUCHERS).find(v => v.code === val)
-                              setAppliedVoucher(voucher || null)
+                              setPromoCodeInfo(discountInfo)
+                            } else {
+                              // Clear all discounts
+                              setEntitlementMode('package')
+                              setSelectedPackage('')
+                              setPromoCode('')
+                              setPromoValid(false)
+                              setPromoCodeInfo(null)
                             }
                           }}
                           selectedPackage={selectedPackage}
                           promoCode={promoCode}
                           promoValid={promoValid}
-                          testVouchers={TEST_VOUCHERS}
+
+                          userId={userId}
+                          bookingAmount={baseSubtotal}
                         />
                       )}
                       {/* ──────────────────────────────────────────────── */}
@@ -1145,7 +1142,6 @@ export default function BookingClient() {
                             tax={tax}
                             total={total}
                             discountAmount={discountAmount}
-                            appliedVoucher={appliedVoucher}
                             selectedPackage={selectedPackage}
                             customer={{ name: customerName, email: customerEmail, phone: customerPhone }}
                             bookingId={bookingId || undefined}
@@ -1364,6 +1360,21 @@ export default function BookingClient() {
                         </div>
                       )}
 
+                      {/* Promo Code Summary */}
+                      {promoCodeInfo && (
+                        <div className="flex items-center space-x-3">
+                          <Ticket className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <span className="text-sm font-medium text-blue-800">
+                              Promo Code Applied
+                            </span>
+                            <p className="text-xs text-blue-600">
+                              Discount: ${promoCodeInfo.discountAmount.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                                              {startDate && endDate && (
                          <div className="flex items-center space-x-3">
                            <Clock className="w-5 h-5 text-gray-400" />
@@ -1438,10 +1449,10 @@ export default function BookingClient() {
                       </div>
 
                       {/* Show discount if applied */}
-                      {appliedVoucher && discountAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Discount ({appliedVoucher.code})</span>
-                          <span>-${discountAmount.toFixed(2)}</span>
+                      {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (
+                        <div className="flex justify-between text-blue-600">
+                          <span>Promo Code Applied</span>
+                          <span>-${promoCodeInfo.discountAmount.toFixed(2)}</span>
                         </div>
                       )}
 
@@ -1454,22 +1465,72 @@ export default function BookingClient() {
 
                       <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>${subtotal}</span>
+                        <span>${(() => {
+                          if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
+                            // Ensure the discounted amount is never more than the original
+                            const discountedAmount = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
+                            return discountedAmount.toFixed(2);
+                          }
+                          return subtotal.toFixed(2);
+                        })()}</span>
                       </div>
                       <div className="flex justify-between text-sm text-gray-600">
                         <span>GST (9%)</span>
-                        <span>${tax.toFixed(2)}</span>
+                        <span>${(() => {
+                          if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
+                            // Ensure the discounted amount is never more than the original
+                            const discountedAmount = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
+                            return (discountedAmount * 0.09).toFixed(2);
+                          }
+                          return tax.toFixed(2);
+                        })()}</span>
                       </div>
                       {selectedPaymentMethod === 'creditCard' && (
                         <div className="flex justify-between text-amber-600">
                           <span>Credit Card Fee (5%)</span>
-                          <span>${(total * 0.05).toFixed(2)}</span>
+                          <span>${(() => {
+                            if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
+                              // Ensure the discounted amount is never more than the original
+                              const discountedSubtotal = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
+                              const discountedTax = discountedSubtotal * 0.09;
+                              const discountedTotal = discountedSubtotal + discountedTax;
+                              return (discountedTotal * 0.05).toFixed(2);
+                            }
+                            return (total * 0.05).toFixed(2);
+                          })()}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total</span>
-                        <span>${finalTotal > 0 ? finalTotal.toFixed(2) : total.toFixed(2)}</span>
+                        <span>${(() => {
+                          if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
+                            // Ensure the discounted amount is never more than the original
+                            const discountedSubtotal = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
+                            const discountedTax = discountedSubtotal * 0.09;
+                            const discountedTotal = discountedSubtotal + discountedTax;
+                            if (selectedPaymentMethod === 'creditCard') {
+                              return (discountedTotal * 1.05).toFixed(2); // Add 5% credit card fee
+                            }
+                            return discountedTotal.toFixed(2);
+                          }
+                          return finalTotal > 0 ? finalTotal.toFixed(2) : total.toFixed(2);
+                        })()}</span>
                       </div>
+
+                      {/* Show total savings if promo code applied */}
+                      {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (
+                        <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-green-800">
+                              🎉 You're saving ${promoCodeInfo.discountAmount.toFixed(2)}!
+                            </p>
+                            <p className="text-xs mt-1 text-green-600">
+                              Original: ${baseSubtotal.toFixed(2)} | 
+                              Final: ${promoCodeInfo.finalAmount.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </CardContent>

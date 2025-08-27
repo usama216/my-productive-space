@@ -1,7 +1,7 @@
 // src/components/book-now-sections/EntitlementTabs.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
 import {
@@ -16,7 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Package, Ticket, Clock, AlertCircle, ExternalLink } from 'lucide-react'
+import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getAvailablePromoCodes, applyPromoCode } from '@/lib/promoCodeService';
 
 export type UserPackage = {
   id: string
@@ -29,20 +30,9 @@ export type UserPackage = {
   is_expired: boolean
 }
 
-export type TestVoucher = {
-  id: string
-  code: string
-  discount_type: 'percentage' | 'fixed_amount'
-  discount_value: number
-  expires_at: string
-  max_uses_per_user: number
-  max_uses_total: number
-  description: string
-  is_active: boolean
-}
+
 
 // Mock user packages data
-// //- set to empty to demonstrate the empty state
 const mockActivePackages: UserPackage[] = [
   {
     id: 'pkg1',
@@ -63,17 +53,7 @@ const mockActivePackages: UserPackage[] = [
     expires_at: '2025-02-20T23:59:59Z',
     package_type: 'half-day',
     is_expired: false
-  },
-  // {
-  //   id: 'pkg3',
-  //   name: 'Student Semester Bundle',
-  //   total_passes: 20,
-  //   passes_used: 8,
-  //   purchased_at: '2025-01-10T00:00:00Z',
-  //   expires_at: '2025-03-10T23:59:59Z',
-  //   package_type: 'study-hour',
-  //   is_expired: false
-  // }
+  }
 ]
 
 const mockExpiredPackages: UserPackage[] = [
@@ -99,49 +79,247 @@ const mockExpiredPackages: UserPackage[] = [
   }
 ]
 
+type DiscountInfo = 
+  | { type: 'package'; id: string }
+  | { type: 'promo'; id: string; discountAmount: number; finalAmount: number; promoCode: PromoCode }
+  | null;
+
 type Props = {
-  onChange: (mode: 'package' | 'promo', value: string) => void
+  onChange: (discountInfo: DiscountInfo) => void
+  onModeChange?: (mode: 'package' | 'promo') => void
   mode: 'package' | 'promo'
   selectedPackage?: string
   promoCode?: string
   promoValid?: boolean
-  testVouchers: Record<string, TestVoucher>
+  userId?: string
+  bookingAmount?: number
 }
 
 export function EntitlementTabs({
   mode,
   onChange,
+  onModeChange,
   selectedPackage,
   promoCode,
   promoValid,
-  testVouchers,
+  userId,
+  bookingAmount = 0
 }: Props) {
+  console.log('EntitlementTabs rendered with mode:', mode);
+  console.log('All props:', { mode, onChange, onModeChange, selectedPackage, promoCode, promoValid, userId, bookingAmount });
   const [localPromo, setLocalPromo] = useState(promoCode || '')
-  const [promoFeedback, setPromoFeedback] = useState<string | null>(
-    promoValid === undefined ? null : (promoValid ? 'Valid code!' : 'Invalid code')
-  )
+  const [promoFeedback, setPromoFeedback] = useState<{ isValid: boolean; message: string } | null>(null)
   const [showExpiredPackages, setShowExpiredPackages] = useState(false)
+  const [availablePromos, setAvailablePromos] = useState<PromoCode[]>([])
+  const [isLoadingPromos, setIsLoadingPromos] = useState(false)
+  const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null)
+  const [discountCalculation, setDiscountCalculation] = useState<{
+    discountAmount: number
+    finalAmount: number
+    isValid: boolean
+    message: string
+  } | null>(null)
 
-  const handleValidatePromo = () => {
-    const upperCode = localPromo.toUpperCase()
-    const found = Object.values(testVouchers).find(v => v.code === upperCode && v.is_active)
 
-    if (found) {
-              setPromoFeedback(`${found.description} - Expires ${new Date(found.expires_at).toLocaleDateString()}`)
-      onChange('promo', found.code)
-    } else {
-      setPromoFeedback('Invalid or expired code')
-      onChange('promo', '')
+
+  // Load available promo codes from API
+  const loadAvailablePromoCodes = useCallback(async () => {
+    console.log('loadAvailablePromoCodes called with userId:', userId);
+    if (!userId) {
+      console.log('No userId provided, skipping promo code load');
+      return;
     }
-  }
-
-      const formatExpiryDate = (dateString: string) => {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      })
+    
+    setIsLoadingPromos(true);
+    try {
+      console.log('Calling getAvailablePromoCodes API...');
+      const response = await getAvailablePromoCodes(userId);
+      console.log('API response:', response);
+      if (response.success) {
+        console.log('Promo codes loaded with details:', response.data);
+        // Log each promo code's discount details
+        response.data.forEach((promo: PromoCode) => {
+          console.log(`Promo ${promo.code}:`, {
+            discounttype: promo.discounttype,
+            discountvalue: promo.discountvalue,
+            minimumamount: promo.minimumamount,
+            maximumdiscount: promo.maximumdiscount
+          });
+        });
+        setAvailablePromos(response.data);
+      } else {
+        console.error('Failed to load promo codes:', response.error);
+        setAvailablePromos([]);
+      }
+    } catch (error) {
+      console.error('Error loading promo codes:', error);
+      setAvailablePromos([]);
+    } finally {
+      setIsLoadingPromos(false);
     }
+  }, [userId]);
+
+  // Load available promo codes when component mounts
+  useEffect(() => {
+    console.log('EntitlementTabs useEffect triggered with mode:', mode);
+    console.log('Props received:', { userId, bookingAmount, mode });
+    
+    if (userId && mode === 'promo') {
+      loadAvailablePromoCodes()
+    }
+  }, [userId, mode, loadAvailablePromoCodes]);
+
+  // Validate and apply promo code
+  const handleValidatePromo = useCallback(async () => {
+    console.log('handleValidatePromo called with:', { localPromo, userId, bookingAmount });
+    if (!localPromo.trim()) {
+      setPromoFeedback({ isValid: false, message: 'Please enter a promo code' });
+      return;
+    }
+
+    if (!userId || !bookingAmount) {
+      console.log('Missing userId or bookingAmount:', { userId, bookingAmount });
+      setPromoFeedback({ isValid: false, message: 'User ID or booking amount not available' });
+      return;
+    }
+
+    try {
+      // First, find the promo code in available promos
+      const foundPromo = availablePromos.find(promo => 
+        promo.code.toLowerCase() === localPromo.toLowerCase()
+      );
+
+      if (!foundPromo) {
+        setPromoFeedback({ isValid: false, message: 'Invalid promo code' });
+        return;
+      }
+
+      // Validate locally first for immediate feedback
+      const localValidation = validatePromoCodeLocally(foundPromo, bookingAmount);
+      if (!localValidation.isValid) {
+        setPromoFeedback({ isValid: false, message: localValidation.message });
+        return;
+      }
+
+      // Apply promo code through API
+      const apiResponse = await applyPromoCode({
+        promoCode: foundPromo.code,
+        userId,
+        bookingAmount: bookingAmount,
+      });
+
+      if (apiResponse.success && apiResponse.data) {
+        const { promoCode: appliedPromo, discountAmount, finalAmount } = apiResponse.data;
+        
+        // If API doesn't provide proper discount calculation, use local calculation
+        let actualDiscountAmount = discountAmount;
+        let actualFinalAmount = finalAmount;
+        
+        if (discountAmount === 0 && finalAmount === bookingAmount) {
+          // API didn't calculate discount, use local calculation
+          const localCalculation = calculateDiscountLocally(appliedPromo, bookingAmount);
+          actualDiscountAmount = localCalculation.discountAmount;
+          actualFinalAmount = localCalculation.finalAmount;
+          
+          console.log('API returned no discount, using local calculation:', localCalculation);
+        }
+        
+        setSelectedPromoCode(appliedPromo);
+        setDiscountCalculation({
+          discountAmount: actualDiscountAmount,
+          finalAmount: actualFinalAmount,
+          isValid: true,
+          message: 'Promo code applied successfully!'
+        });
+        setPromoFeedback({ isValid: true, message: 'Promo code applied successfully!' });
+        
+        // Call onChange with discount info
+        // Ensure finalAmount is always the discounted amount and never increases the total
+        const calculatedDiscountAmount = Math.max(0, actualDiscountAmount || 0);
+        const calculatedFinalAmount = Math.max(0, bookingAmount - calculatedDiscountAmount);
+        
+        // Safety check: final amount should never be more than original amount
+        const safeFinalAmount = Math.min(calculatedFinalAmount, bookingAmount);
+        
+        console.log('Promo code applied - Debug info:', {
+          originalAmount: bookingAmount,
+          discountAmount: calculatedDiscountAmount,
+          calculatedFinalAmount,
+          safeFinalAmount,
+          apiFinalAmount: finalAmount,
+          localCalculation: { actualDiscountAmount, actualFinalAmount }
+        });
+        
+        onChange({
+          type: 'promo',
+          id: appliedPromo.id,
+          discountAmount: calculatedDiscountAmount,
+          finalAmount: safeFinalAmount,
+          promoCode: appliedPromo
+        });
+      } else {
+        console.error('Promo code validation failed:', {
+          apiResponse,
+          request: {
+            promoCode: foundPromo.code,
+            userId,
+            bookingAmount
+          },
+          localValidation
+        });
+        
+        // If API fails, try local validation as fallback
+        if (localValidation.isValid) {
+          console.log('API failed, using local validation as fallback');
+          
+          // Use local calculation for discount
+          const localCalculation = calculateDiscountLocally(foundPromo, bookingAmount);
+          
+          // Use local validation result
+          setSelectedPromoCode(foundPromo);
+          setDiscountCalculation({
+            discountAmount: localCalculation.discountAmount,
+            finalAmount: localCalculation.finalAmount,
+            isValid: true,
+            message: `Promo code validated locally: ${localCalculation.discountAmount > 0 ? `$${localCalculation.discountAmount} off` : 'No discount applied'}`
+          });
+          setPromoFeedback({ 
+            isValid: true, 
+            message: localCalculation.discountAmount > 0 ? 
+              `Promo code applied: $${localCalculation.discountAmount} off` : 
+              'Promo code valid but no discount applied'
+          });
+          
+          // Call onChange with local calculation
+          onChange({
+            type: 'promo',
+            id: foundPromo.id,
+            discountAmount: localCalculation.discountAmount,
+            finalAmount: localCalculation.finalAmount,
+            promoCode: foundPromo
+          });
+        } else {
+          setPromoFeedback({ 
+            isValid: false, 
+            message: apiResponse.error || apiResponse.message || 'Failed to apply promo code' 
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error applying promo code:', error);
+      setPromoFeedback({ isValid: false, message: 'Error applying promo code' });
+    }
+  }, [localPromo, userId, bookingAmount, availablePromos, onChange]);
+
+  const handleRemovePromo = useCallback(() => {
+    setLocalPromo('');
+    setPromoFeedback(null);
+    setSelectedPromoCode(null);
+    setDiscountCalculation(null);
+    onChange(null);
+  }, [onChange]);
+
+
 
   const getPackageTypeIcon = (type: string) => {
     switch (type) {
@@ -160,13 +338,35 @@ export function EntitlementTabs({
   return (
     <div className="border-t pt-6">
       <Label className="text-base font-medium mb-4 block">Apply Discount</Label>
-      <Tabs value={mode} onValueChange={(v) => onChange(v as any, '')}>
+      <Tabs 
+        value={mode} 
+        onValueChange={(newMode) => {
+          console.log('Tab changed from', mode, 'to', newMode);
+          console.log('Current mode state:', mode);
+          console.log('New mode requested:', newMode);
+          // Clear any existing discount when switching tabs
+          onChange(null);
+          // Notify parent component about mode change
+          if (onModeChange && newMode !== mode) {
+            console.log('Calling onModeChange with:', newMode);
+            onModeChange(newMode as 'package' | 'promo');
+          }
+        }}
+      >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="package" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="package" 
+            className="flex items-center gap-2"
+            onClick={() => console.log('Package tab clicked!')}
+          >
             <Package className="w-4 h-4" />
             Use Package
           </TabsTrigger>
-          <TabsTrigger value="promo" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="promo" 
+            className="flex items-center gap-2"
+            onClick={() => console.log('Promo tab clicked!')}
+          >
             <Ticket className="w-4 h-4" />
             Apply Promo
           </TabsTrigger>
@@ -182,7 +382,7 @@ export function EntitlementTabs({
                     <Label className="text-sm font-medium mb-2 block">Active Passes</Label>
                     <Select
                       value={selectedPackage || ''}
-                      onValueChange={(val) => onChange('package', val)}
+                      onValueChange={(val) => onChange({ type: 'package', id: val })}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a pass to use..." />
@@ -232,7 +432,7 @@ export function EntitlementTabs({
                               <div className="flex items-center gap-4 text-sm text-green-700">
                                 <div className="flex items-center gap-1">
                                   <Clock className="w-4 h-4" />
-                                  <span>Expires: {formatExpiryDate(pkg.expires_at)}</span>
+                                  <span>Expires: {new Date(pkg.expires_at).toLocaleDateString()}</span>
                                 </div>
                                 <span>Code: {pkg.package_type}_user123</span>
                               </div>
@@ -246,6 +446,7 @@ export function EntitlementTabs({
                   {/* Expired Packages Section */}
                   <div className="border-t pt-4">
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowExpiredPackages(!showExpiredPackages)}
@@ -270,7 +471,7 @@ export function EntitlementTabs({
                                   </div>
                                 </div>
                                 <Badge variant="secondary" className="bg-red-100 text-red-800">
-                                  Expired {formatExpiryDate(pkg.expires_at)}
+                                  Expired {new Date(pkg.expires_at).toLocaleDateString()}
                                 </Badge>
                               </div>
                             </CardContent>
@@ -281,7 +482,7 @@ export function EntitlementTabs({
                   </div>
                 </>
               ) : (
-                <Card className="bg-orange-50 border-orange-200">
+                <Card className="bg-white border-black">
                   <CardContent className="p-4 text-center">
                     <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
                     <p className="text-orange-800 font-medium">No Active Packages</p>
@@ -289,6 +490,7 @@ export function EntitlementTabs({
                       Purchase a package to unlock member discounts
                     </p>
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       className="mt-3 border-orange-300 text-orange-700 hover:bg-orange-100"
@@ -313,14 +515,14 @@ export function EntitlementTabs({
                     </p>
                     <div className="space-y-2">
                       <Link
-                        href="http://localhost:3000/pricing#packages"
+                        href="/pricing#packages"
                         className="inline-flex items-center justify-center w-full px-3 py-1.5 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 transition-colors font-medium"
                       >
                         View Packages
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Link>
                       <Link
-                        href="http://localhost:3000/buy-pass"
+                        href="/buy-pass"
                         className="inline-flex items-center justify-center w-full px-3 py-1.5 border border-orange-300 text-orange-700 rounded text-sm hover:bg-orange-50 transition-colors font-medium"
                       >
                         Buy Passes
@@ -333,75 +535,211 @@ export function EntitlementTabs({
             )}
           </div>
           <div className="mt-4 pt-4 border-t border-gray-200">
-    <p className="text-sm text-gray-500 text-center">
-      Need more passes?{' '}
-      <a 
-        href="/buy-pass#packages" 
-        className="text-blue-600 hover:text-blue-800 underline"
-      >
-        Buy passes here
-      </a>
-      {' '}or explore our{' '}
-      <a 
-        href="/pricing" 
-        className="text-blue-600 hover:text-blue-800 underline"
-      >
-        membership plans
-      </a>
-    </p>
-  </div>
+            <p className="text-sm text-gray-500 text-center">
+              Need more passes?{' '}
+              <a 
+                href="/buy-pass#packages" 
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Buy passes here
+              </a>
+              {' '}or explore our{' '}
+              <a 
+                href="/pricing" 
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                membership plans
+              </a>
+            </p>
+          </div>
         </TabsContent>
 
         <TabsContent value="promo" className="mt-4 space-y-4">
           <div>
-            <Label className="text-sm font-medium mb-2 block">Discount Code</Label>
+            <Label className={`text-sm font-medium mb-2 block ${selectedPromoCode ? 'text-gray-500' : ''}`}>
+              Discount Code {selectedPromoCode && '(Already Applied)'}
+            </Label>
             <div className="flex gap-2">
               <Input
-                placeholder="Enter promo code"
+                placeholder={selectedPromoCode ? "Promo code already applied" : "Enter promo code"}
                 value={localPromo}
                 onChange={(e) => setLocalPromo(e.target.value.toUpperCase())}
-                className="flex-1"
+                className={`flex-1 ${selectedPromoCode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                disabled={!!selectedPromoCode}
               />
               <Button
+                type="button"
                 onClick={handleValidatePromo}
                 variant="outline"
-                disabled={!localPromo.trim()}
+                disabled={!localPromo.trim() || isLoadingPromos || !!selectedPromoCode}
               >
-                Validate
+                {isLoadingPromos ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : selectedPromoCode ? (
+                  'Promo Applied'
+                ) : (
+                  'Validate'
+                )}
               </Button>
             </div>
 
-            {promoFeedback && (
-              <div className={`mt-3 p-3 rounded-md ${promoFeedback.includes('Invalid')
-                ? 'bg-red-50 border border-red-200'
-                : 'bg-green-50 border border-green-200'
-                }`}>
-                <p className={`text-sm font-medium ${promoFeedback.includes('Invalid')
-                  ? 'text-red-800'
-                  : 'text-green-800'
-                  }`}>
-                  {promoFeedback.includes('Invalid') ? '❌' : '✅'} {promoFeedback}
+            {/* Info message when promo code is already applied */}
+            {selectedPromoCode && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                <p className="flex items-center gap-1">
+                  <span>ℹ️</span>
+                  <span>Remove the current promo code to apply a different one</span>
                 </p>
               </div>
             )}
+
+            {/* Promo Code Feedback */}
+            {promoFeedback && (
+              <div className={`mt-3 p-3 rounded-md ${
+                !promoFeedback.isValid
+                  ? 'bg-red-50 border border-red-200'
+                  : 'bg-green-50 border border-green-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {!promoFeedback.isValid ? (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  )}
+                  <p className={`text-sm font-medium ${
+                    !promoFeedback.isValid
+                      ? 'text-red-800'
+                      : 'text-green-800'
+                  }`}>
+                    {promoFeedback.message}
+                  </p>
+                </div>
+                
+                {/* Show additional help for API errors */}
+                {!promoFeedback.isValid && promoFeedback.message.includes('Failed to check promo code usage') && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                    <p className="font-medium">💡 Troubleshooting Tips:</p>
+                    <ul className="mt-1 space-y-1">
+                      <li>• Check if your backend server is running</li>
+                      <li>• Verify database connection is working</li>
+                      <li>• Check backend logs for detailed error</li>
+                      <li>• Try refreshing the page and try again</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+                        {/* Selected Promo Code Details */}
+            {selectedPromoCode && discountCalculation && (
+              <Card className="bg-green-50 border-green-200">
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Ticket className="w-5 h-5 text-green-600" />
+                        <span className="font-medium text-green-800">{selectedPromoCode.code}</span>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">
+                        {formatDiscountDisplay(selectedPromoCode)}
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-sm text-green-700">
+                      <p>{selectedPromoCode.description}</p>
+                      {selectedPromoCode.maxusageperuser > 0 && (
+                        <p className="text-xs mt-1">Uses remaining: {selectedPromoCode.maxusageperuser - selectedPromoCode.usageCount}</p>
+                      )}
+                    </div>
+
+                    {/* Discount Calculation */}
+                    <div className="border-t pt-3 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Original Amount:</span>
+                        <span>${bookingAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Discount:</span>
+                        <span>-${discountCalculation.discountAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-green-800">
+                        <span>Final Amount:</span>
+                        <span>${discountCalculation.finalAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={handleRemovePromo}
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-green-300 text-green-700 hover:bg-green-100"
+                    >
+                      Remove Promo Code
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Test Vouchers Hint */}
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4">
-              <h4 className="font-medium text-blue-800 mb-2">Test Vouchers Available:</h4>
-              <div className="space-y-1 text-sm text-blue-700">
-                {Object.values(testVouchers).map((voucher) => (
-                  <div key={voucher.code} className="flex justify-between">
-                    <span className="font-mono bg-blue-100 px-2 py-1 rounded">
-                      {voucher.code}
-                    </span>
-                    <span>{voucher.description}</span>
-                  </div>
+          {/* Available Promo Codes */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">Available Promo Codes</Label>
+            {isLoadingPromos ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <span className="ml-2 text-sm text-gray-500">Loading promo codes...</span>
+              </div>
+            ) : availablePromos.length > 0 ? (
+              <div className="space-y-2">
+                {availablePromos.map((promo) => (
+                  <Card key={promo.id} className="border-gray-200 hover:border-gray-300 transition-colors">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Ticket className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-medium bg-blue-50 px-2 py-1 rounded text-sm">
+                                {promo.code}
+                              </span>
+                              <Badge className={getPromoCodeStatusColor(promo)}>
+                                {formatDiscountDisplay(promo)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">{promo.description}</p>
+                            {promo.minimumamount && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Min. order: ${promo.minimumamount}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right text-xs text-gray-500">
+                          <p>Uses: {promo.usageCount}/{promo.maxusageperuser}</p>
+                          <p className="text-green-600 font-medium">
+                            {promo.maxusageperuser - promo.usageCount} uses left
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <Card className="bg-gray-50 border-gray-200">
+                <CardContent className="p-4 text-center">
+                  <Ticket className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 text-sm">No promo codes available at the moment</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+
         </TabsContent>
       </Tabs>
     </div>

@@ -51,7 +51,7 @@ const sections: Section[] = [
 export default function Navbar() {
   const router = useRouter()
   const { toast } = useToast()
-  const { user, loading: authLoading } = useAuth()
+  const { user, databaseUser, loading: authLoading, isLoggedIn } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [logoutLoading, setLogoutLoading] = useState(false)
 
@@ -129,7 +129,7 @@ export default function Navbar() {
         <div className="hidden md:flex items-center space-x-4">
           {authLoading ? (
             <Loader2 className="animate-spin h-5 w-5" />
-          ) : user ? (
+          ) : isLoggedIn ? (
           <DropdownMenu>
   <DropdownMenuTrigger asChild>
     <div className="flex items-center gap-2 cursor-pointer">
@@ -141,9 +141,7 @@ export default function Navbar() {
         className="rounded-full"
       />
 <span className="text-sm font-medium">
-  {user?.user_metadata?.firstName && user?.user_metadata?.lastName
-    ? `${user.user_metadata.firstName} ${user.user_metadata.lastName}`
-    : "User"}
+  {databaseUser?.name || user?.user_metadata?.firstName || "User"}
 </span>
     </div>
   </DropdownMenuTrigger>

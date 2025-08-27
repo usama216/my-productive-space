@@ -17,12 +17,19 @@ const MOCK_STUDENTS = [
   { id: 'STU005', email: 'alex.brown@university.edu', name: 'Alex Brown', status: 'suspended' },
 ]
 
-type StudentValidationStatus = {
+export type Student = {
+  id: string
+  email: string
+  name: string
+  status: 'active' | 'suspended'
+}
+
+export type StudentValidationStatus = {
   id: string
   studentId: string
   isValidating: boolean
   isValid: boolean
-  studentData: any | null
+  studentData: Student | null
   error: string | null
 }
 
@@ -32,7 +39,7 @@ type StudentValidationProps = {
 }
 
 // Replace this with your Supabase validation logic
-const validateStudentAccount = async (studentId: string): Promise<{ success: boolean; student?: any; error?: string }> => {
+const validateStudentAccount = async (studentId: string): Promise<{ success: boolean; student?: Student; error?: string }> => {
   await new Promise(res => setTimeout(res, 800 + Math.random() * 400))
   const student = MOCK_STUDENTS.find(s => s.id.toLowerCase() === studentId.toLowerCase() || s.email.toLowerCase() === studentId.toLowerCase())
   if (!student) return { success: false, error: 'Account not found' }

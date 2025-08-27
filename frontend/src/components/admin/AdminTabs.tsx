@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertTriangle, Clock, Search, Settings, Mail, FileText } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PromoCodeManagement } from './PromoCodeManagement'
 
 export default function AdminTabs({
   activeTab,
@@ -21,6 +22,20 @@ export default function AdminTabs({
   StatusBadge,
   filteredCancellations,
   filteredUsers
+}: {
+  activeTab: string
+  setActiveTab: (value: string) => void
+  cancellations: any[]
+  users: any[]
+  searchTerm: string
+  setSearchTerm: (value: string) => void
+  filterStatus: string
+  setFilterStatus: (value: string) => void
+  setSelectedCancellation: (value: any) => void
+  setSelectedUser: (value: any) => void
+  StatusBadge: any
+  filteredCancellations: any[]
+  filteredUsers: any[]
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -42,7 +57,8 @@ export default function AdminTabs({
             </span>
           )}
         </TabsTrigger>
-        <TabsTrigger value="settings">Settings</TabsTrigger>
+        <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+        {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
       </TabsList>
 
       {/* Overview Tab */}
@@ -203,6 +219,11 @@ export default function AdminTabs({
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* Promo Codes Tab */}
+      <TabsContent value="promocodes" className="space-y-4">
+        <PromoCodeManagement />
       </TabsContent>
 
       {/* Settings Tab */}
