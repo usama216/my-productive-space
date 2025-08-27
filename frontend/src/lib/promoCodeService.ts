@@ -1,5 +1,5 @@
 // Promo Code Service - API Integration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
 
 console.log('API_BASE_URL set to:', API_BASE_URL);
 
