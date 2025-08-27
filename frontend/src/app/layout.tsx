@@ -1,3 +1,4 @@
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/styles/globals.css"
@@ -8,6 +9,9 @@ import 'slick-carousel/slick/slick-theme.css'
 import WhatsappLive from "@/components/whatsapp-logo/WhatsappLive";
 import { Toaster } from "@/components/ui/toaster"
 import HomeToast from "@/components/HomeToast"
+import { Provider } from "react-redux";
+import { store } from "@/store/store";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,14 +38,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="mx-auto">
-          {children}
-          <WhatsappLive />
-        </div>
-        
-        {/* Toast components for authentication notifications */}
-        <Toaster />
-        <HomeToast />
+        {/* <Provider store={store}> */}
+          <div className="mx-auto">
+            {children}
+            <WhatsappLive />
+          </div>
+
+          {/* Toast components for authentication notifications */}
+          <Toaster />
+          <HomeToast />
+          {/* </Provider> */}
       </body>
     </html>
   );

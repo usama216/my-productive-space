@@ -1,9 +1,9 @@
 // src/components/AuthForm.tsx - Updated for client-side auth
 "use client"
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, Lock, Eye, EyeOff, User, Phone, Loader2 } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User, Phone, Loader2, CheckCircle2, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,23 +31,24 @@ const isPhoneValid = (phone: string): boolean => {
 }
 
 type Props = {
-  type: 'login' | 'signUp'
+  type: 'login' | 'signUp';
+  onValid?: () => void;
 }
 
-export function AuthForm({ type }: Props) {
+export function AuthForm({ type, onValid }: Props) {
   const isLoginForm = type === 'login'
   const router = useRouter()
   const { toast } = useToast()
-  
+
   // Form state
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [signupStep, setSignupStep] = useState(1)
   const [phoneTouched, setPhoneTouched] = useState(false)
-  
-  // hCaptcha
+
+  // // hCaptcha
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const hcaptchaRef = useRef<HCaptcha>(null)
+  // const hcaptchaRef = useRef<HCaptcha>(null)
 
   // Login form data
   const [loginData, setLoginData] = useState({
@@ -69,15 +70,38 @@ export function AuthForm({ type }: Props) {
   })
 
   const resetCaptcha = () => {
-    hcaptchaRef.current?.resetCaptcha()
     setCaptchaToken(null)
   }
 
+  const [num1, setNum1] = useState<number | null>(null);
+  const [num2, setNum2] = useState<number | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [captchaValid, setCaptchaValid] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleCaptchaCheck = () => {
+    if (num1 === null || num2 === null) return;
+
+    if (parseInt(answer) === num1 + num2) {
+      setCaptchaValid(true);
+      setError("");
+    } else {
+      setCaptchaValid(false);
+      setError("Incorrect answer, try again");
+    }
+  };
+
+
+
+  useEffect(() => {
+    setNum1(Math.floor(Math.random() * 10));
+    setNum2(Math.floor(Math.random() * 10));
+  }, []);
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    if (!captchaToken) {
+    if (!captchaValid) {
       toast({
         title: "Error",
         description: "Please complete the captcha verification",
@@ -91,9 +115,6 @@ export function AuthForm({ type }: Props) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email,
         password: loginData.password,
-        options: {
-          captchaToken
-        }
       })
 
       if (error) throw error
@@ -114,8 +135,8 @@ export function AuthForm({ type }: Props) {
 
   const handleBasicSignup = (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!captchaToken) {
+
+    if (!captchaValid) {
       toast({
         title: "Error",
         description: "Please complete the captcha verification",
@@ -133,16 +154,16 @@ export function AuthForm({ type }: Props) {
       })
       return
     }
-    
+
     if (signupData.password !== signupData.confirmPassword) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "Passwords do not match",
         variant: "destructive",
       })
       return
     }
-    
+
     if (signupData.password.length < 6) {
       toast({
         title: "Error",
@@ -151,7 +172,7 @@ export function AuthForm({ type }: Props) {
       })
       return
     }
-    
+
     if (!signupData.acceptedTerms) {
       toast({
         title: "Error",
@@ -168,7 +189,7 @@ export function AuthForm({ type }: Props) {
     e.preventDefault()
     setLoading(true)
 
-    if (!captchaToken) {
+    if (!captchaValid) {
       toast({
         title: "Error",
         description: "Please complete the captcha verification",
@@ -209,7 +230,6 @@ export function AuthForm({ type }: Props) {
             contactNumber: signupData.contactNumber,
             memberType: signupData.memberType
           },
-          captchaToken
         }
       })
 
@@ -235,7 +255,7 @@ export function AuthForm({ type }: Props) {
       <form onSubmit={handleBasicSignup}>
         <CardContent className="grid w-full items-center gap-4">
           {/* hCaptcha */}
-          
+
 
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="signup-email">Email</Label>
@@ -310,23 +330,51 @@ export function AuthForm({ type }: Props) {
               </Link>
             </Label>
           </div>
-          <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
         </CardContent>
 
         <CardFooter className="mt-4 flex flex-col gap-6">
-          <Button 
-            type="submit" 
+          {num1 !== null && num2 !== null && (
+          <div className="border rounded-lg p-3 bg-gray-50 flex items-center gap-3">
+            <Shield className="text-blue-500 w-6 h-6" />
+            <div className="flex-1">
+              <p className="text-sm">Prove you’re human:</p>
+              <div className="flex gap-2 mt-1">
+                <span className="font-semibold">
+                  {num1} + {num2} =
+                </span>
+                <input
+                  type="number"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  className="border p-1 rounded w-16 text-center"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCaptchaCheck}
+                >
+                  Verify
+                </Button>
+              </div>
+              {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+              {captchaValid && (
+                <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" /> Verified
+                </p>
+              )}
+            </div>
+          </div>
+          )}
+
+          <Button
+            type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600"
-            disabled={loading || !captchaToken}
+            disabled={loading || !captchaValid}
           >
             {loading ? <Loader2 className="animate-spin" /> : "Continue"}
           </Button>
-          
+
           <p className="text-xs">
             Already have an account?{' '}
             <Link
@@ -347,7 +395,7 @@ export function AuthForm({ type }: Props) {
       <form onSubmit={handleFullSignup}>
         <CardContent className="grid w-full items-center gap-4">
           {/* hCaptcha */}
-    
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="first-name">First Name</Label>
@@ -422,13 +470,6 @@ export function AuthForm({ type }: Props) {
               </SelectContent>
             </Select>
           </div>
-                <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
-
 
         </CardContent>
 
@@ -470,7 +511,7 @@ export function AuthForm({ type }: Props) {
   return (
     <form onSubmit={handleLogin}>
       <CardContent className="grid w-full items-center gap-4">
-    
+
         <div className="flex flex-col space-y-1.5">
           <Label htmlFor="login-email">Email</Label>
           <div className="relative">
@@ -511,7 +552,7 @@ export function AuthForm({ type }: Props) {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          
+
         </div>
 
         {/* <div className="flex flex-col space-y-1.5">
@@ -540,22 +581,44 @@ export function AuthForm({ type }: Props) {
           />
           <Label htmlFor="remember-me" className="text-sm">Remember me</Label>
         </div>
-
-            {/* hCaptcha */}
-        <HCaptcha
-          ref={hcaptchaRef}
-          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-          onVerify={setCaptchaToken}
-          onError={(err) => console.error('hCaptcha error:', err)}
-        />
-
       </CardContent>
 
       <CardFooter className="mt-4 flex flex-col gap-6">
+        <div className="border rounded-lg p-3 bg-gray-50 flex items-center gap-3">
+          <Shield className="text-blue-500 w-6 h-6" />
+          <div className="flex-1">
+            <p className="text-sm">Prove you’re human:</p>
+            <div className="flex gap-2 mt-1">
+              <span className="font-semibold">
+                {num1} + {num2} =
+              </span>
+              <input
+                type="number"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                className="border p-1 rounded w-16 text-center"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleCaptchaCheck}
+              >
+                Verify
+              </Button>
+            </div>
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+            {captchaValid && (
+              <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4" /> Verified
+              </p>
+            )}
+          </div>
+        </div>
         <Button
           type="submit"
           className="w-full bg-orange-500 hover:bg-orange-600"
-          disabled={loading || !captchaToken}
+          disabled={loading || !captchaValid}
         >
           {loading ? <Loader2 className="animate-spin" /> : "Login"}
         </Button>

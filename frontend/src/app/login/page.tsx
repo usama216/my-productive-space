@@ -2,6 +2,7 @@
 // src/app/login/page.tsx
 import { AuthForm } from "@/components/AuthForm"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { RecaptchaProvider } from "@/components/captcha/CaptchaProvider"
 
 function LoginPage() {
   return (
@@ -13,7 +14,7 @@ function LoginPage() {
             Welcome back to CoWork@mps-Kovan
           </p>
         </CardHeader>
-        <AuthForm type="login" />
+          <AuthForm type="login" />
       </Card>
     </div>
   )
