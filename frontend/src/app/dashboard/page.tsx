@@ -35,6 +35,7 @@ import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import { EntitlementHistory } from '@/components/dashboard/EntitlementHistory'
 import { PromoCodeHistory } from '@/components/dashboard/PromoCodeHistory'
+import { UserBookings } from '@/components/dashboard/UserBookings'
 
 // Mock data types
 interface Booking {
@@ -347,13 +348,14 @@ export default function UAMDashboard() {
 
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
               <TabsTrigger value="history">History</TabsTrigger>
               <TabsTrigger value="passes">Passes & Vouchers</TabsTrigger>
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+              <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
 
             </TabsList>
 
@@ -711,6 +713,11 @@ export default function UAMDashboard() {
             {/* Promo Codes Tab */}
             <TabsContent value="promocodes" className="space-y-6">
               <PromoCodeHistory userId={user.id} />
+            </TabsContent>
+
+            {/* My Bookings Tab */}
+            <TabsContent value="mybookings" className="space-y-6">
+              <UserBookings />
             </TabsContent>
 
           </Tabs>

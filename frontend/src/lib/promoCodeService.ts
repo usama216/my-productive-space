@@ -7,23 +7,22 @@ console.log('API_BASE_URL set to:', API_BASE_URL);
 export interface PromoCode {
   id: string;
   code: string;
-  name: string;
+  name?: string;
   description: string;
-  discounttype: 'PERCENTAGE' | 'FIXED';
+  discounttype: 'percentage' | 'fixed';
   discountvalue: number;
   minimumamount: number;
   maximumdiscount: number | null;
   maxusageperuser: number;
   maxtotalusage: number;
-  currentusage: number;
+  currentusage?: number;
   activefrom: string;
   activeto: string | null;
   isactive: boolean;
-  category: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
-  createdat: string;
-  updatedat: string;
-  usageCount: number;
-  remainingGlobalUses: number | null;
+  category?: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
+  createdat?: string;
+  updatedat?: string;
+  usageCount?: number;
 }
 
 export interface PromoCodeUsage {
@@ -170,30 +169,54 @@ export const getAvailablePromoCodes = async (userId: string): Promise<AvailableP
       console.log('Admin endpoint response:', adminResult);
       
       if (adminResult.promoCodes && Array.isArray(adminResult.promoCodes)) {
-        // Filter active promo codes and map to PromoCode interface
-        const availablePromos = adminResult.promoCodes
-          .filter((promo: any) => promo.isactive !== false) // Only active promo codes
-          .map((promo: any) => ({
-            id: promo.id,
-            code: promo.code,
-            name: promo.name,
-            description: promo.description,
-            discounttype: promo.discounttype,
-            discountvalue: promo.discountvalue,
-            minimumamount: promo.minimumamount,
-            maximumdiscount: promo.maximumdiscount,
-            maxusageperuser: promo.maxusageperuser,
-            maxtotalusage: promo.maxtotalusage,
-            currentusage: promo.currentusage,
-            activefrom: promo.activefrom,
-            activeto: promo.activeto,
-            isactive: promo.isactive,
-            category: promo.category,
-            createdat: promo.createdat,
-            updatedat: promo.updatedat,
-            usageCount: promo.usageCount,
-            remainingGlobalUses: promo.remainingGlobalUses
-          }));
+                 // Filter active promo codes and map to PromoCode interface
+         const availablePromos = adminResult.promoCodes
+           .filter((promo: any) => {
+             // Only show active promo codes
+             if (promo.isactive !== true) return false;
+             
+             // Check if promo code is within valid date range
+             const now = new Date();
+             const activeFrom = new Date(promo.activefrom);
+             
+             // Must be active from now or in the past (allow future start dates for preview)
+             if (activeFrom > now) return false;
+             
+             // If there's an expiry date, must not be expired
+             if (promo.activeto) {
+               const activeTo = new Date(promo.activeto);
+               if (activeTo < now) return false;
+             }
+             
+             // Check if promo code hasn't reached its total usage limit
+             if (promo.maxtotalusage && promo.currentusage >= promo.maxtotalusage) return false;
+             
+             // Additional validation: ensure promo code has valid discount values
+             if (promo.discountvalue <= 0) return false;
+             if (promo.minimumamount < 0) return false;
+             
+             return true;
+           })
+           .map((promo: any) => ({
+             id: promo.id,
+             code: promo.code,
+             name: promo.name,
+             description: promo.description,
+             discounttype: promo.discounttype,
+             discountvalue: promo.discountvalue,
+             minimumamount: promo.minimumamount,
+             maximumdiscount: promo.maximumdiscount,
+             maxusageperuser: promo.maxusageperuser,
+             maxtotalusage: promo.maxtotalusage,
+             currentusage: promo.currentusage,
+             activefrom: promo.activefrom,
+             activeto: promo.activeto,
+             isactive: promo.isactive,
+             category: promo.category,
+             createdat: promo.createdat,
+             updatedat: promo.updatedat,
+             usageCount: promo.usageCount
+           }));
         
         return {
           success: true,
@@ -286,7 +309,21 @@ export const getUsedPromoCodes = async (userId: string): Promise<UsedPromosRespo
 };
 
 // Admin API Functions
-export const createPromoCode = async (promoData: Omit<PromoCode, 'id' | 'createdat' | 'updatedat' | 'currentusage' | 'usageCount'>): Promise<PromoCodeResponse> => {
+export const createPromoCode = async (promoData: {
+  code: string;
+  name?: string;
+  description: string;
+  discounttype: 'percentage' | 'fixed';
+  discountvalue: number;
+  minimumamount: number;
+  maximumdiscount?: number;
+  maxusageperuser: number;
+  maxtotalusage: number;
+  category?: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
+  isactive: boolean;
+  activefrom: string;
+  activeto?: string | null;
+}): Promise<PromoCodeResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/promocode/admin/create`, {
       method: 'POST',
@@ -317,7 +354,21 @@ export const createPromoCode = async (promoData: Omit<PromoCode, 'id' | 'created
   }
 };
 
-export const updatePromoCode = async (id: string, promoData: Partial<PromoCode>): Promise<PromoCodeResponse> => {
+export const updatePromoCode = async (id: string, promoData: Partial<{
+  code: string;
+  name?: string;
+  description: string;
+  discounttype: 'percentage' | 'fixed';
+  discountvalue: number;
+  minimumamount: number;
+  maximumdiscount?: number;
+  maxusageperuser: number;
+  maxtotalusage: number;
+  category?: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
+  isactive: boolean;
+  activefrom: string;
+  activeto?: string | null;
+}>): Promise<PromoCodeResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'PUT',
@@ -350,6 +401,8 @@ export const updatePromoCode = async (id: string, promoData: Partial<PromoCode>)
 
 export const deletePromoCode = async (id: string): Promise<PromoCodeResponse> => {
   try {
+    console.log('Attempting to delete promo code:', id);
+    
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'DELETE',
       headers: {
@@ -358,12 +411,26 @@ export const deletePromoCode = async (id: string): Promise<PromoCodeResponse> =>
     });
 
     const result = await response.json();
+    console.log('Delete response:', { status: response.status, result });
     
     if (!response.ok) {
+      // Handle specific error cases
+      let errorMessage = 'Failed to delete promo code';
+      
+      if (result.error) {
+        if (result.error.includes('usage')) {
+          errorMessage = 'Cannot delete promo code that is currently in use. Please deactivate it first.';
+        } else if (result.error.includes('constraint')) {
+          errorMessage = 'Cannot delete promo code due to existing references. Please deactivate it first.';
+        } else {
+          errorMessage = result.error;
+        }
+      }
+      
       return {
         success: false,
         error: result.error || 'Failed to delete promo code',
-        message: 'Failed to delete promo code',
+        message: errorMessage,
       };
     }
 
@@ -373,7 +440,7 @@ export const deletePromoCode = async (id: string): Promise<PromoCodeResponse> =>
     return {
       success: false,
       error: 'Network error occurred',
-      message: 'Network error occurred',
+      message: 'Network error occurred. Please try again.',
     };
   }
 };
@@ -400,9 +467,37 @@ export const getAllPromoCodes = async (): Promise<AvailablePromosResponse> => {
 
     // Handle the API response structure where data is in 'promoCodes' array
     if (result.promoCodes && Array.isArray(result.promoCodes)) {
+      console.log('Raw API response promoCodes:', result.promoCodes);
+      
+             // Map the response to match our snake_case interface
+       const mappedPromoCodes = result.promoCodes.map((promo: any) => {
+         const mapped = {
+           id: promo.id,
+           code: promo.code,
+           name: promo.name,
+           description: promo.description,
+           discounttype: promo.discounttype || promo.discountType,
+           discountvalue: promo.discountvalue || promo.discountValue,
+           minimumamount: promo.minimumamount || promo.minimumAmount,
+           maximumdiscount: promo.maximumdiscount || promo.maxDiscountAmount,
+           maxusageperuser: promo.maxusageperuser || promo.maxUsagePerUser,
+           maxtotalusage: promo.maxtotalusage || promo.maxTotalUsage,
+           currentusage: promo.currentusage || promo.currentUsage,
+           activefrom: promo.activefrom || promo.activeFrom,
+           activeto: promo.activeto || promo.activeTo,
+           isactive: promo.isactive || promo.isActive,
+           category: promo.category,
+           createdat: promo.createdat || promo.createdAt,
+           updatedat: promo.updatedat || promo.updatedAt,
+           usageCount: promo.usageCount
+         };
+         console.log('Mapped promo code:', mapped);
+         return mapped;
+       });
+      
       return {
         success: true,
-        data: result.promoCodes,
+        data: mappedPromoCodes,
         message: 'Promo codes fetched successfully'
       };
     }
@@ -422,8 +517,13 @@ export const getAllPromoCodes = async (): Promise<AvailablePromosResponse> => {
 
 // Local Utility Functions (for immediate validation and calculation)
 export const validatePromoCodeLocally = (promoCode: PromoCode, amount: number): { isValid: boolean; message: string } => {
+  // Check if promo code is active
+  if (!promoCode.isactive) {
+    return { isValid: false, message: 'Promo code is not active' };
+  }
+
   // Check usage limit
-  if (promoCode.usageCount >= promoCode.maxusageperuser) {
+  if (promoCode.usageCount && promoCode.usageCount >= promoCode.maxusageperuser) {
     return { isValid: false, message: 'Promo code usage limit reached' };
   }
 
@@ -436,9 +536,14 @@ export const validatePromoCodeLocally = (promoCode: PromoCode, amount: number): 
   }
 
   return { isValid: true, message: 'Promo code is valid' };
-};
+ };
 
 export const calculateDiscountLocally = (promoCode: PromoCode, amount: number): { discountAmount: number; finalAmount: number } => {
+  // Check if promo code is active first
+  if (!promoCode.isactive) {
+    return { discountAmount: 0, finalAmount: amount };
+  }
+
   // Check minimum amount requirement first
   if (promoCode.minimumamount && amount < promoCode.minimumamount) {
     return { discountAmount: 0, finalAmount: amount };
@@ -446,7 +551,7 @@ export const calculateDiscountLocally = (promoCode: PromoCode, amount: number): 
 
   let discountAmount = 0;
 
-  if (promoCode.discounttype === 'PERCENTAGE' && promoCode.discountvalue) {
+  if (promoCode.discounttype === 'percentage' && promoCode.discountvalue) {
     // Calculate percentage discount
     discountAmount = (amount * promoCode.discountvalue) / 100;
     
@@ -454,7 +559,7 @@ export const calculateDiscountLocally = (promoCode: PromoCode, amount: number): 
     if (promoCode.maximumdiscount && discountAmount > promoCode.maximumdiscount) {
       discountAmount = promoCode.maximumdiscount;
     }
-  } else if (promoCode.discounttype === 'FIXED' && promoCode.discountvalue) {
+  } else if (promoCode.discounttype === 'fixed' && promoCode.discountvalue) {
     // Fixed amount discount
     discountAmount = promoCode.discountvalue;
     
@@ -475,16 +580,16 @@ export const checkMinimumAmountRequirement = (promoCode: PromoCode, amount: numb
 };
 
 export const formatDiscountDisplay = (promoCode: PromoCode): string => {
-  if (promoCode.discounttype === 'PERCENTAGE' && promoCode.discountvalue) {
+  if (promoCode.discounttype === 'percentage' && promoCode.discountvalue) {
     return `${promoCode.discountvalue}% off`;
-  } else if (promoCode.discounttype === 'FIXED' && promoCode.discountvalue) {
+  } else if (promoCode.discounttype === 'fixed' && promoCode.discountvalue) {
     return `$${promoCode.discountvalue} off`;
   }
   return 'Discount available';
 };
 
 export const getPromoCodeStatusColor = (promoCode: PromoCode): string => {
-  if (promoCode.usageCount >= promoCode.maxusageperuser) {
+  if (promoCode.usageCount && promoCode.usageCount >= promoCode.maxusageperuser) {
     return 'text-red-500';
   }
   

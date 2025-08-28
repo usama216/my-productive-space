@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertTriangle, Clock, Search, Settings, Mail, FileText } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PromoCodeManagement } from './PromoCodeManagement'
+import { BookingManagement } from './BookingManagement'
 
 export default function AdminTabs({
   activeTab,
@@ -39,7 +40,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="cancellations">
           Cancellations
@@ -58,6 +59,7 @@ export default function AdminTabs({
           )}
         </TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+        <TabsTrigger value="bookings">Bookings</TabsTrigger>
         {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
       </TabsList>
 
@@ -224,6 +226,11 @@ export default function AdminTabs({
       {/* Promo Codes Tab */}
       <TabsContent value="promocodes" className="space-y-4">
         <PromoCodeManagement />
+      </TabsContent>
+
+      {/* Bookings Tab */}
+      <TabsContent value="bookings" className="space-y-4">
+        <BookingManagement />
       </TabsContent>
 
       {/* Settings Tab */}
