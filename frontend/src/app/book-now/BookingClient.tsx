@@ -682,17 +682,24 @@ export default function BookingClient() {
         members: peopleBreakdown.coWorkers,
         tutors: peopleBreakdown.coTutors,
         totalCost: baseSubtotal,
-                                    // discountId: promoCodeInfo?.id || null,
+        promoCodeId: promoCodeInfo?.promoCode?.id || null,
+        discountAmount: promoCodeInfo?.discountAmount || 0,
         totalAmount: total,
         memberType: memberType,
-        // memberType: 'STUDENT',
         bookedForEmails: [customerEmail],
         confirmedPayment: false,
         bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
         paymentId: null,
-        // paymentMethod will be updated when user selects payment method in step 2
         bookedAt: new Date().toISOString()
       }
+
+      // Log the payload for debugging
+      console.log('Creating booking with payload:', {
+        ...bookingPayload,
+        promoCodeInfo: promoCodeInfo,
+        hasPromoCode: !!promoCodeInfo?.promoCode?.id,
+        discountAmount: promoCodeInfo?.discountAmount || 0
+      });
 
       // Call the create booking API
       const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
