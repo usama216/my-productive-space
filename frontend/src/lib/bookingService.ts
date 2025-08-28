@@ -199,6 +199,40 @@ export const getAllBookings = async (): Promise<BookingResponse> => {
   }
 }
 
+export const getUserBookings = async (): Promise<BookingResponse> => {
+  try {
+    // Get userId from localStorage auth_user
+    let userId = '123e4567-e89b-12d3-a456-426614174000' // fallback
+    
+    try {
+      const authUser = localStorage.getItem('auth_user')
+      if (authUser) {
+        const userData = JSON.parse(authUser)
+        userId = userData.id || userId
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse auth_user from localStorage:', parseError)
+    }
+    
+    const response = await fetch(`${API_BASE}/booking/user/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    })
+    
+    return await handleResponse(response)
+  } catch (error) {
+    console.error('Get User Bookings Error:', error)
+    return {
+      success: false,
+      error: 'Failed to fetch user bookings',
+      message: 'Failed to fetch user bookings'
+    }
+  }
+}
+
 export const getBookingById = async (id: string): Promise<BookingResponse> => {
   try {
     const response = await fetch(`${API_BASE}/booking/getById/${id}`)

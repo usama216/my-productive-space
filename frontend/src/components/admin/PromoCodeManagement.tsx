@@ -76,14 +76,14 @@ export function PromoCodeManagement() {
   // Filter promo codes
   const filteredPromoCodes = promoCodes.filter(promo => {
     const matchesSearch = promo.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         promo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (promo.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                          promo.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = filterCategory === 'all' || promo.category === filterCategory
+    const matchesCategory = filterCategory === 'all' || (promo.category || 'GENERAL') === filterCategory
     return matchesSearch && matchesCategory
   })
 
   // Get unique categories from promo codes
-  const categories = ['all', ...Array.from(new Set(promoCodes.map(p => p.category)))]
+  const categories = ['all', ...Array.from(new Set(promoCodes.map(p => p.category || 'GENERAL').filter(Boolean)))]
 
   // Validate form data
   const validateFormData = () => {
@@ -309,7 +309,7 @@ export function PromoCodeManagement() {
       category: 'GENERAL' as 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL',
       isactive: true,
       activefrom: oneHourFromNow.toISOString(),
-      activeto: null
+      activeto: null as string | null
     })
   }
 
@@ -753,7 +753,7 @@ export function PromoCodeManagement() {
                        <TableCell>
                          <div className="text-sm">
                            <div className="font-medium">From: {formatDate(promo.activefrom)}</div>
-                           <div className="text-gray-500">To: {formatDate(promo.activeto)}</div>
+                           <div className="text-gray-500">To: {promo.activeto ? formatDate(promo.activeto) : 'No expiry'}</div>
                          </div>
                        </TableCell>
                                                <TableCell>
