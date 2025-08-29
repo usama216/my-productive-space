@@ -364,10 +364,18 @@ export function UserManagement() {
               Manage all registered users, their member types, and student verification status
             </p>
          </div>
-         <Button onClick={exportToExcel} className="flex items-center gap-2">
+         {/* <Button onClick={exportToExcel} className="flex items-center gap-2">
            <Download className="h-4 w-4" />
            Export to Excel
-         </Button>
+         </Button> */}
+          <Button
+            variant="outline"
+            onClick={exportToExcel}
+            className="flex items-center space-x-2"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export to Excel</span>
+          </Button>
        </div>
 
       {/* Stats Cards */}
@@ -418,7 +426,7 @@ export function UserManagement() {
       )}
 
       {/* Search Filter */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />
@@ -440,7 +448,7 @@ export function UserManagement() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Users Table */}
       <Card>
@@ -547,13 +555,13 @@ export function UserManagement() {
                        </TableCell>
                       <TableCell>
                                                  <div className="flex items-center gap-2">
-                           <Button
+                           {/* <Button
                              variant="outline"
                              size="sm"
                              onClick={() => handleEdit(user)}
                            >
                              <Edit className="h-4 w-4" />
-                           </Button>
+                           </Button> */}
                            
                            {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && (
                              <>

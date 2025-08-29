@@ -41,9 +41,9 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="cancellations">
+        {/* <TabsTrigger value="cancellations">
           Cancellations
           {cancellations.filter(c => c.status === 'pending').length > 0 && (
             <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-1">
@@ -58,10 +58,11 @@ export default function AdminTabs({
               {users.filter(u => u.verificationStatus === 'pending').length}
             </span>
           )}
-        </TabsTrigger>
-        <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+        </TabsTrigger> */}
         <TabsTrigger value="bookings">Bookings</TabsTrigger>
         <TabsTrigger value="user-management">User Management</TabsTrigger>
+        <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+
         {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
       </TabsList>
 

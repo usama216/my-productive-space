@@ -396,7 +396,7 @@ export function BookingManagement() {
       </div>
 
       {/* Filters */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Filter className="h-5 w-5" />
@@ -520,7 +520,7 @@ export function BookingManagement() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Bookings Table */}
       <Card>
@@ -554,7 +554,7 @@ export function BookingManagement() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
-                    <TableHead>Actions</TableHead>
+                    {/* <TableHead>Actions</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -616,7 +616,7 @@ export function BookingManagement() {
                           {booking.confirmedPayment ? 'Paid' : 'Unpaid'}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -679,7 +679,7 @@ export function BookingManagement() {
                             </AlertDialogContent>
                           </AlertDialog>
                         </div>
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   ))}
                 </TableBody>
