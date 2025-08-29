@@ -6,22 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle, XCircle, Loader2, Users, GraduationCap } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Users, GraduationCap, AlertCircle } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
-// Mock student data for validation
-const MOCK_STUDENTS = [
-  { id: 'STU001', email: 'john.doe@university.edu', name: 'John Doe', status: 'active' },
-  { id: 'STU002', email: 'jane.smith@university.edu', name: 'Jane Smith', status: 'active' },
-  { id: 'STU003', email: 'mike.johnson@university.edu', name: 'Mike Johnson', status: 'active' },
-  { id: 'STU004', email: 'sarah.wilson@university.edu', name: 'Sarah Wilson', status: 'active' },
-  { id: 'STU005', email: 'alex.brown@university.edu', name: 'Alex Brown', status: 'suspended' },
-]
-
-export type Student = {
-  id: string
+// Real API response type
+export type StudentVerificationResponse = {
+  isStudent: boolean
+  verificationStatus: 'VERIFIED' | 'PENDING' | 'REJECTED' | 'NOT_FOUND'
+  message: string
   email: string
   name: string
-  status: 'active' | 'suspended'
 }
 
 export type StudentValidationStatus = {
@@ -29,7 +23,13 @@ export type StudentValidationStatus = {
   studentId: string
   isValidating: boolean
   isValid: boolean
-  studentData: Student | null
+  studentData: {
+    id: string
+    email: string
+    name: string
+    memberType: string
+    verifiedAt?: string
+  } | null
   error: string | null
 }
 
@@ -38,16 +38,33 @@ type StudentValidationProps = {
   onValidationChange: (allValid: boolean, validatedStudents: StudentValidationStatus[]) => void
 }
 
-// Replace this with your Supabase validation logic
-const validateStudentAccount = async (studentId: string): Promise<{ success: boolean; student?: Student; error?: string }> => {
-  await new Promise(res => setTimeout(res, 800 + Math.random() * 400))
-  const student = MOCK_STUDENTS.find(s => s.id.toLowerCase() === studentId.toLowerCase() || s.email.toLowerCase() === studentId.toLowerCase())
-  if (!student) return { success: false, error: 'Account not found' }
-  if (student.status !== 'active') return { success: false, error: 'Account suspended' }
-  return { success: true, student }
+// Real API call to validate student
+const validateStudentAccount = async (email: string): Promise<StudentVerificationResponse> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/student/check-verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: email.trim() }),
+    })
+
+    const data = await response.json()
+    return data
+             } catch (error) {
+         console.error('Student validation error:', error)
+         return {
+           isStudent: false,
+           verificationStatus: 'NOT_FOUND',
+           message: 'Network error. Please try again.',
+           email: email,
+           name: 'Unknown'
+         }
+       }
 }
 
 export function StudentValidation({ numberOfStudents, onValidationChange }: StudentValidationProps) {
+  const { toast } = useToast()
   const [validations, setValidations] = useState<StudentValidationStatus[]>([])
 
   useEffect(() => {
@@ -56,7 +73,14 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
       const slots: StudentValidationStatus[] = []
       for (let i = 0; i < numberOfStudents; i++) {
         slots.push(
-          prev[i] || { id: `student-${i+1}`, studentId: '', isValidating: false, isValid: false, studentData: null, error: null }
+          prev[i] || { 
+            id: `student-${i+1}`, 
+            studentId: '', 
+            isValidating: false, 
+            isValid: false, 
+            studentData: null, 
+            error: null 
+          }
         )
       }
       return slots
@@ -78,37 +102,170 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
   const handleValidate = async (i: number) => {
     const slot = validations[i]
     if (!slot.studentId.trim()) return
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(slot.studentId.trim())) {
+      updateSlot(i, { 
+        isValidating: false, 
+        isValid: false, 
+        error: 'Please enter a valid email address' 
+      })
+      return
+    }
+
     updateSlot(i, { isValidating: true, error: null })
-    const res = await validateStudentAccount(slot.studentId.trim())
-    updateSlot(i, { isValidating: false, isValid: res.success, studentData: res.student || null, error: res.error || null })
+    
+    try {
+      const res = await validateStudentAccount(slot.studentId.trim())
+      
+                      if (res.isStudent && res.verificationStatus === 'VERIFIED') {
+         updateSlot(i, { 
+           isValidating: false, 
+           isValid: true, 
+           studentData: {
+             id: 'verified',
+             email: res.email,
+             name: res.name,
+             memberType: 'STUDENT',
+             verifiedAt: new Date().toISOString()
+           }, 
+           error: null 
+         })
+         
+         toast({
+           title: "Student Validated",
+           description: `${res.name} (${res.email}) is a verified student.`,
+         })
+       } else {
+        updateSlot(i, { 
+          isValidating: false, 
+          isValid: false, 
+          studentData: null, 
+          error: res.message 
+        })
+        
+        toast({
+          title: "Validation Failed",
+          description: res.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      updateSlot(i, { 
+        isValidating: false, 
+        isValid: false, 
+        studentData: null, 
+        error: 'Validation failed. Please try again.' 
+      })
+      
+      toast({
+        title: "Error",
+        description: "Failed to validate student. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const clearValidation = (i: number) => {
+    updateSlot(i, { 
+      studentId: '', 
+      isValidating: false, 
+      isValid: false, 
+      studentData: null, 
+      error: null 
+    })
   }
 
   if (numberOfStudents === 0) return null
 
-  return (
-    <Card className="bg-blue-50 border-blue-200">
-      <CardHeader>
-        <CardTitle className="flex items-center text-blue-800">
-          <GraduationCap className="w-5 h-5 mr-2" /> Validate {numberOfStudents} Student{numberOfStudents>1?'s':''}
-        </CardTitle>
-      </CardHeader>
+     return (
+     <Card className="bg-orange-50 border-orange-200">
+       <CardHeader>
+         <CardTitle className="flex items-center text-orange-800">
+           <GraduationCap className="h-5 w-5 mr-2" /> 
+           Validate {numberOfStudents} Student{numberOfStudents > 1 ? 's' : ''}
+         </CardTitle>
+         <p className="text-sm text-orange-600 font-normal">
+           Enter student email addresses to verify their student status
+         </p>
+       </CardHeader>
       <CardContent className="space-y-4">
         {validations.map((v, i) => (
-          <div key={v.id} className="flex items-center space-x-2">
-            <Input
-              placeholder="ID or Email"
-              value={v.studentId}
-              onChange={e => updateSlot(i, { studentId: e.target.value, isValid: false, error: null })}
-              disabled={v.isValidating || v.isValid}
-            />
-            <Button onClick={() => handleValidate(i)} disabled={!v.studentId.trim() || v.isValidating || v.isValid}>
-              {v.isValidating ? <Loader2 className="animate-spin w-4 h-4" /> : v.isValid ? '✔️' : 'Validate'}
-            </Button>
-            {v.isValid && <CheckCircle className="text-green-500 w-5 h-5" />}
-            {v.error && <XCircle className="text-red-500 w-5 h-5" />}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
+          <div key={v.id} className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Input
+                placeholder="Enter student email address"
+                value={v.studentId}
+                onChange={e => updateSlot(i, { 
+                  studentId: e.target.value, 
+                  isValid: false, 
+                  error: null 
+                })}
+                disabled={v.isValidating || v.isValid}
+                className="flex-1"
+                type="email"
+              />
+              
+                             {!v.isValid ? (
+                 <Button 
+                   onClick={() => handleValidate(i)} 
+                   disabled={!v.studentId.trim() || v.isValidating}
+                   size="sm"
+                   className="bg-orange-500 hover:bg-orange-600"
+                 >
+                   {v.isValidating ? (
+                     <Loader2 className="animate-spin h-4 w-4" />
+                   ) : (
+                     'Validate'
+                   )}
+                 </Button>
+              ) : (
+                <Button 
+                  onClick={() => clearValidation(i)} 
+                  variant="outline"
+                  size="sm"
+                >
+                  Change
+                </Button>
+              )}
+            </div>
+
+                         {/* Validation Status */}
+             {v.isValid && v.studentData && (
+               <div className="flex items-center space-x-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                 <CheckCircle className="text-green-500 h-4 w-4" />
+                 <div className="text-sm text-green-800">
+                   <div className="font-medium">{v.studentData.name}</div>
+                   <div className="text-xs">{v.studentData.email} • {v.studentData.memberType}</div>
+                   <div className="text-xs text-green-600">✓ Verified Student</div>
+                   {v.studentData.verifiedAt && (
+                     <div className="text-xs text-green-600">
+                       Verified: {new Date(v.studentData.verifiedAt).toLocaleDateString()}
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )}
+
+                         {/* Error Message */}
+             {v.error && (
+               <div className="flex items-center space-x-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                 <XCircle className="text-red-500 h-4 w-4" />
+                 <div className="text-sm text-red-800">{v.error}</div>
+               </div>
+             )}
+
+             {/* Help Text */}
+             {!v.studentId && !v.isValid && !v.error && (
+               <div className="flex items-center space-x-2 text-xs text-orange-600">
+                 <AlertCircle className="h-3 w-3" />
+                 <span>Enter the student's email address to verify their status</span>
+               </div>
+             )}
+           </div>
+         ))}
+       </CardContent>
+     </Card>
+   )
+ }
