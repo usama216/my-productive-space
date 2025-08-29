@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText } from 'lucide-react'
+import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText, Download } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { 
   Booking, 
@@ -188,6 +188,95 @@ export function BookingManagement() {
     }
   }
 
+  // Export to Excel
+  const exportToExcel = async () => {
+    try {
+      // Call the same API but with limit 1000 to get all records
+      const exportFilters = { ...filters, limit: 1000, page: 1 }
+      const response = await getAdminBookings(exportFilters)
+      
+      if (response.success && response.bookings) {
+        // Convert bookings data to CSV format
+        const csvData = convertBookingsToCSV(response.bookings)
+        downloadCSV(csvData, 'bookings-export.csv')
+        
+        toast({
+          title: "Success",
+          description: `Exported ${response.bookings.length} bookings to Excel`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to export bookings",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error exporting bookings:', error)
+      toast({
+        title: "Error",
+        description: "Failed to export bookings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const convertBookingsToCSV = (bookings: Booking[]): string => {
+    const headers = [
+      'ID',
+      'Booking Ref',
+      'User Email',
+      'Start Time',
+      'End Time',
+      'Duration (hours)',
+      'Location',
+      'Member Type',
+      'Special Requests',
+      'Total Amount',
+      'Status',
+      'Payment Status',
+      'Pax',
+      'Students',
+      'Members',
+      'Tutors'
+    ]
+    
+    const rows = bookings.map(booking => [
+      booking.id,
+      booking.bookingRef,
+      booking.bookedForEmails?.[0] || 'N/A',
+      formatBookingDate(booking.startAt),
+      formatBookingDate(booking.endAt),
+      calculateDuration(booking.startAt, booking.endAt),
+      booking.location,
+      booking.memberType,
+      booking.specialRequests || '',
+      booking.totalAmount,
+      getBookingStatus(booking),
+      booking.confirmedPayment ? 'PAID' : 'UNPAID',
+      booking.pax,
+      booking.students,
+      booking.members,
+      booking.tutors
+    ])
+    
+    return [headers, ...rows]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n')
+  }
+
+  const downloadCSV = (csvContent: string, filename: string) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   // Handle cancel booking
   const handleCancel = async (booking: Booking, reason: string, refundAmount: number) => {
     try {
@@ -220,71 +309,7 @@ export function BookingManagement() {
     return dateString.slice(0, 16)
   }
 
-  // Export bookings to Excel
-  const exportToExcel = () => {
-    try {
-      // Create CSV content
-      const headers = [
-        'Booking Reference',
-        'User Name',
-        'User Email',
-        'Location',
-        'Start Date & Time',
-        'End Date & Time',
-        'Duration (hours)',
-        'Total Amount',
-        'Discount Amount',
-        'Status',
-        'Payment Status',
-        'Member Type',
-        'Special Requests',
-        'Created At'
-      ]
 
-      const csvContent = [
-        headers.join(','),
-        ...bookings.map(booking => [
-          booking.bookingRef,
-          booking.User?.name || 'N/A',
-          booking.User?.email || 'N/A',
-          booking.location,
-          new Date(booking.startAt).toLocaleString(),
-          new Date(booking.endAt).toLocaleString(),
-          calculateDuration(booking.startAt, booking.endAt),
-          booking.totalAmount,
-          booking.discountAmount || 0,
-          getBookingStatus(booking),
-          booking.confirmedPayment ? 'Paid' : 'Unpaid',
-          booking.User?.memberType || 'N/A',
-          `"${(booking.specialRequests || '').replace(/"/g, '""')}"`,
-          new Date(booking.createdAt || new Date()).toLocaleString()
-        ].join(','))
-      ].join('\n')
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      link.setAttribute('href', url)
-      link.setAttribute('download', `bookings_export_${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      toast({
-        title: "Export Successful",
-        description: "Bookings exported to Excel/CSV format",
-      })
-    } catch (error) {
-      console.error('Export Error:', error)
-      toast({
-        title: "Export Failed",
-        description: "Failed to export bookings",
-        variant: "destructive",
-      })
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -306,10 +331,10 @@ export function BookingManagement() {
           
           <Button
             variant="outline"
-            onClick={() => exportToExcel()}
+            onClick={exportToExcel}
             className="flex items-center space-x-2"
           >
-            <FileText className="h-4 w-4" />
+            <Download className="h-4 w-4" />
             <span>Export to Excel</span>
           </Button>
         </div>
@@ -538,15 +563,19 @@ export function BookingManagement() {
                       <TableCell>
                         <div className="font-mono font-bold">{booking.bookingRef}</div>
                       </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{booking.User?.name || 'N/A'}</div>
-                          <div className="text-sm text-gray-500">{booking.User?.email || 'N/A'}</div>
-                          <Badge variant="outline" className="text-xs">
-                            {booking.User?.memberType || 'N/A'}
-                          </Badge>
-                        </div>
-                      </TableCell>
+                                             <TableCell>
+                         <div>
+                           <div className="font-medium">
+                             {booking.bookedForEmails?.[0]?.split('@')[0] || 'N/A'}
+                           </div>
+                           <div className="text-sm text-gray-500">
+                             {booking.bookedForEmails?.[0] || 'N/A'}
+                           </div>
+                           <Badge variant="outline" className="text-xs">
+                             {booking.memberType || 'N/A'}
+                           </Badge>
+                         </div>
+                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-1">
                           <MapPin className="h-4 w-4 text-gray-400" />

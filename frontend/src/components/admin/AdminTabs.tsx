@@ -8,6 +8,7 @@ import { AlertTriangle, Clock, Search, Settings, Mail, FileText } from 'lucide-r
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PromoCodeManagement } from './PromoCodeManagement'
 import { BookingManagement } from './BookingManagement'
+import { UserManagement } from './UserManagement'
 
 export default function AdminTabs({
   activeTab,
@@ -40,7 +41,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-5">
+      <TabsList className="grid w-full grid-cols-6">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="cancellations">
           Cancellations
@@ -60,6 +61,7 @@ export default function AdminTabs({
         </TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
         <TabsTrigger value="bookings">Bookings</TabsTrigger>
+        <TabsTrigger value="user-management">User Management</TabsTrigger>
         {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
       </TabsList>
 
@@ -231,6 +233,11 @@ export default function AdminTabs({
       {/* Bookings Tab */}
       <TabsContent value="bookings" className="space-y-4">
         <BookingManagement />
+      </TabsContent>
+
+      {/* User Management Tab */}
+      <TabsContent value="user-management" className="space-y-4">
+        <UserManagement />
       </TabsContent>
 
       {/* Settings Tab */}

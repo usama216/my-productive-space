@@ -315,7 +315,7 @@ export default function UAMDashboard() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardContent className="p-4 text-center">
                 <Calendar className="w-8 h-8 mx-auto mb-2 text-blue-600" />
@@ -344,18 +344,18 @@ export default function UAMDashboard() {
                 <p className="text-sm text-gray-600">Member Type</p>
               </CardContent>
             </Card>
-          </div>
+          </div> */}
 
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
-              <TabsTrigger value="passes">Passes & Vouchers</TabsTrigger>
-              <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              {/* <TabsTrigger value="upcoming">Upcoming</TabsTrigger> */}
+              {/* <TabsTrigger value="history">History</TabsTrigger> */}
+              <TabsTrigger value="passes">Passes</TabsTrigger>
+              <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
 
             </TabsList>
 

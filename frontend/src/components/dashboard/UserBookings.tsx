@@ -147,7 +147,6 @@ export function UserBookings() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold">My Bookings</h2>
-        <p className="text-gray-600">Manage your study space bookings</p>
       </div>
 
 
