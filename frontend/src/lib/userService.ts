@@ -70,7 +70,7 @@ export interface UpdateUserPayload {
 }
 
 // API Base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api'
 
 // Helper function to handle API responses
 const handleResponse = async (response: Response): Promise<UserResponse> => {
