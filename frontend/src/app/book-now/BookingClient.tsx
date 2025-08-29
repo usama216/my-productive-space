@@ -868,7 +868,7 @@ export default function BookingClient() {
                               <PeopleSelector
                                 value={people}
                                 min={1}
-                                max={20}
+                                max={15}
                                 onChange={handlePeopleChange}
                                 showBreakdown={true}
                                 onBreakdownChange={handleBreakdownChange}
@@ -933,6 +933,18 @@ export default function BookingClient() {
                             numberOfStudents={peopleBreakdown.coStudents}
                             onValidationChange={handleStudentValidationChange}
                           />
+                          {peopleBreakdown.coStudents > 0 && (
+                            <div className={`mt-2 p-2 rounded-md text-sm ${
+                              studentsValidated 
+                                ? 'bg-green-50 border border-green-200 text-green-800' 
+                                : 'bg-orange-50 border border-orange-200 text-orange-800'
+                            }`}>
+                              {studentsValidated 
+                                ? `✅ All ${peopleBreakdown.coStudents} student${peopleBreakdown.coStudents > 1 ? 's' : ''} validated successfully!`
+                                : `⚠️ Please validate ${peopleBreakdown.coStudents} student${peopleBreakdown.coStudents > 1 ? 's' : ''} to continue`
+                              }
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1118,7 +1130,9 @@ export default function BookingClient() {
                           ? 'Sign In Required'
                           : selectedSeats.length !== people
                             ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
-                            : (isLoading ? 'Processing...' : 'Continue to Payment')
+                            : peopleBreakdown.coStudents > 0 && !studentsValidated
+                              ? `Validate ${peopleBreakdown.coStudents} Student${peopleBreakdown.coStudents > 1 ? 's' : ''} to Continue`
+                              : (isLoading ? 'Processing...' : 'Continue to Payment')
                         }
                       </Button>
 

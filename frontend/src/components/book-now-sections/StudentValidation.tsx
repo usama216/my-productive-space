@@ -256,13 +256,7 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
                </div>
              )}
 
-             {/* Help Text */}
-             {!v.studentId && !v.isValid && !v.error && (
-               <div className="flex items-center space-x-2 text-xs text-orange-600">
-                 <AlertCircle className="h-3 w-3" />
-                 <span>Enter the student's email address to verify their status</span>
-               </div>
-             )}
+          
            </div>
          ))}
        </CardContent>
