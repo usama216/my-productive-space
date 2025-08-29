@@ -12,7 +12,7 @@ import { CardContent, CardFooter } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PhoneInput } from 'react-international-phone'
 import { PhoneNumberUtil } from 'google-libphonenumber'
-import HCaptcha from '@hcaptcha/react-hcaptcha'
+import ReCAPTCHA from 'react-google-recaptcha'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/hooks/use-toast'
@@ -45,9 +45,9 @@ export function AuthForm({ type }: Props) {
   const [signupStep, setSignupStep] = useState(1)
   const [phoneTouched, setPhoneTouched] = useState(false)
   
-  // hCaptcha
+  // Google reCAPTCHA
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const hcaptchaRef = useRef<HCaptcha>(null)
+  const recaptchaRef = useRef<ReCAPTCHA>(null)
 
   // Login form data
   const [loginData, setLoginData] = useState({
@@ -69,7 +69,7 @@ export function AuthForm({ type }: Props) {
   })
 
   const resetCaptcha = () => {
-    hcaptchaRef.current?.resetCaptcha()
+    recaptchaRef.current?.reset()
     setCaptchaToken(null)
   }
 
@@ -310,12 +310,15 @@ export function AuthForm({ type }: Props) {
               </Link>
             </Label>
           </div>
-          <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
+          <div className="flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+              onChange={setCaptchaToken}
+              onExpired={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
+          </div>
         </CardContent>
 
         <CardFooter className="mt-4 flex flex-col gap-6">
@@ -422,12 +425,15 @@ export function AuthForm({ type }: Props) {
               </SelectContent>
             </Select>
           </div>
-                <HCaptcha
-            ref={hcaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-            onVerify={setCaptchaToken}
-            onError={(err) => console.error('hCaptcha error:', err)}
-          />
+          <div className="flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+              onChange={setCaptchaToken}
+              onExpired={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
+          </div>
 
 
         </CardContent>
@@ -541,13 +547,16 @@ export function AuthForm({ type }: Props) {
           <Label htmlFor="remember-me" className="text-sm">Remember me</Label>
         </div>
 
-            {/* hCaptcha */}
-        <HCaptcha
-          ref={hcaptchaRef}
-          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-          onVerify={setCaptchaToken}
-          onError={(err) => console.error('hCaptcha error:', err)}
-        />
+        {/* Google reCAPTCHA */}
+        <div className="flex justify-center">
+          <ReCAPTCHA
+            ref={recaptchaRef}
+            sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+            onChange={setCaptchaToken}
+            onExpired={() => setCaptchaToken(null)}
+            onError={() => setCaptchaToken(null)}
+          />
+        </div>
 
       </CardContent>
 

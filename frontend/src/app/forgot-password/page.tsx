@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
-import HCaptcha from '@hcaptcha/react-hcaptcha'
+import ReCAPTCHA from 'react-google-recaptcha'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/hooks/use-toast'
@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const hcaptchaRef = useRef<HCaptcha>(null)
+  const recaptchaRef = useRef<ReCAPTCHA>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
         description: error.message || "An error occurred",
         variant: "destructive",
       })
-      hcaptchaRef.current?.resetCaptcha()
+      recaptchaRef.current?.reset()
       setCaptchaToken(null)
     } finally {
       setLoading(false)
@@ -90,12 +90,15 @@ export default function ForgotPasswordPage() {
                 />
               </div>
             </div>
-                <HCaptcha
-              ref={hcaptchaRef}
-              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY!}
-              onVerify={setCaptchaToken}
-              onError={(err) => console.error('hCaptcha error:', err)}
-            />
+            <div className="flex justify-center">
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+                onChange={setCaptchaToken}
+                onExpired={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+              />
+            </div>
             <br/>
           </CardContent>
 
