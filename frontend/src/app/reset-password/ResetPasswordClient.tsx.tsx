@@ -75,8 +75,8 @@ export default function ResetPasswordPage() {
 
       if (error) throw error
 
-      // Redirect with success message
-      router.push('/?toastType=passwordReset')
+      // Redirect to password reset success page
+      router.push('/password-reset-success')
 
     } catch (error: any) {
       toast({

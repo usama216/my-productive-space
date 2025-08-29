@@ -64,7 +64,7 @@ export function AuthForm({ type }: Props) {
     password: '',
     confirmPassword: '',
     contactNumber: '',
-    memberType: 'professional' as 'student' | 'professional' | 'freelancer',
+    memberType: 'member' as 'student' | 'member' | 'tutor',
     acceptedTerms: false
   })
 
@@ -199,21 +199,71 @@ export function AuthForm({ type }: Props) {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      // Test Supabase connection first
+      console.log('Testing Supabase connection...')
+      const { data: testData, error: testError } = await supabase.from('User').select('count').limit(1)
+      if (testError) {
+        console.error('Supabase connection test failed:', testError)
+        throw new Error(`Database connection failed: ${testError.message}`)
+      }
+      console.log('Supabase connection successful')
+      
+      // Step 1: Create user using Supabase Auth (this handles auth.users automatically)
+      console.log('Starting signup process...')
+      console.log('Email:', signupData.email)
+      console.log('Password length:', signupData.password.length)
+      console.log('Captcha token exists:', !!captchaToken)
+      
+      // Test with minimal data first
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
         options: {
-          data: {
-            firstName: signupData.firstName,
-            lastName: signupData.lastName,
-            contactNumber: signupData.contactNumber,
-            memberType: signupData.memberType
-          },
           captchaToken
         }
       })
 
-      if (error) throw error
+      if (authError) {
+        console.error('Auth signup error:', authError)
+        throw authError
+      }
+
+      console.log('Auth user created successfully:', authData.user?.id)
+
+      // Step 2: Insert profile data into public.User table
+      if (authData.user) {
+        try {
+          console.log('Attempting to create user profile...')
+          
+                     const profileData = {
+             id: authData.user.id,
+             email: signupData.email,
+             firstName: signupData.firstName,
+             lastName: signupData.lastName,
+             memberType: signupData.memberType.toUpperCase() as 'STUDENT' | 'MEMBER' | 'TUTOR',
+             contactNumber: signupData.contactNumber,
+             studentVerificationStatus: signupData.memberType === 'student' ? 'PENDING' : 'PENDING',
+             createdAt: new Date().toISOString(),
+             updatedAt: new Date().toISOString()
+           }
+          
+          console.log('Profile data to insert:', profileData)
+
+          const { error: profileError } = await supabase
+            .from('User')
+            .insert(profileData)
+
+          if (profileError) {
+            console.error('Profile creation failed:', profileError)
+            throw new Error(`Profile creation failed: ${profileError.message}`)
+          }
+          
+          console.log('User profile created successfully')
+        } catch (profileError: any) {
+          console.error('Profile creation error:', profileError)
+          throw new Error(`Failed to create user profile: ${profileError.message}`)
+        }
+      }
 
       resetCaptcha()
       router.push(`/?toastType=signUp`)
@@ -410,19 +460,19 @@ export function AuthForm({ type }: Props) {
             <Label htmlFor="member-type">Member Type</Label>
             <Select
               value={signupData.memberType}
-              onValueChange={(value: 'student' | 'professional' | 'freelancer') =>
-                setSignupData({ ...signupData, memberType: value })
-              }
+                             onValueChange={(value: 'student' | 'member' | 'tutor') =>
+                 setSignupData({ ...signupData, memberType: value })
+               }
               disabled={loading}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="student">Student</SelectItem>
-                <SelectItem value="professional">Professional</SelectItem>
-                <SelectItem value="freelancer">Freelancer</SelectItem>
-              </SelectContent>
+                             <SelectContent>
+                 <SelectItem value="student">Student</SelectItem>
+                 <SelectItem value="member">Member</SelectItem>
+                 <SelectItem value="tutor">Tutor</SelectItem>
+               </SelectContent>
             </Select>
           </div>
           <div className="flex justify-center">

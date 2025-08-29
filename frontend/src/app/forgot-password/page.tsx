@@ -43,8 +43,8 @@ export default function ForgotPasswordPage() {
 
       if (error) throw error
 
-      // Show success message and redirect
-      router.push('/?toastType=resetEmailSent')
+      // Show success message and redirect to success page
+      router.push('/password-reset-success')
       
     } catch (error: any) {
       toast({
