@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CreditCard, Shield, QrCode, AlertTriangle } from 'lucide-react'
+import { CreditCard, Shield, QrCode, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -23,9 +23,9 @@ type Props = {
     notes?: string
   }
   onBack: () => void
-  onComplete: () => void
   user?: any
-  bookingId?: string // Add bookingId for package purchases
+  userPackageId?: string // ID from the user_packages table
+  orderId?: string // Order ID for the package purchase
 }
 
 export default function PaymentStep({
@@ -37,9 +37,9 @@ export default function PaymentStep({
   customer,
   order,
   onBack,
-  onComplete,
   user,
-  bookingId
+  userPackageId,
+  orderId
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
@@ -48,162 +48,168 @@ export default function PaymentStep({
   const creditCardFee = selectedPaymentMethod === 'creditCard' ? total * 0.05 : 0
   const finalTotal = total + creditCardFee
 
-  // Map payment methods to API values
-  const getPaymentMethodForAPI = (method: PaymentMethod): string => {
-    return method === 'creditCard' ? 'card' : 'paynow_online'
-  }
+
 
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setSelectedPaymentMethod(method)
     const newTotal = method === 'creditCard' ? total + (total * 0.05) : total
-    console.log(`Payment method changed to: ${method} (API value: ${getPaymentMethodForAPI(method)})`)
+    console.log(`Payment method changed to: ${method}`)
     // Update the parent component's payment method
     onPaymentMethodChange(method === 'creditCard' ? 'card' : 'paynow')
   }
 
-  const handlePay = async () => {
+    const handlePay = async () => {
     setLoading(true)
     try {
-      // Get current page full URL (with query params)
-      const redirectUrl = `${window.location.origin}${window.location.pathname}${window.location.search}&step=3`
+      // Construct redirect URL to step 3 for package confirmation
+      const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&orderId=${orderId}&userPackageId=${userPackageId}`
 
-      const body = {
-        amount: finalTotal.toFixed(2),
-        currency: 'SGD',
-        email: user?.email ?? 'guest@gmail.com',  // safe access
-        name: user?.user_metadata?.firstName ?? 'Guest',
-        purpose: 'Test Order Payment for My Productive Space',
-        reference_number: `${bookingId || 'DEMO'}`,
-        redirect_url: redirectUrl,
-        webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
-        payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)], // Array of strings
-        bookingId: bookingId || null, // Add bookingId field
+      // Call the new package payment API endpoint
+      const paymentData = {
+        userPackageId: userPackageId, // ID from the user_packages table
+        orderId: orderId, // Order ID for the package purchase
+        amount: finalTotal.toFixed(2), // Format as string with 2 decimal places
+        paymentMethod: selectedPaymentMethod === 'creditCard' ? 'card' : 'paynow_online', // Updated to match backend
+        customerInfo: {
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone
+        },
+        redirectUrl: redirectUrl, // Add redirect URL for backend to use
+        webhookUrl: `https://productive-space-backend.vercel.app/api/packages/webhook` // Add webhook URL
       }
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
+
+      console.log('Creating package payment:', paymentData)
+      console.log('Redirect URL after payment:', redirectUrl)
+      console.log('Backend URL:', process.env.NEXT_PUBLIC_BACKEND_BASE_URL)
+      console.log('Full API URL:', `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/packages/payment`)
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/packages/payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(paymentData),
       })
 
       const data = await res.json()
+      
       if (data.url) {
+        // Redirect to HitPay hosted payment page
+        console.log('Redirecting to HitPay payment page:', data.url)
         window.location.href = data.url
       } else {
         setLoading(false)
+        console.error('Package payment creation failed:', data.message || 'No payment URL received')
+        alert('Failed to create payment. Please try again.')
       }
     } catch (err) {
-      console.error('Payment error:', err)
+      console.error('Package payment error:', err)
       setLoading(false)
+      alert('Payment creation failed. Please try again.')
     }
   }
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-medium">Payment</h3>
-
-      {/* Payment Method Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <CreditCard className="w-5 h-5 mr-2" />
-            Select Payment Method
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RadioGroup
-            value={selectedPaymentMethod}
-            onValueChange={(value) => handlePaymentMethodChange(value as PaymentMethod)}
-            className="space-y-4"
-          >
-            <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
-              <RadioGroupItem value="payNow" id="payNow" />
-              <Label htmlFor="payNow" className="flex items-center space-x-3 cursor-pointer flex-1">
-                <QrCode className="w-5 h-5 text-orange-500" />
-                <div>
-                  <div className="font-medium">Pay Now (Scan & Pay)</div>
-                  <div className="text-sm text-gray-600">Pay using QR code or bank transfer</div>
-                </div>
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
-              <RadioGroupItem value="creditCard" id="creditCard" />
-              <Label htmlFor="creditCard" className="flex items-center space-x-3 cursor-pointer flex-1">
-                <CreditCard className="w-5 h-5 text-blue-500" />
-                <div>
-                  <div className="font-medium">Credit Card Payment</div>
-                  <div className="text-sm text-gray-600">Pay using credit or debit card</div>
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
-
-          {/* Credit Card Fee Disclaimer */}
-          {selectedPaymentMethod === 'creditCard' && (
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-amber-800">
-                  <p className="font-medium">Credit Card Processing Fee</p>
-                  <p>A 5% processing fee will be added to your total amount when paying with credit card.</p>
-                </div>
+      <div>
+        <h3 className="text-lg font-medium mb-4">Payment Method</h3>
+        <RadioGroup value={selectedPaymentMethod} onValueChange={handlePaymentMethodChange}>
+          <div className="flex items-center space-x-2 p-4 border rounded-lg">
+            <RadioGroupItem value="payNow" id="payNow" />
+            <label htmlFor="payNow" className="flex-1 cursor-pointer">
+              <div className="flex items-center">
+                <Shield className="w-5 h-5 mr-2" />
+                <span>PayNow</span>
               </div>
+            </label>
+          </div>
+          <div className="flex items-center space-x-2 p-4 border rounded-lg">
+            <RadioGroupItem value="creditCard" id="creditCard" />
+            <label htmlFor="creditCard" className="flex-1 cursor-pointer">
+              <div className="flex items-center">
+                <CreditCard className="w-5 h-5 mr-2" />
+                <span>Credit/Debit Card</span>
+                {selectedPaymentMethod === 'creditCard' && (
+                  <span className="ml-2 text-sm text-gray-500">(+5% fee)</span>
+                )}
+              </div>
+            </label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      <div className="p-4 bg-gray-50 rounded-lg">
+        <h4 className="font-medium mb-3">Order Summary</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span>Package:</span>
+            <span>{order.packageName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Quantity:</span>
+            <span>{order.quantity}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Subtotal:</span>
+            <span>${subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>GST (9%):</span>
+            <span>${tax.toFixed(2)}</span>
+          </div>
+          {creditCardFee > 0 && (
+            <div className="flex justify-between text-orange-600">
+              <span>Credit Card Fee:</span>
+              <span>${creditCardFee.toFixed(2)}</span>
             </div>
           )}
-
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Order & Billing</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="text-sm text-gray-700">
-            <div><b>Package:</b> {order.packageName}</div>
-            <div><b>Quantity:</b> {order.quantity}</div>
+          <div className="flex justify-between font-medium border-t pt-2">
+            <span>Total:</span>
+            <span>${finalTotal.toFixed(2)}</span>
           </div>
-          <div className="text-sm text-gray-700">
-            <div><b>Payer:</b> {customer.name}</div>
-            <div><b>Email:</b> {customer.email}</div>
-            <div><b>Phone:</b> {customer.phone}</div>
-          </div>
+        </div>
+      </div>
 
-          <div className="border-t pt-4 space-y-2">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>GST (9%)</span>
-              <span>${tax.toFixed(2)}</span>
-            </div>
-            {creditCardFee > 0 && (
-              <div className="flex justify-between text-amber-600">
-                <span>Credit Card Fee (5%)</span>
-                <span>${creditCardFee.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold text-lg border-t pt-2">
-              <span>Total</span>
-              <span>${finalTotal.toFixed(2)}</span>
-            </div>
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-start space-x-2">
+          <QrCode className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-800">
+            <p className="font-medium">Payment Process</p>
+            <p>You will be redirected to a secure payment page to complete your purchase.</p>
+            <p className="mt-1">After payment, you'll be redirected back to confirm your package activation.</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={loading} className="flex-1">
-          Back
+      <div className="flex space-x-3">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          className="flex-1"
+          disabled={loading}
+        >
+          Back to Details
         </Button>
         <Button
           onClick={handlePay}
-          disabled={loading}
           className="flex-1 bg-orange-500 hover:bg-orange-600"
+          disabled={loading}
         >
-          {loading ? 'Processing…' : `Pay $${finalTotal.toFixed(2)}`}
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            `Pay ${selectedPaymentMethod === 'creditCard' ? 'with Card' : 'with PayNow'}`
+          )}
         </Button>
       </div>
+
+      {loading && (
+        <div className="text-center text-sm text-gray-600">
+          <p>Redirecting to payment gateway...</p>
+        </div>
+      )}
     </div>
   )
 }

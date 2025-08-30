@@ -1,11 +1,17 @@
 // app/pricing/page.tsx
 'use client'
 
+import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import { ContactSection } from '@/components/landing-page-sections/ContactSection'
 import { Tab } from '@headlessui/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { usePackages } from '@/hooks/usePackages'
+import { Package } from '@/lib/api/packages'
+import { Loader2, AlertCircle } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 
 const rateHeaders = ['30min(0.5hr)', '1 hr', '> 1 hr']
 const rateRows = [
@@ -23,31 +29,56 @@ const promos = [
   },
 ]
 
-const packages = [
-  {
-    title: 'Half-Day Productivity Boost',
-    img: '/pricing_img/package-1.png',
-    details: [
-      '6 Half-Day Pass (6 hrs/pass)',
-      '4 Complimentary Hours',
-      'Valid 30 days from activation',
-      'SGD 109 (UP 150) + SGD 5 for all outlets'
-    ],
-  },
-  {
-    title: 'Flexible Full-Day Focus',
-    img: '/pricing_img/package-2.png',
-    details: [
-      '6 Full-Day Pass (12 hrs/pass)',
-      '2 Half-Day Passes (6 hrs/pass)',
-      'Valid 30 days from activation',
-      'SGD 209 (UP 280) + SGD 5 for all outlets'
-    ],
-  },
-]
-
 export default function PricingPage() {
   const router = useRouter()
+  const { packages, loading: packagesLoading, error: packagesError } = usePackages()
+
+  // Filter packages by type for display
+  const coworkPackages = packages.filter(pkg => pkg.type === 'cowork')
+  const costudyPackages = packages.filter(pkg => pkg.type === 'costudy')
+  const colearnPackages = packages.filter(pkg => pkg.type === 'colearn')
+
+  const handleBuyNow = (packageData: Package) => {
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=${packageData.type}`)
+  }
+
+  if (packagesLoading) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p>Loading packages...</p>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  if (packagesError) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="max-w-md mx-auto">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error Loading Packages</AlertTitle>
+              <AlertDescription>{packagesError}</AlertDescription>
+            </Alert>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 w-full"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <Navbar />
@@ -137,29 +168,40 @@ export default function PricingPage() {
 
             {/* Packages Panel */}
             <Tab.Panel className="grid gap-8 md:grid-cols-2">
-              {packages.map((pkg) => (
-                <div key={pkg.title} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
-                  <div className="relative h-48">
-                    <Image src={pkg.img} alt={pkg.title} fill className="object-cover" />
+              {packages.length > 0 ? (
+                packages.map((pkg) => (
+                  <div key={pkg.id} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
+                    <div className="relative h-48">
+                      <Image 
+                        src={`/pricing_img/package-${pkg.name.includes('Half-Day') ? '1' : '2'}.png`} 
+                        alt={pkg.name} 
+                        fill 
+                        className="object-cover" 
+                      />
+                    </div>
+                    <div className="p-6">
+                      <h4 className="text-xl font-semibold">{pkg.name}</h4>
+                      <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
+                        <li>{pkg.description}</li>
+                        {pkg.bonus && <li>{pkg.bonus}</li>}
+                        <li>Valid {pkg.validity} days from activation</li>
+                        <li>SGD {pkg.price} (UP {pkg.originalPrice}) + SGD {pkg.outletFee} for all outlets</li>
+                      </ul>
+                      <button
+                        onClick={() => handleBuyNow(pkg)}
+                        className="mt-4 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500"
+                      >
+                        Buy Now
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-6">
-                    <h4 className="text-xl font-semibold">{pkg.title}</h4>
-                    <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
-                      {pkg.details.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() =>
-                        router.push(`/buy-pass?package=${encodeURIComponent(pkg.title)}&type=cowork`)
-                      } 
-                      className="mt-4 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500"
-                    >
-                      Buy Now
-                    </button>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 col-span-2">
+                  <p className="text-gray-500 text-lg">No packages available at the moment.</p>
+                  <p className="text-gray-400">Please check back later.</p>
                 </div>
-              ))}
+              )}
             </Tab.Panel>
           </Tab.Panels>
         </Tab.Group>

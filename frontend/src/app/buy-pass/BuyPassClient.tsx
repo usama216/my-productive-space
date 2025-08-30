@@ -1,130 +1,62 @@
-// src/app/buy-pass/BuyPassClient.tsx  (Client Component)
+// src/app/buy-pass/BuyPassClient.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle } from 'lucide-react'
+import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
-
+import { usePackages } from '@/hooks/usePackages'
+import { Package as PackageType, packagesApi } from '@/lib/api/packages'
 
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
-
 import PaymentStep from '@/components/buy-pass/PaymentStep'
-
-
-// Package data - you might want to move this to a shared location
-const packageDetails = {
-  // Cowork packages
-  'Half-Day Productivity Boost': {
-    price: 109,
-    originalPrice: 150,
-    description: '6 Half-Day Pass (6 hrs/pass)',
-    bonus: '4 Complimentary Hours',
-    validity: '30 days from activation',
-    addon: 5,
-    type: 'cowork',
-    highlights: ['Perfect for part-time workers', 'Flexible scheduling', 'Access to all amenities']
-  },
-  'Flexible Full-Day Focus': {
-    price: 209,
-    originalPrice: 280,
-    description: '6 Full-Day Pass (12 hrs/pass)',
-    bonus: '2 Half-Day Passes (6 hrs/pass)',
-    validity: '30 days from activation',
-    addon: 5,
-    type: 'cowork',
-    highlights: ['Best value for full-time workers', 'Extended hours access', 'Priority booking']
-  },
-  // Costudy package
-  // 'Student Semester Bundle': {
-  //   price: 129,
-  //   originalPrice: 180,
-  //   description: '20 Study-Hour Pass',
-  //   bonus: 'Includes 5 Project-Room Credits',
-  //   validity: '60 days from activation',
-  //   addon: 0,
-  //   type: 'costudy',
-  //   highlights: ['Student-exclusive pricing', 'Group study room access', 'Extended validity']
-  // },
-  // Colearn packages (same as cowork in the original files)
-  'Half-Day Productivity Boost (Colearn)': {
-    price: 109,
-    originalPrice: 150,
-    description: '6 Half-Day Pass (6 hrs/pass)',
-    bonus: '4 Complimentary Hours',
-    validity: '30 days from activation',
-    addon: 5,
-    type: 'colearn',
-    highlights: ['Perfect for tutors', 'Flexible scheduling', 'Access to teaching facilities']
-  },
-  'Flexible Full-Day Focus (Colearn)': {
-    price: 209,
-    originalPrice: 280,
-    description: '6 Full-Day Pass (12 hrs/pass)',
-    bonus: '2 Half-Day Passes (6 hrs/pass)',
-    validity: '30 days from activation',
-    addon: 5,
-    type: 'colearn',
-    highlights: ['Best for full-time educators', 'Extended hours access', 'Priority room booking']
-  }
-}
 
 export default function BuyNowPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  // Auth state
+  // ALL HOOKS MUST BE CALLED FIRST - NO EARLY RETURNS
   const { user, loading: isLoadingAuth } = useAuth()
-  // Package selection state
-  const [selectedPackage, setSelectedPackage] = useState<string>('')
+  const { packages, loading: packagesLoading, error: packagesError, retryFetch } = usePackages()
+
+
+  // State variables
+  const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null)
   const [packageType, setPackageType] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
-  // Customer information state
   const [customerName, setCustomerName] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
   const [postalCode, setPostalCode] = useState('')
-
-  // Payment state
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'paynow'>('card')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
-
-  // UI state
   const [isLoading, setIsLoading] = useState(false)
-  const [purchaseStep, setPurchaseStep] = useState(1) // 1: Details, 2: Payment, 3: Confirmation
+  const [purchaseStep, setPurchaseStep] = useState(1)
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
-  const [orderId, setOrderId] = useState<string>('') // Generate unique order ID for package purchases
+  const [confirmationData, setConfirmationData] = useState<any>(null)
+  const [orderId, setOrderId] = useState<string>('')
+  const [userPackageId, setUserPackageId] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
 
-
-  // Redirect to login if not authenticated
+  // ALL useEffect calls
   useEffect(() => {
     if (!isLoadingAuth && !user) {
       router.push(`/login?next=/buy-pass${window.location.search}`)
     }
   }, [user, isLoadingAuth, router])
 
-  // Pre-fill user information when user changes
-  // Check authentication status
   useEffect(() => {
     if (user) {
       const metadata = user.user_metadata as any
@@ -136,150 +68,271 @@ export default function BuyNowPage() {
     }
   }, [user])
 
-  // Prefill form with data from URL
   useEffect(() => {
     const packageParam = searchParams.get('package')
     const typeParam = searchParams.get('type')
+    const stepParam = searchParams.get('step')
+    const orderIdParam = searchParams.get('orderId')
+    const userPackageIdParam = searchParams.get('userPackageId')
+    const referenceParam = searchParams.get('reference')
+    const statusParam = searchParams.get('status')
 
-    console.log('URL Params:', { packageParam, typeParam }) // Debug log
-
-    if (packageParam) {
-      // todo:check this hitpay
-      const decodedPackage = decodeURIComponent(packageParam)
-      // const decodedPackage = packageParam
-      console.log('Decoded package:', decodedPackage) // Debug log
-
-      // Check if the package exists in our packageDetails
-      if (packageDetails[decodedPackage as keyof typeof packageDetails]) {
-        setSelectedPackage(decodedPackage)
-        console.log('Package set:', decodedPackage) // Debug log
+    if (packageParam && packages.length > 0) {
+      const decodedPackageName = decodeURIComponent(packageParam)
+      const foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
+      if (foundPackage) {
+        setSelectedPackage(foundPackage)
       } else {
-        console.log('Package not found in packageDetails') // Debug log
+        setError(`Package "${decodedPackageName}" not found`)
       }
     }
+    
     if (typeParam) {
       setPackageType(typeParam)
     }
+  }, [searchParams, packages])
+
+  // Separate useEffect for step 3 handling to avoid dependency issues
+  useEffect(() => {
+    const stepParam = searchParams.get('step')
+    const orderIdParam = searchParams.get('orderId')
+    const userPackageIdParam = searchParams.get('userPackageId')
+    const referenceParam = searchParams.get('reference')
+    const statusParam = searchParams.get('status')
+
+    // Handle step 3 - payment confirmation
+    if (stepParam === '3' && orderIdParam && userPackageIdParam && referenceParam && statusParam === 'completed') {
+      console.log('Step 3 detected, setting up confirmation:', {
+        stepParam,
+        orderIdParam,
+        userPackageIdParam,
+        referenceParam,
+        statusParam
+      })
+      
+      setPurchaseStep(3)
+      setOrderId(orderIdParam)
+      setUserPackageId(userPackageIdParam)
+      
+      // Trigger confirmation immediately after state is set
+      const triggerConfirmation = () => {
+        console.log('Triggering confirmation with current state:', {
+          userPackageId: userPackageIdParam,
+          orderId: orderIdParam,
+          reference: referenceParam
+        })
+        
+        // Use the URL params directly instead of state
+        const confirmData = {
+          userPackageId: userPackageIdParam,
+          orderId: orderIdParam,
+          hitpayReference: referenceParam,
+          paymentStatus: 'completed'
+        }
+        
+        console.log('Calling confirm API with data:', confirmData)
+        
+        // Call the API directly
+        packagesApi.confirmPackagePurchase(confirmData)
+          .then(result => {
+            if (result.success) {
+              setConfirmationStatus('success')
+              setConfirmationData(result.data)
+              console.log('Package purchase confirmed successfully:', result.data)
+            } else {
+              throw new Error(result.message || 'Failed to confirm purchase')
+            }
+          })
+          .catch(error => {
+            console.error('Package confirmation error:', error)
+            setConfirmationStatus('error')
+            setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm purchase')
+            setConfirmationStatus('idle')
+          })
+      }
+      
+      // Trigger immediately
+      triggerConfirmation()
+    }
   }, [searchParams])
 
-  const currentPackage = selectedPackage ? packageDetails[selectedPackage as keyof typeof packageDetails] : null
-  const subtotal = currentPackage ? (currentPackage.price + currentPackage.addon) * quantity : 0
-  const tax = subtotal * 0.09 // 9% GST rn
+  // Helper functions
+  const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user
+  const subtotal = selectedPackage ? (selectedPackage.price + selectedPackage.outletFee) * quantity : 0
+  const tax = subtotal * 0.09
   const total = subtotal + tax
-
-  // Helper function to check if payment failed
-  const isPaymentFailed = useCallback((status: string | null) => {
-    return status === 'canceled' || status === 'cancelled' || status === 'failed' || 
-           status === 'declined' || status === 'rejected' || status === 'expired'
-  }, [])
-
-  // Function to confirm purchase
-  const confirmPurchase = useCallback(async () => {
-    try {
-      setConfirmationStatus('loading')
-      setConfirmationError(null)
-      
-      // Check if payment was canceled or failed
-      const paymentStatus = searchParams.get('status')
-      if (isPaymentFailed(paymentStatus)) {
-        console.log('Payment status indicates failure:', paymentStatus)
-        setConfirmationStatus('error')
-        setConfirmationError('Payment was not completed. Your purchase has not been confirmed.')
-        return
-      }
-
-      // Simulate API call for purchase confirmation
-      // In a real implementation, you would call your confirm purchase API here
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setConfirmationStatus('success')
-      
-    } catch (error) {
-      console.error('Error confirming purchase:', error)
-      setConfirmationStatus('error')
-      setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm purchase')
-    }
-  }, [searchParams, isPaymentFailed])
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Double-check user is logged in
-    // Redirect to login if not authenticated
-    if (!user) {
-      router.push(`/login?next=/buy-pass${window.location.search}`) 
-      // new route to return back after login
-      return
-    }
+    if (!user || !selectedPackage) return
 
     setIsLoading(true)
+    try {
+      // Step 1: Create package purchase record (data only, no payment yet)
+      const purchaseData = {
+        userId: user.id,
+        packageId: selectedPackage.id, // UUID from API response
+        quantity,
+        customerInfo: {
+          name: customerName,
+          email: customerEmail,
+          phone: customerPhone,
+          company: companyName,
+          billingAddress,
+          postalCode
+        }
+      }
 
-    // Generate unique order ID for this purchase
-    const newOrderId = `PKG${Date.now().toString().slice(-6)}`
-    setOrderId(newOrderId)
-
-    // Simulate API call for payments HITPAY
-    setTimeout(() => {
+      // Call the new package purchase endpoint
+      const result = await packagesApi.createPackagePurchase(purchaseData)
+      
+      if (result.success) {
+        // Store purchase data for payment step
+        setOrderId(result.data.orderId)
+        setUserPackageId(result.data.userPackageId)
+        
+        // Step 2: Navigate to payment page (same as booking flow)
+        setPurchaseStep(2)
+      } else {
+        throw new Error(result.message || 'Failed to create package purchase')
+      }
+    } catch (error) {
+      console.error('Package purchase error:', error)
+      alert('Failed to create package purchase. Please try again.')
+    } finally {
       setIsLoading(false)
-      setPurchaseStep(2)
-    }, 2000)
+    }
   }
 
-  useEffect(() => {
-    if (searchParams.get('step') === '3') {
-      setPurchaseStep(3)
-      // Check if payment was canceled or failed before attempting confirmation
-      const paymentStatus = searchParams.get('status')
-      if (isPaymentFailed(paymentStatus)) {
-        setConfirmationStatus('error')
-        setConfirmationError('Payment was not completed. Your purchase has not been confirmed.')
-        return
+  const confirmPurchaseHandler = async () => {
+    try {
+      console.log('confirmPurchaseHandler called with state:', {
+        userPackageId,
+        orderId,
+        searchParams: Object.fromEntries(searchParams.entries())
+      })
+      
+      setConfirmationStatus('loading')
+      
+      // Get reference from URL params (HitPay webhook response)
+      const hitpayReference = searchParams.get('reference') || searchParams.get('reference_number') || orderId
+      
+      console.log('Extracted hitpayReference:', hitpayReference)
+      
+      if (!userPackageId || !hitpayReference) {
+        console.error('Missing required data:', { userPackageId, hitpayReference })
+        throw new Error('Missing purchase information')
       }
-      confirmPurchase()
+
+      console.log('Confirming package purchase:', {
+        userPackageId,
+        orderId,
+        hitpayReference,
+        paymentStatus: 'completed'
+      })
+
+      // Confirm the package purchase with the backend
+      const confirmData = {
+        userPackageId,
+        orderId,
+        hitpayReference,
+        paymentStatus: 'completed'
+      }
+
+      const result = await packagesApi.confirmPackagePurchase(confirmData)
+      
+      if (result.success) {
+        setConfirmationStatus('success')
+        setConfirmationData(result.data)
+        console.log('Package purchase confirmed successfully:', result.data)
+      } else {
+        throw new Error(result.message || 'Failed to confirm purchase')
+      }
+    } catch (error) {
+      console.error('Package confirmation error:', error)
+      setConfirmationStatus('error')
+      setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm purchase')
+      setConfirmationStatus('idle') // Reset to idle so user can try again
     }
-  }, [searchParams, confirmPurchase])
+  }
 
-  const isFormValid =
-    selectedPackage &&
-    customerName &&
-    customerEmail &&
-    customerPhone &&
-    agreedToTerms &&
-    user;
-
-  // Show loading state while checking auth
-  if (isLoadingAuth) {
+  // NOW ALL HOOKS ARE CALLED - WE CAN DO CONDITIONAL RENDERING
+  if (isLoadingAuth || packagesLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="pt-32 text-center">
-          <p>Loading...</p>
+          <Loader2 className="w-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading packages...</p>
         </div>
       </div>
     )
   }
 
+  if (packagesError) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-32 text-center">
+          <Alert className="max-w-md mx-auto">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error Loading Packages</AlertTitle>
+            <AlertDescription>{packagesError}</AlertDescription>
+          </Alert>
+          <Button onClick={retryFetch} className="mt-4">Try Again</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-32 text-center">
+          <Alert className="max-w-md mx-auto">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Package Not Found</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button onClick={() => router.push('/pricing')} className="mt-4">View All Packages</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (packages.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-32 text-center">
+          <Alert className="max-w-md mx-auto">
+            <Package className="h-4 w-4" />
+            <AlertTitle>No Packages Available</AlertTitle>
+            <AlertDescription>Please check back later or contact support</AlertDescription>
+          </Alert>
+          <Button onClick={() => router.push('/pricing')} className="mt-4">View All Packages</Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Main component render
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
       <div className="pt-28 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Guest Warning Alert */}
+          {/* Guest Warning */}
           {!user && (
             <Alert className="mb-6 border-orange-200 bg-orange-50">
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertTitle className="text-orange-800">Sign In Required</AlertTitle>
               <AlertDescription className="text-orange-700">
-                You must be signed in as a member to purchase passes.
-                <Button
-                  variant="link"
-                  className="px-2 text-orange-600 hover:text-orange-800"
-                  onClick={() => router.push('/login')}
-                >
+                You must be signed in to purchase packages.
+                <Button variant="link" className="px-2 text-orange-600 hover:text-orange-800" onClick={() => router.push('/login')}>
                   Sign in now
                 </Button>
-                to continue with your purchase.
               </AlertDescription>
             </Alert>
           )}
@@ -287,13 +340,11 @@ export default function BuyNowPage() {
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-serif text-gray-900 mb-4">Purchase Your Pass</h1>
-            <p className="text-lg text-gray-600">
-              {user ? 'Unlock unlimited productivity with our flexible packages' : 'Sign in to purchase member-exclusive packages'}
-            </p>
+            <p className="text-lg text-gray-600">Unlock unlimited productivity with our flexible packages</p>
             {selectedPackage && (
               <div className="mt-4 inline-flex items-center px-4 py-2 bg-orange-100 text-orange-800 rounded-full text-sm">
                 <Package className="w-4 h-4 mr-2" />
-                Purchasing: {selectedPackage}
+                Purchasing: {selectedPackage.name}
               </div>
             )}
           </div>
@@ -301,19 +352,13 @@ export default function BuyNowPage() {
           {/* Progress Steps */}
           <div className="flex justify-center mb-8">
             <div className="flex space-x-8">
-              {[
-                { step: 1, title: 'Details', icon: Package },
-                { step: 2, title: 'Payment', icon: CreditCard },
-                { step: 3, title: 'Confirmation', icon: Shield }
-              ].map(({ step, title, icon: Icon }) => (
+              {[1, 2, 3].map((step) => (
                 <div key={step} className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${purchaseStep >= step ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
-                    }`}>
-                    {purchaseStep > step ? '✓' : <Icon className="w-5 h-5" />}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${purchaseStep >= step ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    {purchaseStep > step ? '✓' : step}
                   </div>
-                  <span className={`ml-2 text-sm font-medium ${purchaseStep >= step ? 'text-orange-500' : 'text-gray-500'
-                    }`}>
-                    {title}
+                  <span className={`ml-2 text-sm font-medium ${purchaseStep >= step ? 'text-orange-500' : 'text-gray-500'}`}>
+                    {step === 1 ? 'Details' : step === 2 ? 'Payment' : 'Confirmation'}
                   </span>
                 </div>
               ))}
@@ -325,56 +370,48 @@ export default function BuyNowPage() {
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Package className="w-5 h-5 mr-2" />
-                    Purchase Details
-                  </CardTitle>
+                  <CardTitle>Purchase Details</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {purchaseStep === 1 && (
                     <form onSubmit={handlePurchaseSubmit} className="space-y-6">
                       {/* Package Selection */}
                       <div>
-                        <Label htmlFor="package">Select Package {selectedPackage && <span className="text-green-600 text-sm ml-2">(Pre-selected)</span>}</Label>
-                        <Select value={selectedPackage || ''} onValueChange={setSelectedPackage}>
-                          <SelectTrigger className={selectedPackage ? "border-green-500" : ""}>
-                            <SelectValue placeholder="Choose your package">
-                              {selectedPackage || "Choose your package"}
-                            </SelectValue>
+                        <Label>Select Package</Label>
+                        <Select 
+                          value={selectedPackage?.id || ''} 
+                          onValueChange={(value) => {
+                            const packageData = packages.find(pkg => pkg.id === value)
+                            setSelectedPackage(packageData || null)
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose your package" />
                           </SelectTrigger>
                           <SelectContent>
-                            {Object.entries(packageDetails)
-                              .filter(([name, details]) => {
-                                // If packageType is set from URL, only show packages of that type
-                                return !packageType || details.type === packageType
-                              })
-                              .map(([name, details]) => (
-                                <SelectItem key={name} value={name}>
+                            {packages
+                              .filter((pkg) => !packageType || pkg.type === packageType)
+                              .map((pkg) => (
+                                <SelectItem key={pkg.id} value={pkg.id}>
                                   <div className="flex flex-col">
-                                    <span>{name} - ${details.price}</span>
-                                    <span className="text-xs text-gray-500">{details.type}</span>
+                                    <span>{pkg.name} - ${pkg.price}</span>
+                                    <span className="text-xs text-gray-500">{pkg.type}</span>
                                   </div>
                                 </SelectItem>
                               ))}
                           </SelectContent>
                         </Select>
-                        {selectedPackage && currentPackage && (
-                          <div className="mt-2 p-3 bg-green-50 rounded-md text-sm">
-                            <p className="font-medium text-green-800">Selected: {selectedPackage}</p>
-                            <p className="text-green-700">{currentPackage.description}</p>
-                          </div>
-                        )}
                       </div>
 
                       {/* Quantity */}
                       <div>
-                        <Label htmlFor="quantity">Quantity</Label>
+                        <Label>Quantity</Label>
                         <Select value={quantity.toString()} onValueChange={(val) => setQuantity(parseInt(val))}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                            {[1, 2, 3, 4, 5].map(num => (
                               <SelectItem key={num} value={num.toString()}>
                                 {num} {num === 1 ? 'Package' : 'Packages'}
                               </SelectItem>
@@ -383,287 +420,217 @@ export default function BuyNowPage() {
                         </Select>
                       </div>
 
-                      {/* Personal Information */}
-                      <div className="border-t pt-6">
-                        <h3 className="text-lg font-medium mb-4">Personal Information</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Customer Info */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor="name">Full Name *</Label>
-                            <Input
-                              id="name"
-                              value={customerName}
-                              onChange={(e) => setCustomerName(e.target.value)}
-                              placeholder="Enter your full name"
-                              required
-                            />
+                            <Label>Full Name *</Label>
+                            <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
                           </div>
                           <div>
-                            <Label htmlFor="email">Email Address *</Label>
-                            <Input
-                              id="email"
-                              type="email"
-                              value={customerEmail}
-                              onChange={(e) => setCustomerEmail(e.target.value)}
-                              placeholder="Enter your email"
-                              required
-                              disabled={!!user} // Disable if user is logged in
-                              className={user ? "bg-gray-50" : ""}
-                            />
+                            <Label>Email *</Label>
+                            <Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} required />
                           </div>
                           <div>
-                            <Label htmlFor="phone">Phone Number *</Label>
-                            <Input
-                              id="phone"
-                              type="tel"
-                              value={customerPhone}
-                              onChange={(e) => setCustomerPhone(e.target.value)}
-                              placeholder="Enter your phone number"
-                              required
-                            />
+                            <Label>Phone *</Label>
+                            <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required />
                           </div>
                           <div>
-                            <Label htmlFor="company">Company Name (Optional)</Label>
-                            <Input
-                              id="company"
-                              value={companyName}
-                              onChange={(e) => setCompanyName(e.target.value)}
-                              placeholder="Enter company name"
-                            />
+                            <Label>Company</Label>
+                            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
                           </div>
+                        </div>
+                        <div>
+                          <Label>Billing Address</Label>
+                          <Input value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} />
+                        </div>
+                        <div>
+                          <Label>Postal Code</Label>
+                          <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
                         </div>
                       </div>
 
-                      {/* Billing Information */}
-                      <div className="border-t pt-6">
-                        <h3 className="text-lg font-medium mb-4">Billing Information</h3>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="address">Billing Address</Label>
-                            <Input
-                              id="address"
-                              value={billingAddress}
-                              onChange={(e) => setBillingAddress(e.target.value)}
-                              placeholder="Enter your billing address"
-                            />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <Label htmlFor="postal">Postal Code</Label>
-                              <Input
-                                id="postal"
-                                value={postalCode}
-                                onChange={(e) => setPostalCode(e.target.value)}
-                                placeholder="Enter postal code"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                      {/* Terms */}
+                      <div className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={agreedToTerms}
+                          onChange={(e) => setAgreedToTerms(e.target.checked)}
+                          className="mt-1 h-4 w-4 text-orange-600"
+                          required
+                        />
+                        <Label className="text-sm">I agree to the terms and conditions</Label>
                       </div>
 
-                      {/* Terms and Conditions */}
-                      <div className="border-t pt-6">
-                        <div className="flex items-start space-x-3">
-                          <input
-                            type="checkbox"
-                            id="terms"
-                            checked={agreedToTerms}
-                            onChange={(e) => setAgreedToTerms(e.target.checked)}
-                            className="mt-1"
-                          />
-                          <label htmlFor="terms" className="text-sm text-gray-600">
-                            I agree to the terms and conditions, including the package validity period and usage policies.
-                          </label>
-                        </div>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        className="w-full bg-orange-500 hover:bg-orange-600"
-                        disabled={!isFormValid || isLoading || !user}
-                      >
-                        {!user ? 'Sign In Required' : (isLoading ? 'Processing...' : 'Continue to Payment')}
+                      <Button type="submit" disabled={!isFormValid || isLoading} className="w-full">
+                        {isLoading ? 'Processing...' : 'Continue to Payment'}
                       </Button>
-
-                      {!user && (
-                        <p className="text-center text-sm text-gray-600 mt-2">
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="text-orange-600 hover:text-orange-800 p-0"
-                            onClick={() => router.push('/login')}
-                          >
-                            Sign in
-                          </Button>
-                          {' '}to purchase member passes
-                        </p>
-                      )}
                     </form>
                   )}
 
                   {purchaseStep === 2 && (
-                    <div className="space-y-6">
-                      <PaymentStep
-                        subtotal={subtotal}
-                        tax={tax}
-                        total={total}
-                        paymentMethod={paymentMethod}
-                        onPaymentMethodChange={(v) => setPaymentMethod(v)}
-                        customer={{ name: customerName, email: customerEmail, phone: customerPhone }}
-                        order={{ packageName: selectedPackage, quantity }}
-                        onBack={() => setPurchaseStep(1)}
-                        onComplete={() => setPurchaseStep(3)}
-                        user={user}
-                        bookingId={orderId} // Pass orderId as bookingId for payment API
-                      />
-
-                      {/* <h3 className="text-lg font-medium">Payment Method</h3>
-
-                      <RadioGroup value={paymentMethod} onValueChange={(value: 'card' | 'paynow') => setPaymentMethod(value)}>
-                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                          <RadioGroupItem value="card" id="card" />
-                          <label htmlFor="card" className="flex-1 cursor-pointer">
-                            <div className="flex items-center">
-                              <CreditCard className="w-5 h-5 mr-2" />
-                              <span>Credit/Debit Card</span>
-                            </div>
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                          <RadioGroupItem value="paynow" id="paynow" />
-                          <label htmlFor="paynow" className="flex-1 cursor-pointer">
-                            <div className="flex items-center">
-                              <Shield className="w-5 h-5 mr-2" />
-                              <span>PayNow</span>
-                            </div>
-                          </label>
-                        </div>
-                      </RadioGroup> */}
-
-                      {/* <div className="p-4 bg-gray-50 rounded-lg">
-                      
-                        <div className="flex space-x-3">
-                          <Button
-                            variant="outline"
-                            onClick={() => setPurchaseStep(1)}
-                            className="flex-1"
-                          >
-                            Back to Details
-                          </Button>
-                          <Button
-                            onClick={() => setPurchaseStep(3)}
-                            className="flex-1 bg-orange-500 hover:bg-orange-600"
-                          >
-                            Complete Purchase (Demo)
-                          </Button>
-                        </div>
-                      </div> */}
-                    </div>
+                    <PaymentStep
+                      subtotal={subtotal}
+                      tax={tax}
+                      total={total}
+                      paymentMethod={paymentMethod}
+                      onPaymentMethodChange={setPaymentMethod}
+                      customer={{
+                        name: customerName,
+                        email: customerEmail,
+                        phone: customerPhone
+                      }}
+                      order={{
+                        packageName: selectedPackage?.name || '',
+                        quantity,
+                        notes: `Package: ${selectedPackage?.name}, Total: $${total.toFixed(2)}`
+                      }}
+                      onBack={() => setPurchaseStep(1)}
+                      user={user}
+                      userPackageId={userPackageId}
+                      orderId={orderId}
+                    />
                   )}
 
                   {purchaseStep === 3 && (
                     <div className="text-center py-8">
-                      {confirmationStatus === 'loading' && (
-                        <>
-                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirming Your Purchase...</h3>
-                          <p className="text-gray-600 mb-6">
-                            Please wait while we confirm your purchase.
-                          </p>
-                        </>
-                      )}
-
-                      {confirmationStatus === 'error' && (
-                        <>
-                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                            {isPaymentFailed(searchParams.get('status')) ? 'Payment Not Completed' : 'Confirmation Failed'}
-                          </h3>
-                          <p className="text-red-600 mb-4">
-                            {confirmationError || 'An error occurred while confirming your purchase.'}
-                          </p>
-                          {isPaymentFailed(searchParams.get('status')) && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                              <div className="flex items-start space-x-2">
-                                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                                <div className="text-sm text-amber-800">
-                                  <p className="font-medium">What happened?</p>
-                                  <p>Your payment was not completed successfully.</p>
-                                  <p className="mt-2">Your purchase has not been confirmed and no charges were made to your account.</p>
-                                </div>
-                              </div>
+                      {confirmationStatus === 'idle' && (
+                        <div>
+                          <h3 className="text-2xl font-bold mb-4">Payment Successful!</h3>
+                          <p className="text-gray-600 mb-6">Your payment has been processed. Now confirming your package purchase...</p>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+                            <h4 className="font-medium text-blue-800 mb-2">Purchase Details:</h4>
+                            <div className="text-sm text-blue-700 space-y-1">
+                              <p><strong>Order ID:</strong> {orderId}</p>
+                              <p><strong>Package ID:</strong> {userPackageId}</p>
+                              <p><strong>Status:</strong> Payment Completed</p>
+                              <p><strong>Reference:</strong> {searchParams.get('reference') || 'Not found'}</p>
                             </div>
-                          )}
-                          <div className="space-y-3">
-                            {isPaymentFailed(searchParams.get('status')) ? (
-                              <>
-                                <Button
-                                  onClick={() => router.push('/')}
-                                  className="bg-orange-500 hover:bg-orange-600"
-                                >
-                                  Try Purchase Again
-                                </Button>
-                                <Button
-                                  onClick={() => router.push('/dashboard')}
-                                  variant="outline"
-                                  className="ml-3"
-                                >
-                                  Go to Dashboard
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  onClick={() => {
-                                    setConfirmationStatus('idle')
-                                    setConfirmationError(null)
-                                    confirmPurchase()
-                                  }}
-                                  className="bg-orange-500 hover:bg-orange-600"
-                                >
-                                  Try Again
-                                </Button>
-                                <Button
-                                  onClick={() => router.push('/dashboard')}
-                                  variant="outline"
-                                  className="ml-3"
-                                >
-                                  Go to Dashboard
-                                </Button>
-                              </>
-                            )}
                           </div>
-                        </>
+                          <div className="space-y-3">
+                            <Button onClick={confirmPurchaseHandler} className="bg-green-600 hover:bg-green-700 w-full">
+                              Confirm Package Activation
+                            </Button>
+                            <Button 
+                              onClick={() => {
+                                console.log('Manual trigger clicked. Current state:', {
+                                  userPackageId,
+                                  orderId,
+                                  searchParams: Object.fromEntries(searchParams.entries())
+                                })
+                                confirmPurchaseHandler()
+                              }} 
+                              variant="outline" 
+                              className="w-full"
+                            >
+                              Debug: Check State & Retry
+                            </Button>
+                          </div>
+                        </div>
                       )}
-
+                      {confirmationStatus === 'loading' && (
+                        <div>
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+                          <h3 className="text-xl font-medium mb-2">Confirming Purchase</h3>
+                          <p className="text-gray-600">Please wait while we activate your package...</p>
+                        </div>
+                      )}
                       {confirmationStatus === 'success' && (
-                        <>
+                        <div>
                           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h3>
-                          <p className="text-gray-600 mb-6">
-                            Your package has been activated.
-                          </p>
-                          <div className="bg-gray-50 p-4 rounded-lg text-left space-y-2">
-                            <p className="text-sm text-gray-600">Order Reference: {orderId}</p>
-                            <p className="text-sm text-gray-600">Package: {selectedPackage}</p>
-                            <p className="text-sm text-gray-600">Valid for: {currentPackage?.validity}</p>
+                          <h3 className="text-2xl font-bold text-green-600 mb-4">Package Activated Successfully!</h3>
+                          <p className="text-gray-600 mb-4">Your package has been confirmed and activated.</p>
+                          
+                          {/* Package Details */}
+                          {confirmationData?.package && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-left">
+                              <h4 className="font-bold text-blue-800 text-lg mb-4">Package Details</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <h5 className="font-semibold text-blue-700 mb-2">{confirmationData.package.name}</h5>
+                                  <p className="text-blue-600 text-sm mb-2">{confirmationData.package.description}</p>
+                                  <p className="text-blue-600 text-sm mb-2">Bonus: {confirmationData.package.bonus}</p>
+                                  <p className="text-blue-600 text-sm">Validity: {confirmationData.package.validity} days</p>
+                                </div>
+                                <div>
+                                  <div className="space-y-2">
+                                    {confirmationData.package.passes.map((pass: any, index: number) => (
+                                      <div key={index} className="flex justify-between items-center bg-white rounded-lg px-3 py-2">
+                                        <span className="text-blue-700 text-sm font-medium">
+                                          {pass.count}x {pass.type} Pass
+                                        </span>
+                                        <span className="text-blue-600 text-sm">
+                                          {pass.hours} hrs each
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="mt-3 pt-3 border-t border-blue-200">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-blue-700 font-medium">Total Passes:</span>
+                                      <span className="text-blue-600 font-bold">
+                                        {confirmationData.package.passes.reduce((total: number, pass: any) => total + pass.count, 0)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Activation Details */}
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                            <h4 className="font-medium text-green-800 mb-2">Activation Details</h4>
+                            <div className="text-sm text-green-700 space-y-1">
+                              {confirmationData?.activatedAt && (
+                                <p><strong>Activated:</strong> {new Date(confirmationData.activatedAt).toLocaleDateString()}</p>
+                              )}
+                              {confirmationData?.expiresAt && (
+                                <p><strong>Expires:</strong> {new Date(confirmationData.expiresAt).toLocaleDateString()}</p>
+                              )}
+                              <p><strong>Status:</strong> Active</p>
+                            </div>
                           </div>
-                          <Button
-                            onClick={() => router.push('/book-now')}
-                            className="mt-6 bg-orange-500 hover:bg-orange-600"
-                          >
-                            Book Your First Session
+                          
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                            <p className="text-green-800 text-sm">
+                              <strong>What's next?</strong> You can now use your passes to book coworking spaces.
+                            </p>
+                          </div>
+                          
+                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <Button onClick={() => router.push('/dashboard')} className="bg-blue-600 hover:bg-blue-700">
+                              Go to Dashboard
+                            </Button>
+                            <Button onClick={() => router.push('/book-now')} variant="outline">
+                              Book Now
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {confirmationStatus === 'error' && (
+                        <div>
+                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle className="w-8 h-8 text-red-600" />
+                          </div>
+                          <h3 className="text-2xl font-bold text-red-600 mb-4">Confirmation Failed</h3>
+                          <p className="text-gray-600 mb-4">{confirmationError}</p>
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <p className="text-red-800 text-sm">
+                              <strong>Don't worry!</strong> Your payment was successful. Please contact support if this issue persists.
+                            </p>
+                          </div>
+                          <Button onClick={confirmPurchaseHandler} className="bg-orange-600 hover:bg-orange-700 mr-2">
+                            Try Again
                           </Button>
-                        </>
+                          <Button onClick={() => router.push('/dashboard')} variant="outline">
+                            Go to Dashboard
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -671,96 +638,56 @@ export default function BuyNowPage() {
               </Card>
             </div>
 
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-24">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    Order Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {!user && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-md p-4 text-center">
-                      <p className="text-sm text-orange-800 font-medium">Member Pricing</p>
-                      <p className="text-xs text-orange-700 mt-1">Sign in to purchase packages</p>
-                    </div>
-                  )}
-
-
-                  {currentPackage && (
-                    <div className="space-y-3">
-                      <div>
-                        <h4 className="font-medium">{selectedPackage}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{currentPackage.description}</p>
-                        {currentPackage.bonus && (
-                          <p className="text-sm text-green-600 mt-1">+ {currentPackage.bonus}</p>
-                        )}
-                        <p className="text-sm text-gray-500 mt-2">Valid: {currentPackage.validity}</p>
-
-                        {/* Add highlights if available */}
-                        {currentPackage.highlights && (
-                          <div className="mt-3 space-y-1">
-                            {currentPackage.highlights.map((highlight, idx) => (
-                              <p key={idx} className="text-xs text-gray-600 flex items-center">
-                                <span className="text-green-500 mr-1">✓</span>
-                                {highlight}
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="border-t pt-4 space-y-2">
-                        <div className="flex justify-between">
-                          <span>Package Price</span>
-                          <span>${currentPackage.price}</span>
+            {/* Order Summary - Only show on steps 1 and 2 */}
+            {purchaseStep !== 3 && (
+              <div className="lg:col-span-1">
+                <Card className="sticky top-24">
+                  <CardHeader>
+                    <CardTitle>Order Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedPackage && (
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium">{selectedPackage.name}</h4>
+                          <p className="text-sm text-gray-600">{selectedPackage.description}</p>
                         </div>
-                        {currentPackage.addon > 0 && (
+                        <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span>All Outlets Access</span>
-                            <span>${currentPackage.addon}</span>
+                            <span>Package Price</span>
+                            <span>${selectedPackage.price}</span>
                           </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span>Quantity</span>
-                          <span>× {quantity}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Subtotal</span>
-                          <span>${subtotal}</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-gray-600">
-                          <span>GST (9%)</span>
-                          <span>${tax.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-lg border-t pt-2">
-                          <span>Total</span>
-                          <span>${total.toFixed(2)}</span>
-                        </div>
-                        {currentPackage.originalPrice && (
-                          <div className="text-center mt-4">
-                            <span className="text-sm text-gray-500 line-through">
-                              Original: ${currentPackage.originalPrice * quantity}
-                            </span>
-                            <span className="text-sm text-green-600 ml-2">
-                              You save: ${(currentPackage.originalPrice - currentPackage.price) * quantity}
-                            </span>
+                          <div className="flex justify-between">
+                            <span>Outlet Fee</span>
+                            <span>${selectedPackage.outletFee}</span>
                           </div>
-                        )}
+                          <div className="flex justify-between">
+                            <span>Quantity</span>
+                            <span>× {quantity}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Subtotal</span>
+                            <span>${subtotal}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>GST (9%)</span>
+                            <span>${tax.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold border-t pt-2">
+                            <span>Total</span>
+                            <span>${total.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
       <FooterSection />
-
     </div>
   )
 }

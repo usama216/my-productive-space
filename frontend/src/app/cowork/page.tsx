@@ -8,7 +8,8 @@ import { Tab } from '@headlessui/react'
 import { Carousel } from '@/components/Carousel'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-
+import { usePackages } from '@/hooks/usePackages'
+import { Package } from '@/lib/api/packages'
 
 const rateHeaders = ['1 hr', '> 1 hr']
 const rateRows = [
@@ -26,29 +27,6 @@ const promos = [
 
 const TABS = ['Rates', 'Promos', 'Packages'] as const
 
-
-const packages = [
-  {
-    title: 'Half-Day Productivity Boost',
-    img: '/pricing_img/package-1.png',
-    details: [
-      '6 Half-Day Pass (6 hrs/pass)',
-      '4 Complimentary Hours',
-      'Valid 30 days from activation',
-      'SGD 109 (UP 150) + SGD 5 for all outlets'
-    ],
-  },
-  {
-    title: 'Flexible Full-Day Focus',
-    img: '/pricing_img/package-2.png',
-    details: [
-      '6 Full-Day Pass (12 hrs/pass)',
-      '2 Half-Day Passes (6 hrs/pass)',
-      'Valid 30 days from activation',
-      'SGD 209 (UP 280) + SGD 5 for all outlets'
-    ],
-  },
-]
 const perks = [
   { src: '/mock_img/perk1.png', title: 'Best WiFi in Town', subtitle: '1 Gbps High-Speed Wi-Fi' },
   { src: '/mock_img/perk2.png', title: 'Tech Forward Space', subtitle: 'Charging Points & Monitors at Every Table' },
@@ -67,22 +45,19 @@ const perks = [
   { src: '/mock_img/perk1.png', title: 'Work-Life Balance', subtitle: 'Wellness areas & break spaces to recharge' },
   { src: '/mock_img/perk2.png', title: 'No Commitment Stress', subtitle: 'Pay-per-use flexibility without long-term contracts' },
 ]
-// const reasons = [
-//   { num: '1', title: 'Scale Your Teaching', desc: 'More space lets you reach more students.' },
-//   { num: '2', title: 'Peer Learning',      desc: 'Facilitate group learning experiences.' },
-//   { num: '3', title: 'Multimedia Ready',    desc: '55″ TV & whiteboard for better demos.' },
-//   { num: '4', title: 'Maximize Profits',    desc: 'Lower overhead, higher margins.' },
-//   { num: '5', title: 'Save Travel Time',    desc: 'Central locations for you and your tutees.' },
-//   { num: '6', title: 'No Startup Cost',     desc: 'Furnished classrooms—walk in and teach.' },
-//   { num: '7', title: 'Build Your Brand',    desc: 'Join our community of educators.' },
-//   { num: '8', title: 'Pay-per-Use',         desc: 'No minimums or hidden fees.' },
-//   { num: '9', title: 'Guaranteed Space',    desc: 'Fixed bookings give you certainty.' },
-// ]
 
-export default function ColearnPage() {
+export default function CoworkPage() {
   const router = useRouter()
+  const { packages, loading: packagesLoading, error: packagesError } = usePackages()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const packagesRef = useRef<HTMLDivElement | null>(null)
+
+  // Filter cowork packages
+  const coworkPackages = packages.filter(pkg => pkg.type === 'cowork')
+
+  const handleBuyNow = (packageData: Package) => {
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=${packageData.type}`)
+  }
 
   // If URL has #packages on first load, open that tab
   useEffect(() => {
@@ -125,34 +100,14 @@ export default function ColearnPage() {
             <p className="uppercase text-sm text-gray-500">People. Space. Vibes.</p>
             <h1 className="mt-2 text-3xl font-bold">Co-Workspace Solutions</h1>
             <p className="mt-4 text-gray-700">
-              Elevate Your Work Experience. Find the perfect workspace solution tailored to your needs—whether you’re a guest, member,
-              student, or tutor, we’ve got you covered.
+              Elevate Your Work Experience. Find the perfect workspace solution tailored to your needs—whether you're a guest, member,
+              student, or tutor, we've got you covered.
             </p>
           </div>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto py-20 px-4 space-y-12">
-
-        {/* Reasons Grid */}
-
-        {/* <section className="space-y-6">
-          <h2 className="text-3xl font-bold text-center">Reasons to Teach at Spatial</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {reasons.map((r) => (
-              <div key={r.num} className="bg-gray-50 rounded-lg p-6 text-center">
-                <div className="text-4xl font-bold text-orange-600">{r.num}</div>
-                <h4 className="mt-2 font-semibold">{r.title}</h4>
-                <p className="mt-1 text-gray-700 text-sm">{r.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="text-center">
-            <button className="px-6 py-3 bg-orange-600 text-white rounded">
-              Book Now
-            </button>
-          </div>
-        </section> */}
 
         <section className="space-y-6">
           <h2 className="text-3xl font-bold text-center">Reasons to Co-Work at My Prodcutive Space</h2>
@@ -176,6 +131,7 @@ export default function ColearnPage() {
             </button>
           </div>
         </section>
+
         {/* Tabs */}
         <div id="packages" ref={packagesRef} className="h-0 w-0 overflow-hidden scroll-mt-24" />
 
@@ -254,26 +210,55 @@ export default function ColearnPage() {
 
             {/* Packages Panel */}
             <Tab.Panel className="grid gap-8 md:grid-cols-2">
-              {packages.map((pkg) => (
-                <div key={pkg.title} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
-                  <div className="relative h-48">
-                    <Image src={pkg.img} alt={pkg.title} fill className="object-cover" />
-                  </div>
-                  <div className="p-6">
-                    <h4 className="text-xl font-semibold">{pkg.title}</h4>
-                    <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
-                      {pkg.details.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() => router.push(`/buy-pass?package=${encodeURIComponent(pkg.title)}&type=cowork`)}
-                      className="mt-4 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500">
-                      Buy Now
-                    </button>
-                  </div>
+              {packagesLoading ? (
+                <div className="text-center py-12 col-span-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                  <p>Loading packages...</p>
                 </div>
-              ))}
+              ) : packagesError ? (
+                <div className="text-center py-12 col-span-2">
+                  <p className="text-red-500">Error loading packages: {packagesError}</p>
+                  <button 
+                    onClick={() => window.location.reload()} 
+                    className="mt-2 px-4 py-2 bg-orange-500 text-white rounded"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : coworkPackages.length > 0 ? (
+                coworkPackages.map((pkg) => (
+                  <div key={pkg.id} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
+                    <div className="relative h-48">
+                      <Image 
+                        src={`/pricing_img/package-${pkg.name.includes('Half-Day') ? '1' : '2'}.png`} 
+                        alt={pkg.name} 
+                        fill 
+                        className="object-cover" 
+                      />
+                    </div>
+                    <div className="p-6">
+                      <h4 className="text-xl font-semibold">{pkg.name}</h4>
+                      <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
+                        <li>{pkg.description}</li>
+                        {pkg.bonus && <li>{pkg.bonus}</li>}
+                        <li>Valid {pkg.validity} days from activation</li>
+                        <li>SGD {pkg.price} (UP {pkg.originalPrice}) + SGD {pkg.outletFee} for all outlets</li>
+                      </ul>
+                      <button
+                        onClick={() => handleBuyNow(pkg)}
+                        className="mt-4 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500"
+                      >
+                        Buy Now
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 col-span-2">
+                  <p className="text-gray-500 text-lg">No coworking packages available at the moment.</p>
+                  <p className="text-gray-400">Please check back later or contact us for custom arrangements.</p>
+                </div>
+              )}
             </Tab.Panel>
           </Tab.Panels>
         </Tab.Group>
