@@ -106,6 +106,22 @@ export const useUserPackages = (userId: string | undefined) => {
   const [userPackages, setUserPackages] = useState<UserPackage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Passes pagination state
+  const [availablePasses, setAvailablePasses] = useState<UserPass[]>([]);
+  const [passesLoading, setPassesLoading] = useState(false);
+  const [passesError, setPassesError] = useState<string | null>(null);
+  const [passesPagination, setPassesPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+    hasNextPage: false,
+    hasPrevPage: false,
+    nextPage: null,
+    prevPage: null,
+  });
+  const [passesInitialized, setPassesInitialized] = useState(false);
 
   // Fetch user packages
   const fetchUserPackages = useCallback(async () => {
@@ -124,20 +140,42 @@ export const useUserPackages = (userId: string | undefined) => {
     }
   }, [userId]);
 
-  // Fetch user passes
-  const fetchUserPasses = useCallback(async (): Promise<UserPass[]> => {
-    if (!userId) return [];
+  // Fetch user passes with pagination
+  const fetchUserPasses = useCallback(async (page: number = 1, limit: number = 10) => {
+    if (!userId) return;
     
     try {
-      setError(null);
-      const passes = await packagesApi.getUserPasses(userId);
-      return passes;
+      setPassesLoading(true);
+      setPassesError(null);
+      const result = await packagesApi.getUserPasses(userId, page, limit);
+      
+      setAvailablePasses(result.passes);
+      setPassesPagination(result.pagination);
+      setPassesInitialized(true);
+      
+      return result;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch user passes');
+      setPassesError(err instanceof Error ? err.message : 'Failed to fetch user passes');
       console.error('Error fetching user passes:', err);
-      return [];
+      return null;
+    } finally {
+      setPassesLoading(false);
     }
   }, [userId]);
+
+  // Initialize passes (called when Passes tab is first clicked)
+  const initializePasses = useCallback(async () => {
+    if (!passesInitialized && userId) {
+      await fetchUserPasses(1, 10);
+    }
+  }, [passesInitialized, userId, fetchUserPasses]);
+
+  // Change page for passes
+  const changePassesPage = useCallback(async (newPage: number) => {
+    if (newPage >= 1 && newPage <= passesPagination.totalPages) {
+      await fetchUserPasses(newPage, 10); // Default limit of 10
+    }
+  }, [fetchUserPasses, passesPagination.totalPages]);
 
   // Fetch purchase history
   const fetchPurchaseHistory = useCallback(async (): Promise<PurchaseHistory[]> => {
@@ -167,7 +205,15 @@ export const useUserPackages = (userId: string | undefined) => {
     error,
     fetchUserPackages,
     fetchUserPasses,
+    changePassesPage,
+    initializePasses,
     fetchPurchaseHistory,
+    // Passes state
+    availablePasses,
+    passesLoading,
+    passesError,
+    passesPagination,
+    passesInitialized,
   };
 };
 

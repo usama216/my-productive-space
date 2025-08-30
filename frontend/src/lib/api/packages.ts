@@ -315,15 +315,60 @@ export const packagesApi = {
     }
   },
 
-  // Get user's available passes
-  async getUserPasses(userId: string): Promise<UserPass[]> {
+  // Get user's available passes with pagination
+  async getUserPasses(userId: string, page: number = 1, limit: number = 10): Promise<{
+    passes: UserPass[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+      nextPage: number | null;
+      prevPage: number | null;
+    };
+  }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/packages/user/${userId}/passes`);
+      const response = await fetch(
+        `${API_BASE_URL}/packages/user/${userId}/passes?page=${page}&limit=${limit}`
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      return data.availablePasses || [];
+      
+      // Handle the actual API response structure
+      if (data.success && data.data) {
+        return {
+          passes: data.data.passes || [],
+          pagination: {
+            currentPage: data.data.pagination?.currentPage || page,
+            totalPages: data.data.pagination?.totalPages || 1,
+            totalItems: data.data.pagination?.totalItems || 0,
+            itemsPerPage: data.data.pagination?.itemsPerPage || limit,
+            hasNextPage: data.data.pagination?.hasNextPage || false,
+            hasPrevPage: data.data.pagination?.hasPrevPage || false,
+            nextPage: data.data.pagination?.nextPage || null,
+            prevPage: data.data.pagination?.prevPage || null,
+          },
+        };
+      }
+      
+      // Fallback for unexpected response structure
+      return {
+        passes: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 1,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false,
+          nextPage: null,
+          prevPage: null,
+        },
+      };
     } catch (error) {
       console.error('Error fetching user passes:', error);
       throw error;

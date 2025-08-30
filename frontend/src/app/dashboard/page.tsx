@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   User,
   Calendar,
@@ -19,7 +19,11 @@ import {
   CheckCircle,
   XCircle,
   Gift,
-  Package
+  Package,
+  Loader2,
+  AlertCircle,
+  BarChart3,
+  Star
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -36,6 +40,10 @@ import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import { EntitlementHistory } from '@/components/dashboard/EntitlementHistory'
 import { PromoCodeHistory } from '@/components/dashboard/PromoCodeHistory'
 import { UserBookings } from '@/components/dashboard/UserBookings'
+import { useAuth } from '@/hooks/useAuth'
+import { useUserPackages } from '@/hooks/usePackages'
+import { UserPackage, UserPass } from '@/lib/api/packages'
+import { useRouter } from 'next/navigation'
 
 // Mock data types
 interface Booking {
@@ -160,6 +168,22 @@ const mockBookings: Booking[] = [
 ]
 
 export default function UAMDashboard() {
+  const { user: authUser } = useAuth()
+  const { 
+    userPackages, 
+    loading: packagesLoading, 
+    error: packagesError, 
+    fetchUserPasses,
+    changePassesPage,
+    initializePasses,
+    availablePasses,
+    passesLoading,
+    passesError,
+    passesPagination,
+    passesInitialized
+  } = useUserPackages(authUser?.id)
+  const router = useRouter()
+  
   const [activeTab, setActiveTab] = useState('overview')
   const [user, setUser] = useState<UserProfile>(mockUser)
   const [bookings, setBookings] = useState<Booking[]>(mockBookings)
@@ -167,6 +191,16 @@ export default function UAMDashboard() {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Handle tab change to lazy load passes
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    
+    // Initialize passes only when Passes tab is first clicked
+    if (newTab === 'passes' && !passesInitialized && authUser?.id) {
+      initializePasses();
+    }
+  }
 
   // Get upcoming and past bookings
   const upcomingBookings = bookings.filter(b =>
@@ -347,7 +381,7 @@ export default function UAMDashboard() {
           </div> */}
 
           {/* Main Content */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
@@ -625,89 +659,237 @@ export default function UAMDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
-            {/* Passes & Vouchers Tab */}
+            {/* Passes Tab - Dynamic User Passes */}
             <TabsContent value="passes" className="space-y-6">
-              {/* Active Passes Section */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <Package className="w-5 h-5 mr-2" />
-                    Active Passes
+                    <Gift className="w-5 h-5 mr-2" />
+                    My Passes
                   </CardTitle>
                   <p className="text-sm text-gray-600">
-                    Your currently available passes and their usage
+                    Individual passes from your packages
                   </p>
                 </CardHeader>
                 <CardContent>
-                  {mockActivePackages.length > 0 ? (
+                  {!passesInitialized ? (
+                    <div className="text-center py-8">
+                      <Gift className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-gray-600">Click to load your passes</p>
+                    </div>
+                  ) : passesLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      <p>Loading your passes...</p>
+                    </div>
+                  ) : passesError ? (
+                    <div className="text-center py-8">
+                      <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{passesError}</AlertDescription>
+                      </Alert>
+                      <Button 
+                        onClick={() => fetchUserPasses(1, 10)} 
+                        className="mt-4"
+                        size="sm"
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : availablePasses.length > 0 ? (
                     <div className="space-y-4">
-                      {mockActivePackages.map((pkg) => {
-                        const remaining = pkg.total_passes - pkg.passes_used
-                        return (
-                          <Card key={pkg.id} className="bg-green-50 border-green-200">
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                    <span className="text-lg">
-                                      {pkg.package_type === 'full-day' ? '🌅' : pkg.package_type === 'half-day' ? '🌤️' : '📚'}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-semibold text-lg text-green-800">{pkg.name}</h4>
-                                    <p className="text-sm text-green-700">
-                                      {remaining} of {pkg.total_passes} passes remaining
-                                    </p>
-                                  </div>
+                      {availablePasses.map((pass) => (
+                        <Card key={pass.id} className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                  <Gift className="w-5 h-5 text-green-600" />
                                 </div>
-                                <Badge className="bg-green-100 text-green-800">Active</Badge>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                                <div className="flex items-center text-green-700">
-                                  <Calendar className="w-4 h-4 mr-2" />
-                                  <span>Purchased: {new Date(pkg.purchased_at).toLocaleDateString()}</span>
-                                </div>
-                                <div className="flex items-center text-green-700">
-                                  <Clock className="w-4 h-4 mr-2" />
-                                  <span>Expires: {new Date(pkg.expires_at).toLocaleDateString()}</span>
+                                <div>
+                                  <h4 className="font-semibold text-lg text-green-800">{pass.packageName}</h4>
+                                  <p className="text-sm text-green-700">
+                                    {pass.passType} pass • {pass.hours} hours
+                                  </p>
                                 </div>
                               </div>
+                              <Badge className="bg-green-100 text-green-800">Available</Badge>
+                            </div>
 
-                              {/* Usage Progress Bar */}
-                              <div className="mb-3">
-                                <div className="flex justify-between text-xs text-green-700 mb-1">
-                                  <span>Usage Progress</span>
-                                  <span>{Math.round((pkg.passes_used / pkg.total_passes) * 100)}%</span>
-                                </div>
-                                <div className="w-full bg-green-200 rounded-full h-2">
-                                  <div
-                                    className="h-2 rounded-full bg-green-600"
-                                    style={{ width: `${(pkg.passes_used / pkg.total_passes) * 100}%` }}
-                                  ></div>
-                                </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                              <div className="flex items-center text-green-700">
+                                <Calendar className="w-4 h-4 mr-2" />
+                                <span>Package: {pass.packageName}</span>
                               </div>
+                              <div className="flex items-center text-green-700">
+                                <Clock className="w-4 h-4 mr-2" />
+                                <span>Duration: {pass.hours} hours</span>
+                              </div>
+                            </div>
 
-                              <p className="text-sm text-green-700">
-                                Code: {pkg.package_type}_user123
-                              </p>
-                            </CardContent>
-                          </Card>
-                        )
-                      })}
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm text-green-700">
+                                <span className="font-medium">Pass ID:</span>
+                                 {/* {pass.id.slice(0, 8)}... */}
+                               {pass.id}
+                              </div>
+                              <Button 
+                                onClick={() => router.push('/book-now')}
+                                size="sm"
+                                className="bg-orange-500 hover:bg-orange-600"
+                              >
+                                Use This Pass
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-12">
-                      <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No active passes</h3>
-                      <p className="text-gray-600">Purchase passes to unlock member benefits</p>
+                      <Gift className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No available passes</h3>
+                      <p className="text-gray-600 mb-4">
+                        {userPackages.length > 0 
+                          ? "All your passes have been used or expired. Check your packages tab for more details."
+                          : "You don't have any packages yet. Get started by purchasing your first workspace package."
+                        }
+                      </p>
+                      {userPackages.length === 0 && (
+                        <Button onClick={() => router.push('/buy-pass')}>
+                          Browse Packages
+                        </Button>
+                      )}
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Past Usage History */}
-              <EntitlementHistory />
+               {/* Pass Statistics - Moved to top for better UX */}
+               {/* {availablePasses.length > 0 && (
+                 <Card>
+                   <CardHeader>
+                     <CardTitle className="flex items-center">
+                       <BarChart3 className="w-5 h-5 mr-2" />
+                       Pass Summary
+                     </CardTitle>
+                     <p className="text-sm text-gray-600">
+                       Overview of your available passes
+                     </p>
+                   </CardHeader>
+                   <CardContent>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                         <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                           <Gift className="w-6 h-6 text-green-600" />
+                         </div>
+                         <div className="text-3xl font-bold text-green-700">{availablePasses.length}</div>
+                         <div className="text-sm text-green-600 font-medium">Available Passes</div>
+                       </div>
+                       <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+                         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                           <Clock className="w-6 h-6 text-blue-600" />
+                         </div>
+                         <div className="text-3xl font-bold text-blue-700">
+                           {availablePasses.reduce((total, pass) => total + pass.hours, 0)}
+                         </div>
+                         <div className="text-sm text-blue-600 font-medium">Total Hours</div>
+                       </div>
+                       <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-200">
+                         <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                           <Star className="w-6 h-6 text-orange-600" />
+                         </div>
+                         <div className="text-3xl font-bold text-orange-700">
+                           {availablePasses.filter(pass => pass.passType === 'bonus').length}
+                         </div>
+                         <div className="text-sm text-orange-600 font-medium">Bonus Passes</div>
+                       </div>
+                     </div>
+                   </CardContent>
+                 </Card>
+               )} */}
+
+              {/* Pagination Controls */}
+              {passesPagination.totalPages > 1 && (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                      {/* Status Info */}
+                      <div className="text-sm text-gray-600 text-center lg:text-left">
+                        Showing <span className="font-medium">{availablePasses.length}</span> of{' '}
+                        <span className="font-medium">{passesPagination.totalItems}</span> passes
+                        <br className="lg:hidden" />
+                        <span className="lg:ml-2">(Page {passesPagination.currentPage} of {passesPagination.totalPages})</span>
+                      </div>
+                      
+                      {/* Navigation Controls */}
+                      <div className="flex items-center justify-center lg:justify-end space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => changePassesPage(passesPagination.prevPage || passesPagination.currentPage - 1)}
+                          disabled={!passesPagination.hasPrevPage}
+                          className="min-w-[80px]"
+                        >
+                          Previous
+                        </Button>
+                        
+                        {/* Page Numbers - Responsive design */}
+                        <div className="flex items-center space-x-1">
+                          {(() => {
+                            const totalPages = passesPagination.totalPages;
+                            const currentPage = passesPagination.currentPage;
+                            const pages = [];
+                            
+                            // Always show first page
+                            if (currentPage > 1) {
+                              pages.push(1);
+                              if (currentPage > 3) pages.push('...');
+                            }
+                            
+                            // Show pages around current page
+                            for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                              if (i > 1 && i < totalPages) pages.push(i);
+                            }
+                            
+                            // Always show last page
+                            if (currentPage < totalPages) {
+                              if (currentPage < totalPages - 2) pages.push('...');
+                              pages.push(totalPages);
+                            }
+                            
+                            return pages.map((pageNum, index) => (
+                              pageNum === '...' ? (
+                                <span key={`ellipsis-${index}`} className="px-2 text-gray-500 select-none">...</span>
+                              ) : (
+                                <Button
+                                  key={pageNum}
+                                  variant={pageNum === currentPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => changePassesPage(pageNum as number)}
+                                  className="w-10 h-10 p-0 text-sm font-medium"
+                                >
+                                  {pageNum}
+                                </Button>
+                              )
+                            ));
+                          })()}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => changePassesPage(passesPagination.nextPage || passesPagination.currentPage + 1)}
+                          disabled={!passesPagination.hasNextPage}
+                          className="min-w-[80px]"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {/* Promo Codes Tab */}
