@@ -1118,13 +1118,13 @@ export default function BookingClient() {
                       <Button
                         type="submit"
                         className="w-full bg-orange-500 hover:bg-orange-600"
-                        disabled={
-                          !isFormValid ||
-                          // (entitlementMode === 'package' && !selectedPackage) ||
-                          (entitlementMode === 'promo' && !promoValid) ||
-                          isLoading ||
-                          !user
-                        }
+                        // disabled={
+                        //   !isFormValid ||
+                        //   // (entitlementMode === 'package' && !selectedPackage) ||
+                        //   (entitlementMode === 'promo' && !promoValid) ||
+                        //   isLoading ||
+                        //   !user
+                        // }
                       >
                         {!user
                           ? 'Sign In Required'
