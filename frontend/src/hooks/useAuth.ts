@@ -7,7 +7,16 @@ interface DatabaseUser {
   id: string
   email: string
   name?: string
-  // Add other database user fields as needed
+  firstName?: string
+  lastName?: string
+  memberType?: 'STUDENT' | 'MEMBER' | 'TUTOR'
+  contactNumber?: string
+  studentVerificationStatus?: 'NA' | 'PENDING' | 'VERIFIED'
+  studentVerificationImageUrl?: string
+  studentVerificationDate?: string
+  studentRejectionReason?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 // Local storage keys
@@ -60,10 +69,20 @@ export function useAuth() {
 
   // Create mock database user from auth user (for demo purposes)
   const createMockDatabaseUser = (authUser: User): DatabaseUser => {
+    const fullName = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User'
+    const nameParts = fullName.split(' ')
+    
     return {
       id: authUser.id, // Use auth ID as database ID for now
       email: authUser.email || '',
-      name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User'
+      name: fullName,
+      firstName: nameParts[0] || '',
+      lastName: nameParts.slice(1).join(' ') || '',
+      memberType: 'MEMBER', // Default to MEMBER
+      contactNumber: authUser.user_metadata?.phone || '',
+      studentVerificationStatus: 'NA', // Default to NA
+      createdAt: authUser.created_at,
+      updatedAt: authUser.updated_at
     }
   }
 

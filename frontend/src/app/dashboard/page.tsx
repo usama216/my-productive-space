@@ -41,11 +41,11 @@ import { EntitlementHistory } from '@/components/dashboard/EntitlementHistory'
 import { PromoCodeHistory } from '@/components/dashboard/PromoCodeHistory'
 import { UserBookings } from '@/components/dashboard/UserBookings'
 import { UserPromoCodes } from '@/components/dashboard/UserPromoCodes'
+import { UserPackages } from '@/components/dashboard/UserPackages'
 
 import { useAuth } from '@/hooks/useAuth'
-import { useUserPackages } from '@/hooks/usePackages'
-import { UserPackage, UserPass } from '@/lib/api/packages'
 import { useRouter } from 'next/navigation'
+import { getUserProfile, updateUserProfile, UserProfile, formatUserName, getMemberTypeDisplayName, getVerificationStatusDisplayName, getVerificationStatusColor } from '@/lib/userProfileService'
 
 // Mock data types
 interface Booking {
@@ -58,172 +58,112 @@ interface Booking {
   numberOfPeople: number
   selectedSeats: string[]
   totalAmount: number
-  status: 'confirmed' | 'cancelled' | 'completed'
+  status: 'confirmed' | 'cancelled' | 'completed' | 'pending'
+  bookingReference: string
   canEdit: boolean
   canCancel: boolean
-  bookingReference: string
 }
 
-interface UserProfile {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  contactNumber: string
-  memberType: 'student' | 'professional' | 'freelancer'
-  verificationStatus: 'pending' | 'verified' | 'rejected'
-  joinDate: string
-}
-
-// Mock data
-const mockUser: UserProfile = {
-  id: '1',
-  email: 'john.doe@example.com',
-  firstName: 'John',
-  lastName: 'Doe',
-  contactNumber: '+65 9123 4567',
-  memberType: 'professional',
-  verificationStatus: 'verified',
-  joinDate: '2024-01-15'
-}
-
-// Add this after your existing imports and before the mockUser declaration
-const mockActivePackages = [
-  { 
-    id: 'pkg1', 
-    name: '20-Day Pass', 
-    total_passes: 20, 
-    passes_used: 4,
-    purchased_at: '2025-01-15T00:00:00Z',
-    expires_at: '2025-09-15T23:59:59Z',
-    package_type: 'full-day',
-    is_expired: false
-  },
-  { 
-    id: 'pkg2', 
-    name: '15-Half-Day Pass', 
-    total_passes: 15, 
-    passes_used: 3,
-    purchased_at: '2025-01-20T00:00:00Z',
-    expires_at: '2025-09-20T23:59:59Z',
-    package_type: 'half-day',
-    is_expired: false
-  },
-  { 
-    id: 'pkg3', 
-    name: 'Student Semester Bundle', 
-    total_passes: 20, 
-    passes_used: 8,
-    purchased_at: '2025-01-10T00:00:00Z',
-    expires_at: '2025-09-10T23:59:59Z',
-    package_type: 'study-hour',
-    is_expired: false
-  }
-]
-
-const mockBookings: Booking[] = [
-  {
-    id: '1',
-    locationName: 'Bukit Panjang',
-    locationAddress: '123 Bukit Panjang Plaza, Singapore 670123',
-    date: '2024-12-28',
-    startTime: '09:00',
-    endTime: '17:00',
-    numberOfPeople: 2,
-    selectedSeats: ['S1', 'S2'],
-    totalAmount: 40.00,
-    status: 'confirmed',
-    canEdit: true,
-    canCancel: true,
-    bookingReference: 'BK001234'
-  },
-  {
-    id: '2',
-    locationName: 'Kovan',
-    locationAddress: '456 Kovan Road, Singapore 560456',
-    date: '2024-12-15',
-    startTime: '10:00',
-    endTime: '16:00',
-    numberOfPeople: 1,
-    selectedSeats: ['S5'],
-    totalAmount: 18.00,
-    status: 'completed',
-    canEdit: false,
-    canCancel: false,
-    bookingReference: 'BK001235'
-  },
-  {
-    id: '3',
-    locationName: 'Ang Mo Kio',
-    locationAddress: '789 Ang Mo Kio Avenue 3, Singapore 560789',
-    date: '2025-04-20',
-    startTime: '14:00',
-    endTime: '18:00',
-    numberOfPeople: 3,
-    selectedSeats: ['S7', 'S8', 'S9'],
-    totalAmount: 25.90,
-    status: 'cancelled',
-    canEdit: false,
-    canCancel: false,
-    bookingReference: 'BK001236'
-  }
-]
-
-export default function UAMDashboard() {
-  const { user: authUser } = useAuth()
-  const { 
-    userPackages, 
-    loading: packagesLoading, 
-    error: packagesError, 
-    fetchUserPasses,
-    changePassesPage,
-    initializePasses,
-    availablePasses,
-    passesLoading,
-    passesError,
-    passesPagination,
-    passesInitialized
-  } = useUserPackages(authUser?.id)
+export default function Dashboard() {
+  const { user: authUser, databaseUser } = useAuth()
   const router = useRouter()
-  
   const [activeTab, setActiveTab] = useState('overview')
-  const [user, setUser] = useState<UserProfile>(mockUser)
-  const [bookings, setBookings] = useState<Booking[]>(mockBookings)
-  const [editingProfile, setEditingProfile] = useState(false)
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
-  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+    const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    firstName: '',
+    lastName: '',
+    contactNumber: '',
+    memberType: 'MEMBER' as 'STUDENT' | 'MEMBER' | 'TUTOR'
+  })
 
-  // Handle tab change to lazy load passes
-  const handleTabChange = (newTab: string) => {
-    setActiveTab(newTab);
+  // Sample data for testing (fallback)
+  const sampleUserData = {
+    name: 'John Doe',
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@example.com',
+    contactNumber: '+1 (555) 123-4567',
+    memberType: 'MEMBER' as const,
+    studentVerificationStatus: 'NA' as const
+  }
+
+  // Debug: Log user data
+  console.log('Auth User:', authUser)
+  console.log('Database User:', databaseUser)
+
+  // Load user profile data
+  const loadUserProfile = async () => {
+    if (!authUser?.id) return
     
-    // Initialize passes only when Passes tab is first clicked
-    if (newTab === 'passes' && !passesInitialized && authUser?.id) {
-      initializePasses();
+    setIsLoadingProfile(true)
+    try {
+      const profile = await getUserProfile(authUser.id)
+      if (profile) {
+        setUserProfile(profile)
+        setEditFormData({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          contactNumber: profile.contactNumber,
+          memberType: profile.memberType
+        })
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error)
+    } finally {
+      setIsLoadingProfile(false)
     }
   }
 
-  // Get upcoming and past bookings
-  const upcomingBookings = bookings.filter(b =>
-    new Date(b.date) >= new Date() && b.status === 'confirmed'
-  )
-  const pastBookings = bookings.filter(b =>
-    new Date(b.date) < new Date() || b.status === 'completed' || b.status === 'cancelled'
-  )
+  // Handle edit profile
+  const handleEditProfile = () => {
+    setIsEditingProfile(true)
+  }
 
-  // Handle profile update
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  // Handle save profile changes
+  const handleSaveProfile = async () => {
+    if (!authUser?.id || !userProfile) return
+    
+    setIsLoadingProfile(true)
+    try {
+      const updatedProfile = await updateUserProfile(authUser.id, editFormData)
+      if (updatedProfile) {
+        setUserProfile(updatedProfile)
+        setIsEditingProfile(false)
+        alert('Profile updated successfully!')
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      alert('Failed to update profile. Please try again.')
+    } finally {
+      setIsLoadingProfile(false)
+    }
+  }
 
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    if (userProfile) {
+      setEditFormData({
+        firstName: userProfile.firstName,
+        lastName: userProfile.lastName,
+        contactNumber: userProfile.contactNumber,
+        memberType: userProfile.memberType
+      })
+    }
+    setIsEditingProfile(false)
+  }
 
-    console.log('Profile updated:', user)
-    alert('Profile updated successfully!')
-    setEditingProfile(false)
-    setIsLoading(false)
+  // Load user profile when component mounts or authUser changes
+  useEffect(() => {
+    loadUserProfile()
+  }, [authUser?.id])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
   }
 
   // Handle booking cancellation
@@ -233,16 +173,8 @@ export default function UAMDashboard() {
     // Mock API call
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Update booking status
-    setBookings(prev => prev.map(b =>
-      b.id === booking.id
-        ? { ...b, status: 'cancelled' as const, canEdit: false, canCancel: false }
-        : b
-    ))
-
-    console.log('Booking cancelled:', booking.id)
-    console.log('Admin email notification sent for cancellation')
-    alert(`Booking ${booking.bookingReference} cancelled successfully! Admin has been notified for refund processing.`)
+    console.log('Booking cancellation request:', booking)
+    alert('Booking cancelled successfully!')
     setCancellingBooking(null)
     setIsLoading(false)
   }
@@ -336,7 +268,7 @@ export default function UAMDashboard() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -346,41 +278,23 @@ export default function UAMDashboard() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-            <p className="text-gray-600">Manage your bookings and account settings</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-gray-600 mt-1">
+                  Welcome back, {databaseUser?.name || 'User'}!
+                </p>
+              </div>
+              {/* <div className="flex items-center space-x-4">
+                <Button onClick={() => router.push('/book-now')} className="bg-orange-500 hover:bg-orange-600">
+                  Book Now
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/buy-pass')}>
+                  Buy Passes
+                </Button>
+              </div> */}
+            </div>
           </div>
-
-          {/* Quick Stats */}
-          {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <Calendar className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                <p className="text-2xl font-bold">{upcomingBookings.length}</p>
-                <p className="text-sm text-gray-600">Upcoming Bookings</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <History className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                <p className="text-2xl font-bold">{pastBookings.length}</p>
-                <p className="text-sm text-gray-600">Past Bookings</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <CreditCard className="w-8 h-8 mx-auto mb-2 text-purple-600" />
-                <p className="text-2xl font-bold">${bookings.reduce((sum, b) => sum + b.totalAmount, 0)}</p>
-                <p className="text-sm text-gray-600">Total Spent</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <User className="w-8 h-8 mx-auto mb-2 text-orange-600" />
-                <p className="text-2xl font-bold capitalize">{user.memberType}</p>
-                <p className="text-sm text-gray-600">Member Type</p>
-              </CardContent>
-            </Card>
-          </div> */}
 
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -388,11 +302,8 @@ export default function UAMDashboard() {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
-              {/* <TabsTrigger value="upcoming">Upcoming</TabsTrigger> */}
-              {/* <TabsTrigger value="history">History</TabsTrigger> */}
               <TabsTrigger value="passes">Passes</TabsTrigger>
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
-
             </TabsList>
 
             {/* Overview Tab */}
@@ -407,60 +318,36 @@ export default function UAMDashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {upcomingBookings.length > 0 ? (
-                      upcomingBookings.slice(0, 2).map(booking => (
-                        <BookingCard key={booking.id} booking={booking} showActions={false} />
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No upcoming bookings</p>
-                    )}
-                    {upcomingBookings.length > 2 && (
-                      <Button
-                        variant="outline"
-                        className="w-full mt-4"
-                        onClick={() => setActiveTab('upcoming')}
-                      >
-                        View All Upcoming Bookings
+                    <div className="text-center py-8">
+                      <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
+                      <p className="text-gray-600 mb-4">You don't have any upcoming bookings at the moment.</p>
+                      <Button onClick={() => router.push('/book-now')}>
+                        Book Now
                       </Button>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
 
-                {/* Account Status */}
+                {/* Quick Stats */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <User className="w-5 h-5 mr-2" />
-                      Account Status
+                      <BarChart3 className="w-5 h-5 mr-2" />
+                      Quick Stats
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span>Email Verified</span>
-                      <CheckCircle className="w-5 h-5 text-green-600" />
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-4 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">0</div>
+                        <div className="text-sm text-blue-600">Total Bookings</div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span>Member Status</span>
-                      <div className="flex items-center">
-                        {user.verificationStatus === 'verified' ? (
-                          <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-red-600 mr-2" />
-                        )}
-                        <span className="capitalize">{user.verificationStatus}</span>
+                      <div className="text-center p-4 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">0</div>
+                        <div className="text-sm text-green-600">Hours Used</div>
                       </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span>Member Since</span>
-                                              <span>{new Date(user.joinDate).toLocaleDateString()}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full mt-4"
-                      onClick={() => setActiveTab('profile')}
-                    >
-                      Edit Profile
-                    </Button>
                   </CardContent>
                 </Card>
               </div>
@@ -468,430 +355,221 @@ export default function UAMDashboard() {
 
             {/* Profile Tab */}
             <TabsContent value="profile">
+              <div className="space-y-6">
+                {/* Profile Header */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Profile Settings</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    Manage your account information and membership type
-                  </p>
+                    <CardTitle className="flex items-center">
+                      <User className="w-5 h-5 mr-2" />
+                      Profile Information
+                    </CardTitle>
+                                      <p className="text-sm text-gray-600">
+                      Manage your account information and preferences
+                    </p>
+                    {isLoadingProfile && (
+                      <Alert className="mt-4">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <AlertDescription>
+                          Loading profile data...
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    {!userProfile && !isLoadingProfile && (
+                      <Alert className="mt-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          Showing sample data. Real user data will be displayed when available.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                 </CardHeader>
-                <CardContent>
-                  {editingProfile ? (
-                    <form onSubmit={handleProfileUpdate} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <CardContent className="space-y-6">
+                    {/* User Avatar and Basic Info */}
+                    <div className="flex items-center space-x-6">
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <User className="w-10 h-10 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          {userProfile ? formatUserName(userProfile) : (databaseUser?.name || authUser?.user_metadata?.full_name || sampleUserData.name)}
+                        </h3>
+                        <p className="text-gray-600">{userProfile?.email || authUser?.email || sampleUserData.email}</p>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {userProfile ? getMemberTypeDisplayName(userProfile.memberType) : (databaseUser?.memberType || sampleUserData.memberType)}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={userProfile ? getVerificationStatusColor(userProfile.studentVerificationStatus) : 
+                              (databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus) === 'VERIFIED' 
+                                ? 'bg-green-50 text-green-700 border-green-200' 
+                                : (databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus) === 'PENDING'
+                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                : 'bg-gray-50 text-gray-700 border-gray-200'
+                            }
+                          >
+                            {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
+                             (databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
+                             (databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
+                             'Not Verified'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleEditProfile}
+                        disabled={isLoadingProfile}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        {isEditingProfile ? 'Cancel' : 'Edit Profile'}
+                      </Button>
+                    </div>
+
+                    {/* Detailed Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t">
                         <div>
                           <Label htmlFor="firstName">First Name</Label>
-                          <Input
-                            id="firstName"
-                            value={user.firstName}
-                            onChange={(e) => setUser({ ...user, firstName: e.target.value })}
-                            required
-                          />
+                                                  <Input
+                          id="firstName"
+                          value={isEditingProfile ? editFormData.firstName : (userProfile?.firstName || databaseUser?.firstName || authUser?.user_metadata?.full_name?.split(' ')[0] || sampleUserData.firstName)}
+                          disabled={!isEditingProfile}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                          className="mt-1"
+                        />
                         </div>
                         <div>
                           <Label htmlFor="lastName">Last Name</Label>
                           <Input
                             id="lastName"
-                            value={user.lastName}
-                            onChange={(e) => setUser({ ...user, lastName: e.target.value })}
-                            required
+                            value={isEditingProfile ? editFormData.lastName : (userProfile?.lastName || databaseUser?.lastName || authUser?.user_metadata?.full_name?.split(' ').slice(1).join(' ') || sampleUserData.lastName)}
+                            disabled={!isEditingProfile}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                            className="mt-1"
                           />
                         </div>
-                      </div>
-
                       <div>
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">Email Address</Label>
                         <Input
                           id="email"
-                          type="email"
-                          value={user.email}
-                          onChange={(e) => setUser({ ...user, email: e.target.value })}
-                          required
+                          value={authUser?.email || ''}
+                          disabled
+                          className="mt-1"
                         />
                       </div>
-
                       <div>
-                        <Label htmlFor="contactNumber">Contact Number</Label>
+                        <Label htmlFor="phone">Contact Number</Label>
                         <Input
-                          id="contactNumber"
-                          value={user.contactNumber}
-                          onChange={(e) => setUser({ ...user, contactNumber: e.target.value })}
-                          required
+                          id="phone"
+                          value={isEditingProfile ? editFormData.contactNumber : (userProfile?.contactNumber || databaseUser?.contactNumber || authUser?.user_metadata?.phone || sampleUserData.contactNumber)}
+                          disabled={!isEditingProfile}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, contactNumber: e.target.value }))}
+                          className="mt-1"
                         />
                       </div>
-
                       <div>
                         <Label htmlFor="memberType">Member Type</Label>
-                        <Select
-                          value={user.memberType}
-                          onValueChange={(value: 'student' | 'professional' | 'freelancer') =>
-                            setUser({ ...user, memberType: value })
-                          }
+                        <Select 
+                          disabled={!isEditingProfile} 
+                          value={isEditingProfile ? editFormData.memberType : (userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType)}
+                          onValueChange={(value) => setEditFormData(prev => ({ ...prev, memberType: value as 'STUDENT' | 'MEMBER' | 'TUTOR' }))}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="mt-1">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="student">Student</SelectItem>
-                            <SelectItem value="professional">Professional</SelectItem>
-                            <SelectItem value="freelancer">Freelancer</SelectItem>
+                            <SelectItem value="STUDENT">Student</SelectItem>
+                            <SelectItem value="MEMBER">Member</SelectItem>
+                            <SelectItem value="TUTOR">Tutor</SelectItem>
                           </SelectContent>
                         </Select>
-                        {user.memberType === 'student' && (
-                          <p className="text-xs text-amber-600 mt-1">
-                            Changing to student requires document verification
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex space-x-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setEditingProfile(false)}
-                          className="flex-1"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={isLoading}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600"
-                        >
-                          {isLoading ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>First Name</Label>
-                          <p className="text-sm text-gray-600">{user.firstName}</p>
                         </div>
                         <div>
-                          <Label>Last Name</Label>
-                          <p className="text-sm text-gray-600">{user.lastName}</p>
+                        <Label htmlFor="verificationStatus">Student Verification</Label>
+                        <Select disabled value={userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NA">Not Applicable</SelectItem>
+                            <SelectItem value="PENDING">Pending</SelectItem>
+                            <SelectItem value="VERIFIED">Verified</SelectItem>
+                          </SelectContent>
+                        </Select>
                         </div>
                       </div>
 
-                      <div>
-                        <Label>Email</Label>
-                        <p className="text-sm text-gray-600">{user.email}</p>
+                    {/* Edit Profile Actions */}
+                    {isEditingProfile && (
+                      <div className="pt-6 border-t">
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            variant="outline" 
+                            onClick={handleCancelEdit}
+                            disabled={isLoadingProfile}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleSaveProfile}
+                            disabled={isLoadingProfile}
+                          >
+                            {isLoadingProfile ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Saving...
+                              </>
+                            ) : (
+                              'Save Changes'
+                            )}
+                          </Button>
+                        </div>
                       </div>
+                    )}
 
+                    {/* Account Statistics */}
+                    {/* <div className="pt-6 border-t">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Account Statistics</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <div className="flex items-center">
+                            <Calendar className="w-8 h-8 text-blue-600 mr-3" />
                       <div>
-                        <Label>Contact Number</Label>
-                        <p className="text-sm text-gray-600">{user.contactNumber}</p>
+                              <p className="text-sm text-blue-600 font-medium">Total Bookings</p>
+                              <p className="text-2xl font-bold text-blue-700">0</p>
                       </div>
-
+                      </div>
+                      </div>
+                        <div className="bg-green-50 p-4 rounded-lg">
+                          <div className="flex items-center">
+                            <Clock className="w-8 h-8 text-green-600 mr-3" />
                       <div>
-                        <Label>Member Type</Label>
-                        <p className="text-sm text-gray-600 capitalize">{user.memberType}</p>
+                              <p className="text-sm text-green-600 font-medium">Hours Used</p>
+                              <p className="text-2xl font-bold text-green-700">0</p>
                       </div>
-
-                      <div>
-                        <Label>Verification Status</Label>
-                        <p className="text-sm text-gray-600 capitalize">{user.verificationStatus}</p>
-                      </div>
-
-                      <Button
-                        onClick={() => setEditingProfile(true)}
-                        className="bg-orange-500 hover:bg-orange-600"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Profile
-                      </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Upcoming Bookings Tab */}
-            <TabsContent value="upcoming">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Bookings</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    You can edit bookings up to 5 hours before the start time
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {upcomingBookings.length > 0 ? (
-                    upcomingBookings.map(booking => (
-                      <BookingCard key={booking.id} booking={booking} />
-                    ))
-                  ) : (
-                    <div className="text-center py-12">
-                      <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
-                      <p className="text-gray-600 mb-4">Ready to book your next co-working session?</p>
-                      <Button className="bg-orange-500 hover:bg-orange-600">
-                        Book Now
-                      </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* History Tab */}
-            <TabsContent value="history" className="space-y-6">
-              {/* Booking History */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Booking History</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    Your past and cancelled bookings
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {pastBookings.length > 0 ? (
-                    pastBookings.map(booking => (
-                      <BookingCard key={booking.id} booking={booking} showActions={false} />
-                    ))
-                  ) : (
-                    <div className="text-center py-12">
-                      <History className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No booking history</h3>
-                      <p className="text-gray-600">Your completed and cancelled bookings will appear here</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            {/* Passes Tab - Dynamic User Passes */}
-            <TabsContent value="passes" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Gift className="w-5 h-5 mr-2" />
-                    My Passes
-                  </CardTitle>
-                  <p className="text-sm text-gray-600">
-                    Individual passes from your packages
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {!passesInitialized ? (
-                    <div className="text-center py-8">
-                      <Gift className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <p className="text-gray-600">Click to load your passes</p>
-                    </div>
-                  ) : passesLoading ? (
-                    <div className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                      <p>Loading your passes...</p>
-                    </div>
-                  ) : passesError ? (
-                    <div className="text-center py-8">
-                      <Alert>
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription>{passesError}</AlertDescription>
-                      </Alert>
-                      <Button 
-                        onClick={() => fetchUserPasses(1, 10)} 
-                        className="mt-4"
-                        size="sm"
-                      >
-                        Retry
-                      </Button>
-                    </div>
-                  ) : availablePasses.length > 0 ? (
-                    <div className="space-y-4">
-                      {availablePasses.map((pass) => (
-                        <Card key={pass.id} className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                  <Gift className="w-5 h-5 text-green-600" />
-                                </div>
+                        <div className="bg-purple-50 p-4 rounded-lg">
+                          <div className="flex items-center">
+                            <Gift className="w-8 h-8 text-purple-600 mr-3" />
                                 <div>
-                                  <h4 className="font-semibold text-lg text-green-800">{pass.packageName}</h4>
-                                  <p className="text-sm text-green-700">
-                                    {pass.passType} pass • {pass.hours} hours
-                                  </p>
+                              <p className="text-sm text-purple-600 font-medium">Promo Codes Used</p>
+                              <p className="text-2xl font-bold text-purple-700">0</p>
                                 </div>
                               </div>
-                              <Badge className="bg-green-100 text-green-800">Available</Badge>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                              <div className="flex items-center text-green-700">
-                                <Calendar className="w-4 h-4 mr-2" />
-                                <span>Package: {pass.packageName}</span>
-                              </div>
-                              <div className="flex items-center text-green-700">
-                                <Clock className="w-4 h-4 mr-2" />
-                                <span>Duration: {pass.hours} hours</span>
                               </div>
                             </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm text-green-700">
-                                <span className="font-medium">Pass ID:</span>
-                                 {/* {pass.id.slice(0, 8)}... */}
-                               {pass.id}
-                              </div>
-                              <Button 
-                                onClick={() => router.push('/book-now')}
-                                size="sm"
-                                className="bg-orange-500 hover:bg-orange-600"
-                              >
-                                Use This Pass
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Gift className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No available passes</h3>
-                      <p className="text-gray-600 mb-4">
-                        {userPackages.length > 0 
-                          ? "All your passes have been used or expired. Check your packages tab for more details."
-                          : "You don't have any packages yet. Get started by purchasing your first workspace package."
-                        }
-                      </p>
-                      {userPackages.length === 0 && (
-                        <Button onClick={() => router.push('/buy-pass')}>
-                          Browse Packages
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                            </div> */}
                 </CardContent>
               </Card>
 
-               {/* Pass Statistics - Moved to top for better UX */}
-               {/* {availablePasses.length > 0 && (
-                 <Card>
-                   <CardHeader>
-                     <CardTitle className="flex items-center">
-                       <BarChart3 className="w-5 h-5 mr-2" />
-                       Pass Summary
-                     </CardTitle>
-                     <p className="text-sm text-gray-600">
-                       Overview of your available passes
-                     </p>
-                   </CardHeader>
-                   <CardContent>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                       <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                         <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                           <Gift className="w-6 h-6 text-green-600" />
-                         </div>
-                         <div className="text-3xl font-bold text-green-700">{availablePasses.length}</div>
-                         <div className="text-sm text-green-600 font-medium">Available Passes</div>
-                       </div>
-                       <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
-                         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                           <Clock className="w-6 h-6 text-blue-600" />
-                         </div>
-                         <div className="text-3xl font-bold text-blue-700">
-                           {availablePasses.reduce((total, pass) => total + pass.hours, 0)}
-                         </div>
-                         <div className="text-sm text-blue-600 font-medium">Total Hours</div>
-                       </div>
-                       <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-200">
-                         <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                           <Star className="w-6 h-6 text-orange-600" />
-                         </div>
-                         <div className="text-3xl font-bold text-orange-700">
-                           {availablePasses.filter(pass => pass.passType === 'bonus').length}
-                         </div>
-                         <div className="text-sm text-orange-600 font-medium">Bonus Passes</div>
-                       </div>
-                     </div>
-                   </CardContent>
-                 </Card>
-               )} */}
+                
+                      </div>
+            </TabsContent>
 
-              {/* Pagination Controls */}
-              {passesPagination.totalPages > 1 && (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      {/* Status Info */}
-                      <div className="text-sm text-gray-600 text-center lg:text-left">
-                        Showing <span className="font-medium">{availablePasses.length}</span> of{' '}
-                        <span className="font-medium">{passesPagination.totalItems}</span> passes
-                        <br className="lg:hidden" />
-                        <span className="lg:ml-2">(Page {passesPagination.currentPage} of {passesPagination.totalPages})</span>
-                      </div>
-                      
-                      {/* Navigation Controls */}
-                      <div className="flex items-center justify-center lg:justify-end space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => changePassesPage(passesPagination.prevPage || passesPagination.currentPage - 1)}
-                          disabled={!passesPagination.hasPrevPage}
-                          className="min-w-[80px]"
-                        >
-                          Previous
-                        </Button>
-                        
-                        {/* Page Numbers - Responsive design */}
-                        <div className="flex items-center space-x-1">
-                          {(() => {
-                            const totalPages = passesPagination.totalPages;
-                            const currentPage = passesPagination.currentPage;
-                            const pages = [];
-                            
-                            // Always show first page
-                            if (currentPage > 1) {
-                              pages.push(1);
-                              if (currentPage > 3) pages.push('...');
-                            }
-                            
-                            // Show pages around current page
-                            for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-                              if (i > 1 && i < totalPages) pages.push(i);
-                            }
-                            
-                            // Always show last page
-                            if (currentPage < totalPages) {
-                              if (currentPage < totalPages - 2) pages.push('...');
-                              pages.push(totalPages);
-                            }
-                            
-                            return pages.map((pageNum, index) => (
-                              pageNum === '...' ? (
-                                <span key={`ellipsis-${index}`} className="px-2 text-gray-500 select-none">...</span>
-                              ) : (
-                                <Button
-                                  key={pageNum}
-                                  variant={pageNum === currentPage ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => changePassesPage(pageNum as number)}
-                                  className="w-10 h-10 p-0 text-sm font-medium"
-                                >
-                                  {pageNum}
-                                </Button>
-                              )
-                            ));
-                          })()}
-                        </div>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => changePassesPage(passesPagination.nextPage || passesPagination.currentPage + 1)}
-                          disabled={!passesPagination.hasNextPage}
-                          className="min-w-[80px]"
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+            {/* Passes Tab - User Packages */}
+            <TabsContent value="passes" className="space-y-6">
+              <UserPackages userId={authUser?.id || ''} />
             </TabsContent>
 
             {/* Promo Codes Tab */}
@@ -908,55 +586,33 @@ export default function UAMDashboard() {
         </div>
       </div>
 
-      {/* Cancel Booking Modal */}
+      {/* Cancellation Dialog */}
       <Dialog open={!!cancellingBooking} onOpenChange={() => setCancellingBooking(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center text-red-600">
-              <AlertTriangle className="w-5 h-5 mr-2" />
-              Cancel Booking
-            </DialogTitle>
+            <DialogTitle>Cancel Booking</DialogTitle>
           </DialogHeader>
-
           {cancellingBooking && (
             <div className="space-y-4">
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Cancellation Policy:</strong>
-                  <ul className="list-disc list-inside mt-2 text-sm">
-                    <li>Cancellations made more than 24 hours before booking: Full refund</li>
-                    <li>Cancellations made 6-24 hours before booking: 50% refund</li>
-                    <li>Cancellations made less than 6 hours before booking: No refund</li>
-                    <li>All refunds are processed manually by admin within 3-5 business days</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
-
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h4 className="font-semibold mb-2">Booking Details:</h4>
-                <p><strong>Location:</strong> {cancellingBooking.locationName}</p>
-                <p><strong>Date:</strong> {new Date(cancellingBooking.date).toLocaleDateString()}</p>
-                <p><strong>Time:</strong> {cancellingBooking.startTime} - {cancellingBooking.endTime}</p>
-                <p><strong>Amount:</strong> ${cancellingBooking.totalAmount}</p>
-                <p><strong>Reference:</strong> {cancellingBooking.bookingReference}</p>
+              <p>Are you sure you want to cancel this booking?</p>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold">{cancellingBooking.locationName}</h4>
+                <p className="text-sm text-gray-600">{cancellingBooking.locationAddress}</p>
+                <p className="text-sm text-gray-500">
+                  {new Date(cancellingBooking.date).toLocaleDateString()} at {cancellingBooking.startTime} - {cancellingBooking.endTime}
+                </p>
+                <p className="text-sm text-gray-500">Ref: {cancellingBooking.bookingReference}</p>
               </div>
-
-              <div className="flex space-x-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setCancellingBooking(null)}
-                  className="flex-1"
-                >
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setCancellingBooking(null)}>
                   Keep Booking
                 </Button>
                 <Button
                   variant="destructive"
                   onClick={() => handleCancelBooking(cancellingBooking)}
                   disabled={isLoading}
-                  className="flex-1"
                 >
-                  {isLoading ? 'Cancelling...' : 'Confirm Cancellation'}
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel Booking'}
                 </Button>
               </div>
             </div>
@@ -964,48 +620,32 @@ export default function UAMDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Booking Modal */}
+      {/* Edit Booking Dialog */}
       <Dialog open={!!editingBooking} onOpenChange={() => setEditingBooking(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Edit className="w-5 h-5 mr-2" />
-              Edit Booking
-            </DialogTitle>
+            <DialogTitle>Edit Booking</DialogTitle>
           </DialogHeader>
-
           {editingBooking && (
             <div className="space-y-4">
-              <Alert>
-                <AlertDescription>
-                  <strong>Edit Policy:</strong> Bookings can only be edited up to 5 hours before the start time.
-                  You'll be redirected to the booking page to make changes.
-                </AlertDescription>
-              </Alert>
-
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h4 className="font-semibold mb-2">Current Booking:</h4>
-                <p><strong>Location:</strong> {editingBooking.locationName}</p>
-                <p><strong>Date:</strong> {new Date(editingBooking.date).toLocaleDateString()}</p>
-                <p><strong>Time:</strong> {editingBooking.startTime} - {editingBooking.endTime}</p>
-                <p><strong>People:</strong> {editingBooking.numberOfPeople}</p>
-                <p><strong>Seats:</strong> {editingBooking.selectedSeats.join(', ')}</p>
+              <p>You will be redirected to the booking page to make changes.</p>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold">{editingBooking.locationName}</h4>
+                <p className="text-sm text-gray-600">{editingBooking.locationAddress}</p>
+                <p className="text-sm text-gray-500">
+                  {new Date(editingBooking.date).toLocaleDateString()} at {editingBooking.startTime} - {editingBooking.endTime}
+                </p>
+                <p className="text-sm text-gray-500">Ref: {editingBooking.bookingReference}</p>
               </div>
-
-              <div className="flex space-x-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditingBooking(null)}
-                  className="flex-1"
-                >
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setEditingBooking(null)}>
                   Cancel
                 </Button>
                 <Button
                   onClick={() => handleEditBooking(editingBooking)}
                   disabled={isLoading}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
                 >
-                  {isLoading ? 'Processing...' : 'Continue to Edit'}
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Edit Booking'}
                 </Button>
               </div>
             </div>
