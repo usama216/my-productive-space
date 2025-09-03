@@ -181,7 +181,7 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
   return (
     <div className="space-y-6">
       {/* User Info Card */}
-      {userInfo && (
+      {/* {userInfo && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -211,7 +211,7 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
             </div>
           </CardContent>
         </Card>
-      )}
+      )} */}
 
       {/* Promo Codes Tabs */}
       <Tabs defaultValue="available" className="w-full">

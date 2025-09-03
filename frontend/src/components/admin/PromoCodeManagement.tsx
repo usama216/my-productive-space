@@ -646,7 +646,7 @@ export function PromoCodeManagement() {
       </div>
 
       {/* Filters */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Filter className="w-5 h-5 mr-2" />
@@ -727,7 +727,7 @@ export function PromoCodeManagement() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Promo Codes Table */}
       <Card>
