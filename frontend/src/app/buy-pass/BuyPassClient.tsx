@@ -159,8 +159,7 @@ export default function BuyNowPage() {
   // Helper functions
   const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user
   const subtotal = selectedPackage ? (selectedPackage.price + selectedPackage.outletFee) * quantity : 0
-  const tax = subtotal * 0.09
-  const total = subtotal + tax
+  const total = subtotal
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -471,7 +470,6 @@ export default function BuyNowPage() {
                   {purchaseStep === 2 && (
                     <PaymentStep
                       subtotal={subtotal}
-                      tax={tax}
                       total={total}
                       paymentMethod={paymentMethod}
                       onPaymentMethodChange={setPaymentMethod}
@@ -669,10 +667,7 @@ export default function BuyNowPage() {
                             <span>Subtotal</span>
                             <span>${subtotal}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span>GST (9%)</span>
-                            <span>${tax.toFixed(2)}</span>
-                          </div>
+
                           <div className="flex justify-between font-bold border-t pt-2">
                             <span>Total</span>
                             <span>${total.toFixed(2)}</span>

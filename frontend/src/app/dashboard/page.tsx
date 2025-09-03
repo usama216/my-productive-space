@@ -40,6 +40,8 @@ import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import { EntitlementHistory } from '@/components/dashboard/EntitlementHistory'
 import { PromoCodeHistory } from '@/components/dashboard/PromoCodeHistory'
 import { UserBookings } from '@/components/dashboard/UserBookings'
+import { UserPromoCodes } from '@/components/dashboard/UserPromoCodes'
+
 import { useAuth } from '@/hooks/useAuth'
 import { useUserPackages } from '@/hooks/usePackages'
 import { UserPackage, UserPass } from '@/lib/api/packages'
@@ -894,7 +896,7 @@ export default function UAMDashboard() {
 
             {/* Promo Codes Tab */}
             <TabsContent value="promocodes" className="space-y-6">
-              <PromoCodeHistory userId={user.id} />
+              <UserPromoCodes userId={authUser?.id || ''} />
             </TabsContent>
 
             {/* My Bookings Tab */}

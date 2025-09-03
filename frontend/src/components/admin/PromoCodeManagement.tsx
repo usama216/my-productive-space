@@ -1,362 +1,330 @@
-// src/components/admin/PromoCodeManagement.tsx - Admin promo code management
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Plus, Search, Edit, Trash2, Eye, Calendar, Users, Target, Gift, Globe, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Plus, Edit, Trash2, Eye, Calendar, Users, DollarSign } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
-import { PromoCode, createPromoCode, updatePromoCode, deletePromoCode, getAllPromoCodes } from '@/lib/promoCodeService'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { 
+  PromoCode, 
+  createPromoCode, 
+  updatePromoCode, 
+  deletePromoCode, 
+  getAllPromoCodes,
+  getPromoCodeDetails,
+  formatDiscountDisplay,
+  getPromoCodeTypeLabel,
+  getPromoCodeStatusBadge
+} from '@/lib/promoCodeService'
+import { UserSelector } from './UserSelector'
 
 export function PromoCodeManagement() {
   const { toast } = useToast()
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategory, setFilterCategory] = useState('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterType, setFilterType] = useState<string>('all')
+  const [filterGroup, setFilterGroup] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  
+  // Form state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [viewingPromo, setViewingPromo] = useState<PromoCode | null>(null)
+  const [isViewing, setIsViewing] = useState(false)
+  
+  // Form fields
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     description: '',
     discounttype: 'percentage' as 'percentage' | 'fixed',
     discountvalue: 0,
+    maxDiscountAmount: 0,
     minimumamount: 0,
-    maximumdiscount: 0,
+    activefrom: '',
+    activeto: '',
+    promoType: 'GENERAL' as 'GENERAL' | 'GROUP_SPECIFIC' | 'USER_SPECIFIC' | 'WELCOME',
+    targetGroup: '' as '' | 'STUDENT' | 'MEMBER',
+    targetUserIds: [] as string[],
     maxusageperuser: 1,
-    maxtotalusage: 0,
-    category: 'GENERAL' as 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL',
+    globalUsageLimit: 100,
     isactive: true,
-    activefrom: new Date().toISOString(),
-    activeto: null as string | null
+    category: '',
+    priority: 1
   })
 
-  // Load promo codes
-  const loadPromoCodes = async () => {
+  useEffect(() => {
+    fetchPromoCodes()
+  }, [currentPage, searchTerm, filterStatus, filterType, filterGroup])
+
+  const fetchPromoCodes = async () => {
     try {
       setLoading(true)
-      const response = await getAllPromoCodes()
-      console.log('loadPromoCodes response:', response);
-      if (response.success && response.data) {
-        console.log('Setting promoCodes:', response.data);
-        setPromoCodes(response.data)
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to load promo codes",
-          variant: "destructive",
-        })
-      }
+      const response = await getAllPromoCodes({
+        page: currentPage,
+        limit: 20,
+        search: searchTerm || undefined,
+        status: filterStatus !== 'all' ? filterStatus : undefined,
+        promoType: filterType !== 'all' ? filterType : undefined,
+        targetGroup: filterGroup !== 'all' ? filterGroup : undefined
+      })
+      
+      setPromoCodes(response.promoCodes)
+      setTotalPages(response.pagination.totalPages)
+      setTotalItems(response.pagination.total)
     } catch (error) {
-      console.error('Error in loadPromoCodes:', error);
       toast({
         title: "Error",
-        description: "Failed to load promo codes",
-        variant: "destructive",
+        description: "Failed to fetch promo codes",
+        variant: "destructive"
       })
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadPromoCodes()
-  }, [])
-
-  // Filter promo codes
-  const filteredPromoCodes = promoCodes.filter(promo => {
-    const matchesSearch = promo.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (promo.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                         promo.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = filterCategory === 'all' || (promo.category || 'GENERAL') === filterCategory
-    return matchesSearch && matchesCategory
-  })
-
-  // Get unique categories from promo codes
-  const categories = ['all', ...Array.from(new Set(promoCodes.map(p => p.category || 'GENERAL').filter(Boolean)))]
-
-  // Validate form data
-  const validateFormData = () => {
-    const now = new Date();
-    const activeFrom = new Date(formData.activefrom);
-    const activeTo = formData.activeto ? new Date(formData.activeto) : null;
-    
-    // Check if active from is in the future
-    if (activeFrom <= now) {
-      toast({
-        title: "Validation Error",
-        description: "Active From date must be in the future",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    // Check if active to is before active from
-    if (activeTo && activeTo <= activeFrom) {
-      toast({
-        title: "Validation Error",
-        description: "Active Until date must be after Active From date",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    return true;
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (isSubmitting) return
-    
-    // Validate form data first
-    if (!validateFormData()) {
-      return;
-    }
-    
-    setIsSubmitting(true)
-    
-    try {
-      if (editingPromo) {
-        const response = await updatePromoCode(editingPromo.id, formData)
-        console.log('Update response:', response);
-        
-        // Check if response has success property or if it's a direct success response
-        if (response.success || response.message?.includes('success') || response.message?.includes('updated')) {
-          toast({
-            title: "Success",
-            description: "Promo code updated successfully",
-          })
-          setIsCreateDialogOpen(false)
-          setEditingPromo(null)
-          resetForm()
-          loadPromoCodes()
-        } else {
-          toast({
-            title: "Error",
-            description: response.message || response.error || "Failed to update promo code",
-            variant: "destructive",
-          })
-        }
-      } else {
-        const response = await createPromoCode(formData)
-        console.log('Create response:', response);
-        
-        // Check if response has success property or if it's a direct success response
-        if (response.success || response.message?.includes('success') || response.message?.includes('created')) {
-          toast({
-            title: "Success",
-            description: "Promo code created successfully",
-          })
-          setIsCreateDialogOpen(false)
-          setEditingPromo(null)
-          resetForm()
-          loadPromoCodes()
-        } else {
-          toast({
-            title: "Error",
-            description: response.message || response.error || "Failed to create promo code",
-            variant: "destructive",
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Form submission error:', error);
-      toast({
-        title: "Error",
-        description: "An error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  // Handle delete
-  const handleDelete = async (id: string) => {
-    try {
-      const response = await deletePromoCode(id)
-      console.log('Delete response:', response);
-      
-      if (response.success || response.message?.includes('success') || response.message?.includes('deleted')) {
-        toast({
-          title: "Success",
-          description: "Promo code deleted successfully",
-        })
-        loadPromoCodes()
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || response.error || "Failed to delete promo code",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error('Delete error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete promo code",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Handle deactivate (safer alternative to delete)
-  const handleDeactivate = async (promo: PromoCode) => {
-    try {
-      const response = await updatePromoCode(promo.id, { isactive: false })
-      console.log('Deactivate response:', response);
-      
-      if (response.success || response.message?.includes('success') || response.message?.includes('updated')) {
-        toast({
-          title: "Success",
-          description: "Promo code deactivated successfully",
-        })
-        loadPromoCodes()
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || response.error || "Failed to deactivate promo code",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error('Deactivate error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to deactivate promo code",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Handle activate
-  const handleActivate = async (promo: PromoCode) => {
-    try {
-      const response = await updatePromoCode(promo.id, { isactive: true })
-      console.log('Activate response:', response);
-      
-      if (response.success || response.message?.includes('success') || response.message?.includes('updated')) {
-        toast({
-          title: "Success",
-          description: "Promo code activated successfully",
-        })
-        loadPromoCodes()
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || response.error || "Failed to activate promo code",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error('Activate error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to activate promo code",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Handle edit
-  const handleEdit = (promo: PromoCode) => {
-    setEditingPromo(promo)
-    setFormData({
-      code: promo.code,
-      name: promo.name || '',
-      description: promo.description,
-      discounttype: promo.discounttype,
-      discountvalue: promo.discountvalue,
-      minimumamount: promo.minimumamount,
-      maximumdiscount: promo.maximumdiscount || 0,
-      maxusageperuser: promo.maxusageperuser,
-      maxtotalusage: promo.maxtotalusage,
-      category: promo.category || 'GENERAL',
-      isactive: promo.isactive,
-      activefrom: promo.activefrom,
-      activeto: promo.activeto || null
-    })
-    setIsCreateDialogOpen(true)
-  }
-
-  // Reset form
   const resetForm = () => {
-    const now = new Date();
-    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000); // Current time + 1 hour
-    
     setFormData({
       code: '',
       name: '',
       description: '',
-      discounttype: 'percentage' as 'percentage' | 'fixed',
+      discounttype: 'percentage',
       discountvalue: 0,
+      maxDiscountAmount: 0,
       minimumamount: 0,
-      maximumdiscount: 0,
+      activefrom: '',
+      activeto: '',
+      promoType: 'GENERAL',
+      targetGroup: '',
+      targetUserIds: [],
       maxusageperuser: 1,
-      maxtotalusage: 0,
-      category: 'GENERAL' as 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL',
+      globalUsageLimit: 100,
       isactive: true,
-      activefrom: oneHourFromNow.toISOString(),
-      activeto: null as string | null
+      category: '',
+      priority: 1
     })
+    setEditingPromo(null)
+    setIsEditing(false)
   }
 
-  // Calculate summary stats
-  const totalPromoCodes = promoCodes.length
-  const activePromoCodes = promoCodes.filter(p => p.isactive).length
-  const totalUsage = promoCodes.reduce((sum, p) => sum + (p.currentusage || 0), 0)
+  const validateForm = (): string[] => {
+    const errors: string[] = []
+    
+    // Required fields
+    if (!formData.code.trim()) errors.push('Promo code is required')
+    if (!formData.name.trim()) errors.push('Name is required')
+    if (!formData.discountvalue || formData.discountvalue <= 0) errors.push('Discount value must be greater than 0')
+    
+    // Conditional validation based on promo type
+    if (formData.promoType === 'GROUP_SPECIFIC' && !formData.targetGroup) {
+      errors.push('Target group is required for group-specific codes')
+    }
+    
+    if (formData.promoType === 'USER_SPECIFIC' && (!formData.targetUserIds || formData.targetUserIds.length === 0)) {
+      errors.push('Target user IDs are required for user-specific codes')
+    }
+    
+    // Discount validation
+    if (formData.discounttype === 'percentage') {
+      if (formData.discountvalue < 1 || formData.discountvalue > 100) {
+        errors.push('Percentage must be between 1 and 100')
+      }
+      if (!formData.maxDiscountAmount || formData.maxDiscountAmount <= 0) {
+        errors.push('Max discount amount is required for percentage discounts')
+      }
+    }
+    
+    // Date validation
+    if (formData.activefrom && formData.activeto) {
+      const fromDate = new Date(formData.activefrom)
+      const toDate = new Date(formData.activeto)
+      if (fromDate >= toDate) {
+        errors.push('End date must be after start date')
+      }
+    }
+    
+    return errors
+  }
 
-  // Format date for display in local timezone
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'No expiry'
-    try {
-      const date = new Date(dateString);
-      // Convert UTC to local timezone
-      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-      
-      return localDate.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZoneName: 'short' // This will show the timezone abbreviation
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate form
+    const errors = validateForm()
+    if (errors.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: errors.join(', '),
+        variant: "destructive"
       })
-    } catch {
-      return 'Invalid date'
+      return
+    }
+    
+    try {
+      const promoData = {
+        code: formData.code,
+        name: formData.name,
+        description: formData.description,
+        discounttype: formData.discounttype,
+        discountvalue: formData.discountvalue,
+        maxDiscountAmount: formData.maxDiscountAmount,
+        minimumamount: formData.minimumamount,
+        activefrom: formData.activefrom && formData.activefrom.trim() ? formData.activefrom : undefined,
+        activeto: formData.activeto && formData.activeto.trim() ? formData.activeto : undefined,
+        promoType: formData.promoType,
+        targetGroup: formData.promoType === 'GROUP_SPECIFIC' && formData.targetGroup ? formData.targetGroup : undefined,
+        targetUserIds: formData.promoType === 'USER_SPECIFIC' ? formData.targetUserIds : undefined,
+        maxusageperuser: formData.maxusageperuser,
+        globalUsageLimit: formData.globalUsageLimit,
+        isactive: formData.isactive,
+        category: formData.category || undefined,
+        priority: formData.priority
+      }
+
+      let response
+      if (isEditing && editingPromo) {
+        response = await updatePromoCode(editingPromo.id, promoData)
+      } else {
+        response = await createPromoCode(promoData)
+      }
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: isEditing ? "Promo code updated successfully" : "Promo code created successfully"
+        })
+        setIsCreateDialogOpen(false)
+        resetForm()
+        fetchPromoCodes()
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to save promo code",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save promo code",
+        variant: "destructive"
+      })
     }
   }
 
-  // Format date for datetime-local input (YYYY-MM-DDTHH:MM) in local timezone
-  const formatDateForInput = (dateString: string | null) => {
-    if (!dateString) return ''
+  const handleEdit = (promo: PromoCode) => {
+    setEditingPromo(promo)
+    setIsEditing(true)
+    setFormData({
+      code: promo.code,
+      name: promo.name,
+      description: promo.description || '',
+      discounttype: promo.discounttype || promo.discountType || '',
+      discountvalue: promo.discountvalue || promo.discountValue || 0,
+      maxDiscountAmount: promo.maxDiscountAmount || 0,
+      minimumamount: promo.minimumamount || promo.minimumAmount || 0,
+      activefrom: promo.activefrom ? new Date(promo.activefrom).toISOString().slice(0, 16) : (promo.activeFrom ? new Date(promo.activeFrom).toISOString().slice(0, 16) : ''),
+      activeto: promo.activeto ? new Date(promo.activeto).toISOString().slice(0, 16) : (promo.activeTo ? new Date(promo.activeTo).toISOString().slice(0, 16) : ''),
+      promoType: promo.promoType,
+      targetGroup: promo.targetGroup || '',
+      targetUserIds: promo.targetUserIds || [],
+      maxusageperuser: promo.maxusageperuser || promo.maxUsagePerUser || 1,
+      globalUsageLimit: promo.globalUsageLimit || 100,
+      isactive: promo.isactive !== undefined ? promo.isactive : (promo.isActive !== undefined ? promo.isActive : true),
+      category: promo.category || '',
+      priority: promo.priority || 1
+    })
+    setIsCreateDialogOpen(true)
+  }
+
+  const handleView = async (promo: PromoCode) => {
     try {
-      const date = new Date(dateString);
-      // Convert UTC to local timezone for display
-      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-      
-      const year = localDate.getFullYear();
-      const month = String(localDate.getMonth() + 1).padStart(2, '0');
-      const day = String(localDate.getDate()).padStart(2, '0');
-      const hours = String(localDate.getHours()).padStart(2, '0');
-      const minutes = String(localDate.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    } catch {
-      return ''
+      const response = await getPromoCodeDetails(promo.id)
+      if (response.success && response.promoCode) {
+        setViewingPromo(response.promoCode)
+        setIsViewing(true)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch promo code details",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch promo code details",
+        variant: "destructive"
+      })
     }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this promo code?')) return
+    
+    try {
+      const response = await deletePromoCode(id)
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Promo code deleted successfully"
+        })
+        fetchPromoCodes()
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to delete promo code",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete promo code",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const getPromoTypeIcon = (type: string) => {
+    switch (type) {
+      case 'GENERAL': return <Globe className="w-4 h-4" />
+      case 'GROUP_SPECIFIC': return <Users className="w-4 h-4" />
+      case 'USER_SPECIFIC': return <Target className="w-4 h-4" />
+      case 'WELCOME': return <Gift className="w-4 h-4" />
+      default: return <Globe className="w-4 h-4" />
+    }
+  }
+
+  const getPromoTypeColor = (type: string) => {
+    switch (type) {
+      case 'GENERAL': return 'bg-blue-100 text-blue-800'
+      case 'GROUP_SPECIFIC': return 'bg-green-100 text-green-800'
+      case 'USER_SPECIFIC': return 'bg-purple-100 text-purple-800'
+      case 'WELCOME': return 'bg-orange-100 text-orange-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFilterStatus('all')
+    setFilterType('all')
+    setFilterGroup('all')
+    setCurrentPage(1)
   }
 
   return (
@@ -381,27 +349,31 @@ export function PromoCodeManagement() {
               Create Promo Code
             </Button>
           </DialogTrigger>
-                     <DialogContent className="max-w-2xl">
-             <DialogHeader>
-               <DialogTitle>
-                 {editingPromo ? 'Edit Promo Code' : 'Create New Promo Code'}
-               </DialogTitle>
-               {isSubmitting && (
-                 <div className="flex items-center space-x-2 text-sm text-blue-600">
-                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                   <span>Processing...</span>
-                 </div>
-               )}
-             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {isEditing ? 'Edit Promo Code' : 'Create New Promo Code'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Required Fields Note */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Fields marked with * are required. 
+                  Some fields become required based on your promo type selection.
+                </p>
+              </div>
+              
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="code">Code *</Label>
+                  <Label htmlFor="code">Promo Code *</Label>
                   <Input
                     id="code"
                     value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    placeholder="WELCOME20"
+                    onChange={(e) => setFormData({...formData, code: e.target.value})}
+                    placeholder="e.g., STUDENT25, WELCOME20"
                     required
                   />
                 </div>
@@ -410,28 +382,92 @@ export function PromoCodeManagement() {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Welcome Discount"
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    placeholder="e.g., Student 25% Off"
                     required
                   />
                 </div>
               </div>
-              
+
               <div>
-                <Label htmlFor="description">Description *</Label>
+                <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Get 20% off your first booking"
-                  required
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Describe the promo code and its benefits"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Promo Type and Targeting */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="promoType">Promo Type *</Label>
+                  <Select
+                    value={formData.promoType}
+                    onValueChange={(value: any) => setFormData({...formData, promoType: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GENERAL">General Public</SelectItem>
+                      <SelectItem value="GROUP_SPECIFIC">Group Specific</SelectItem>
+                      <SelectItem value="USER_SPECIFIC">User Specific</SelectItem>
+                      <SelectItem value="WELCOME">Welcome Code</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.promoType === 'GENERAL' && 'Available to everyone'}
+                    {formData.promoType === 'GROUP_SPECIFIC' && 'Available to specific user groups (students, members, etc.)'}
+                    {formData.promoType === 'USER_SPECIFIC' && 'Available to specific individual users only'}
+                    {formData.promoType === 'WELCOME' && 'Available to new users for their first booking only'}
+                  </p>
+                </div>
+
+                {formData.promoType === 'GROUP_SPECIFIC' && (
+                  <div>
+                    <Label htmlFor="targetGroup">Target Group *</Label>
+                    <Select
+                      value={formData.targetGroup}
+                      onValueChange={(value: any) => setFormData({...formData, targetGroup: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="STUDENT">Students</SelectItem>
+                        <SelectItem value="MEMBER">Members</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">Select which user group can use this promo code</p>
+                  </div>
+                )}
+
+                {formData.promoType === 'USER_SPECIFIC' && (
+                  <div>
+                    <Label htmlFor="targetUserIds">Select Target Users *</Label>
+                    <UserSelector
+                      selectedUserIds={formData.targetUserIds}
+                      onSelectionChange={(userIds) => setFormData({
+                        ...formData,
+                        targetUserIds: userIds
+                      })}
+                      placeholder="Search and select users..."
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Select specific users who can use this promo code</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Discount Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="discounttype">Discount Type *</Label>
-                  <Select value={formData.discounttype} onValueChange={(value: 'percentage' | 'fixed') => setFormData({ ...formData, discounttype: value })}>
+                  <Select
+                    value={formData.discounttype}
+                    onValueChange={(value: any) => setFormData({...formData, discounttype: value})}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -441,490 +477,520 @@ export function PromoCodeManagement() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div>
-                  <Label htmlFor="discountvalue">Discount Value *</Label>
+                  <Label htmlFor="discountvalue">
+                    {formData.discounttype === 'percentage' ? 'Discount %' : 'Discount Amount (SGD)'} *
+                  </Label>
                   <Input
                     id="discountvalue"
                     type="number"
                     value={formData.discountvalue}
-                    onChange={(e) => setFormData({ ...formData, discountvalue: parseFloat(e.target.value) || 0 })}
-                    placeholder="20"
+                    onChange={(e) => setFormData({...formData, discountvalue: parseFloat(e.target.value) || 0})}
+                    min={formData.discounttype === 'percentage' ? '1' : '0.01'}
+                    max={formData.discounttype === 'percentage' ? '100' : undefined}
+                    step={formData.discounttype === 'percentage' ? '1' : '0.01'}
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.discounttype === 'percentage' ? 'Enter percentage (1-100%)' : 'Enter fixed amount in SGD'}
+                  </p>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="minimumamount">Minimum Amount *</Label>
+                  <Label htmlFor="minimumamount">Minimum Amount (SGD)</Label>
                   <Input
                     id="minimumamount"
                     type="number"
                     value={formData.minimumamount}
-                    onChange={(e) => setFormData({ ...formData, minimumamount: parseFloat(e.target.value) || 0 })}
-                    placeholder="5"
-                    required
+                    onChange={(e) => setFormData({...formData, minimumamount: parseFloat(e.target.value) || 0})}
+                    min="0"
+                    step="0.01"
+                    placeholder="0 (no minimum)"
                   />
-                </div>
-                <div>
-                  <Label htmlFor="maximumdiscount">Maximum Discount</Label>
-                  <Input
-                    id="maximumdiscount"
-                    type="number"
-                    value={formData.maximumdiscount}
-                    onChange={(e) => setFormData({ ...formData, maximumdiscount: parseFloat(e.target.value) || 0 })}
-                    placeholder="0 (no limit)"
-                  />
+                  <p className="text-xs text-gray-500 mt-1">Minimum order amount required to use this promo code</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {formData.discounttype === 'percentage' && (
                 <div>
-                  <Label htmlFor="maxusageperuser">Max Usage Per User *</Label>
+                  <Label htmlFor="maxDiscountAmount">Maximum Discount Amount (SGD) *</Label>
+                  <Input
+                    id="maxDiscountAmount"
+                    type="number"
+                    value={formData.maxDiscountAmount}
+                    onChange={(e) => setFormData({...formData, maxDiscountAmount: parseFloat(e.target.value) || 0})}
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Required for percentage discounts"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Required to prevent excessive discounts on large orders</p>
+                </div>
+              )}
+
+              {/* Usage Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="maxusageperuser">Max Usage Per User</Label>
                   <Input
                     id="maxusageperuser"
                     type="number"
                     value={formData.maxusageperuser}
-                    onChange={(e) => setFormData({ ...formData, maxusageperuser: parseInt(e.target.value) || 1 })}
+                    onChange={(e) => setFormData({...formData, maxusageperuser: parseInt(e.target.value) || 1})}
+                    min="1"
                     placeholder="1"
-                    required
                   />
+                  <p className="text-xs text-gray-500 mt-1">How many times a single user can use this code</p>
                 </div>
+
                 <div>
-                  <Label htmlFor="maxtotalusage">Max Total Usage</Label>
+                  <Label htmlFor="globalUsageLimit">Global Usage Limit</Label>
                   <Input
-                    id="maxtotalusage"
+                    id="globalUsageLimit"
                     type="number"
-                    value={formData.maxtotalusage}
-                    onChange={(e) => setFormData({ ...formData, maxtotalusage: parseInt(e.target.value) || 0 })}
-                    placeholder="0 (no limit)"
+                    value={formData.globalUsageLimit}
+                    onChange={(e) => setFormData({...formData, globalUsageLimit: parseInt(e.target.value) || 100})}
+                    min="1"
+                    placeholder="100"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Total number of times this code can be used by all users</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Time Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="category">Category *</Label>
-                  <Select value={formData.category} onValueChange={(value: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL') => setFormData({ ...formData, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="STUDENT">Student</SelectItem>
-                      <SelectItem value="WELCOME">Welcome</SelectItem>
-                      <SelectItem value="MEMBER">Member</SelectItem>
-                      <SelectItem value="GENERAL">General</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="isactive">Status</Label>
-                  <Select value={formData.isactive ? 'true' : 'false'} onValueChange={(value) => setFormData({ ...formData, isactive: value === 'true' })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Active</SelectItem>
-                      <SelectItem value="false">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Date and Time Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="activefrom">Active From *</Label>
+                  <Label htmlFor="activefrom">Active From</Label>
                   <Input
                     id="activefrom"
                     type="datetime-local"
-                    value={formatDateForInput(formData.activefrom)}
-                                         onChange={(e) => {
-                       const selectedDate = e.target.value;
-                       if (selectedDate) {
-                         // Convert local datetime to UTC ISO string
-                         const localDate = new Date(selectedDate);
-                         // Add timezone offset to convert local to UTC
-                         const utcDate = new Date(localDate.getTime() + (localDate.getTimezoneOffset() * 60000));
-                         setFormData({ ...formData, activefrom: utcDate.toISOString() });
-                       }
-                     }}
-                    required
+                    value={formData.activefrom}
+                    onChange={(e) => setFormData({...formData, activefrom: e.target.value})}
+                    placeholder="Leave empty for immediate activation"
                   />
-                  <p className="text-xs text-gray-500 mt-1">When the promo code becomes active</p>
+                  <p className="text-xs text-gray-500 mt-1">When this promo code becomes active (leave empty for immediate)</p>
                 </div>
+
                 <div>
                   <Label htmlFor="activeto">Active Until (Optional)</Label>
                   <Input
                     id="activeto"
                     type="datetime-local"
-                    value={formatDateForInput(formData.activeto)}
-                    onChange={(e) => {
-                      const selectedDate = e.target.value;
-                      if (selectedDate) {
-                        // Convert local datetime to ISO string
-                        const date = new Date(selectedDate);
-                        setFormData({ ...formData, activeto: date.toISOString() });
-                      } else {
-                        setFormData({ ...formData, activeto: null });
-                      }
-                    }}
+                    value={formData.activeto}
+                    onChange={(e) => setFormData({...formData, activeto: e.target.value})}
+                    placeholder="Leave empty for no expiration"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Leave empty for no expiry</p>
+                  <p className="text-xs text-gray-500 mt-1">When this promo code expires (leave empty for no expiration)</p>
                 </div>
               </div>
 
+              {/* Priority and Category */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Input
+                    id="priority"
+                    type="number"
+                    value={formData.priority}
+                    onChange={(e) => setFormData({...formData, priority: parseInt(e.target.value) || 1})}
+                    min="1"
+                    max="10"
+                    placeholder="1 (lowest) to 10 (highest)"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Higher priority codes are shown first</p>
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    placeholder="e.g., STUDENT_PROMO, WELCOME_PROMO"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Optional category for organization</p>
+                </div>
+              </div>
+
+              {/* Active Status */}
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isactive"
+                  type="checkbox"
+                  checked={formData.isactive}
+                  onChange={(e) => setFormData({...formData, isactive: e.target.checked})}
+                  className="rounded"
+                />
+                <Label htmlFor="isactive">Active</Label>
+              </div>
+
+              {/* Form Actions */}
               <div className="flex justify-end space-x-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setIsCreateDialogOpen(false)
-                    setEditingPromo(null)
                     resetForm()
                   }}
                 >
                   Cancel
                 </Button>
-                                 <Button 
-                   type="submit"
-                   disabled={isSubmitting}
-                   style={{ backgroundColor: '#ff6900' }}
-                   className="hover:opacity-90"
-                 >
-                   {isSubmitting ? (
-                     <>
-                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                       {editingPromo ? 'Updating...' : 'Creating...'}
-                     </>
-                   ) : (
-                     <>{editingPromo ? 'Update' : 'Create'} Promo Code</>
-                   )}
-                 </Button>
+                <Button type="submit" style={{ backgroundColor: '#ff6900' }}>
+                  {isEditing ? 'Update' : 'Create'} Promo Code
+                </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <Card>
-           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-             <CardTitle className="text-sm font-medium">Total Promo Codes</CardTitle>
-             <DollarSign className="h-4 w-4 text-muted-foreground" />
-           </CardHeader>
-           <CardContent>
-             <div className="text-2xl font-bold">{totalPromoCodes}</div>
-             <p className="text-xs text-muted-foreground">
-               {totalPromoCodes === 0 ? 'No codes yet' : 'Manage your promotions'}
-             </p>
-           </CardContent>
-         </Card>
-                 <Card>
-           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-             <CardTitle className="text-sm font-medium">Active Promo Codes</CardTitle>
-             <Eye className="h-4 w-4 text-muted-foreground" />
-           </CardHeader>
-           <CardContent>
-             <div className="text-2xl font-bold">{activePromoCodes}</div>
-             <p className="text-xs text-muted-foreground">
-               {activePromoCodes === 0 ? 'No active codes' : `${totalPromoCodes - activePromoCodes} inactive`}
-             </p>
-           </CardContent>
-         </Card>
-         <Card>
-           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-             <CardTitle className="text-sm font-medium">Total Usage</CardTitle>
-             <Users className="h-4 w-4 text-muted-foreground" />
-           </CardHeader>
-           <CardContent>
-             <div className="text-2xl font-bold">{totalUsage}</div>
-             <p className="text-xs text-muted-foreground">
-               {totalUsage === 0 ? 'No usage yet' : 'Across all codes'}
-             </p>
-           </CardContent>
-         </Card>
-      </div>
-
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search promo codes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map(category => (
-              <SelectItem key={category} value={category}>
-                {category === 'all' ? 'All Categories' : category.charAt(0) + category.slice(1).toLowerCase()}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Filter className="w-5 h-5 mr-2" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label>Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search promo codes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label>Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Type</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="GENERAL">General</SelectItem>
+                  <SelectItem value="GROUP_SPECIFIC">Group Specific</SelectItem>
+                  <SelectItem value="USER_SPECIFIC">User Specific</SelectItem>
+                  <SelectItem value="WELCOME">Welcome</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Target Group</Label>
+              <Select value={filterGroup} onValueChange={setFilterGroup}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Groups</SelectItem>
+                  <SelectItem value="STUDENT">Students</SelectItem>
+                  <SelectItem value="MEMBER">Members</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {(searchTerm || filterStatus !== 'all' || filterType !== 'all' || filterGroup !== 'all') && (
+            <div className="mt-4 flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+                className="flex items-center gap-1"
+              >
+                <X className="w-4 h-4" />
+                Clear Filters
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Promo Codes Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Promo Codes ({filteredPromoCodes.length})</CardTitle>
+          <CardTitle>Promo Codes ({totalItems})</CardTitle>
         </CardHeader>
         <CardContent>
-                     {loading ? (
-             <div className="text-center py-8">
-               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
-               <p className="text-gray-600">Loading promo codes...</p>
-             </div>
-           ) : filteredPromoCodes.length === 0 ? (
-             <div className="text-center py-8">
-               <div className="text-gray-400 mb-2">
-                 <Search className="h-12 w-12 mx-auto" />
-               </div>
-               <p className="text-gray-500 text-lg">No promo codes found</p>
-               <p className="text-gray-400 text-sm">Try adjusting your search or create a new promo code</p>
-             </div>
-           ) : (
-            <Table>
-              <TableHeader>
-                                 <TableRow>
-                   <TableHead>Code</TableHead>
-                   <TableHead>Name</TableHead>
-                   <TableHead>Category</TableHead>
-                   <TableHead>Discount</TableHead>
-                   <TableHead>Min Amount</TableHead>
-                   <TableHead>Usage</TableHead>
-                   <TableHead>Validity</TableHead>
-                   <TableHead>Status</TableHead>
-                   <TableHead>Actions</TableHead>
-                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                                 {filteredPromoCodes.map((promo) => {
-                   console.log('Rendering promo in table:', promo);
-                   return (
-                   <TableRow key={promo.id}>
-                     <TableCell>
-                       <div>
-                         <div className="font-mono font-bold">{promo.code}</div>
-                       </div>
-                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{promo.name}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{promo.category || 'GENERAL'}</Badge>
-                    </TableCell>
-                                         <TableCell>
-                       <div className="text-sm">
-                         <div className="font-medium">
-                           {promo.discounttype === 'percentage' ? `${promo.discountvalue}%` : `$${promo.discountvalue}`}
-                         </div>
-                         {promo.maximumdiscount && promo.maximumdiscount > 0 && (
-                           <div className="text-xs text-gray-500">Max: ${promo.maximumdiscount}</div>
-                         )}
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       <div className="text-sm">
-                         ${promo.minimumamount}
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       <div className="text-sm">
-                         <div>{promo.currentusage || 0} / {promo.maxusageperuser}</div>
-                         <div className="text-gray-500">
-                           {promo.maxtotalusage ? 
-                             `Global: ${promo.currentusage || 0} / ${promo.maxtotalusage}` : 
-                             'No global limit'
-                           }
-                         </div>
-                                                </div>
-                       </TableCell>
-                       <TableCell>
-                         <div className="text-sm">
-                           <div className="font-medium">From: {formatDate(promo.activefrom)}</div>
-                           <div className="text-gray-500">To: {promo.activeto ? formatDate(promo.activeto) : 'No expiry'}</div>
-                         </div>
-                       </TableCell>
-                                               <TableCell>
-                          <Badge 
-                            variant="outline"
-                            style={{ 
-                              backgroundColor: promo.isactive ? '#ff6900' : '#f3f4f6',
-                              color: promo.isactive ? 'white' : '#6b7280',
-                              borderColor: promo.isactive ? '#ff6900' : '#d1d5db'
-                            }}
-                          >
-                            {promo.isactive ? "Active" : "Inactive"}
-                          </Badge>
-                                                     {(() => {
-                             const now = new Date();
-                             const activeFrom = new Date(promo.activefrom);
-                             
-                             if (activeFrom > now) {
-                               return (
-                                 <div className="text-xs text-gray-500 mt-1">
-                                   🕐 Starts {formatDate(promo.activefrom)}
-                                 </div>
-                               );
-                             }
-                             return null;
-                           })()}
-                        </TableCell>
-                                         <TableCell>
-                       <div className="flex items-center gap-2">
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           onClick={() => handleEdit(promo)}
-                           style={{ borderColor: '#ff6900', color: '#ff6900' }}
-                           className="hover:bg-orange-50"
-                         >
-                           <Edit className="h-4 w-4" />
-                         </Button>
-                         
-                                                   {/* Deactivate Button (safer option) */}
-                          {promo.isactive && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  style={{ borderColor: '#f59e0b', color: '#f59e0b' }}
-                                  className="hover:bg-amber-50"
-                                  title="Deactivate promo code"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Deactivate Promo Code</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    <div className="space-y-2">
-                                      <p>Are you sure you want to deactivate "{promo.code}"?</p>
-                                      <p className="text-sm text-amber-600">
-                                        ℹ️ <strong>Info:</strong> This will hide the promo code from users but keep all data intact.
-                                      </p>
-                                      <p className="text-sm text-gray-600">
-                                        You can reactivate it later if needed.
-                                      </p>
-                                    </div>
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeactivate(promo)}
-                                    className="bg-amber-600 hover:bg-amber-700"
-                                  >
-                                    Deactivate
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading promo codes...</p>
+            </div>
+          ) : promoCodes.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No promo codes found</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Discount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Usage</TableHead>
+                      <TableHead>Valid Period</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {promoCodes.map((promo) => {
+                      const statusBadge = getPromoCodeStatusBadge(promo)
+                      return (
+                        <TableRow key={promo.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getPromoTypeIcon(promo.promoType)}
+                              <span className="font-mono font-medium">{promo.code}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{promo.name}</div>
+                              {promo.description && (
+                                <div className="text-sm text-gray-500 truncate max-w-xs">
+                                  {promo.description}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getPromoTypeColor(promo.promoType)}>
+                              {getPromoCodeTypeLabel(promo)}
+                            </Badge>
+                            {promo.targetGroup && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {promo.targetGroup}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="font-medium">{formatDiscountDisplay(promo)}</div>
+                              {promo.minimumAmount && (
+                                <div className="text-xs text-gray-500">
+                                  Min: SGD {promo.minimumAmount}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusBadge.variant as any} className={statusBadge.className}>
+                              {statusBadge.text}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div>{promo.currentUsage || 0}/{promo.globalUsageLimit || 100}</div>
+                              <div className="text-xs text-gray-500">
+                                {promo.maxUsagePerUser || 1} per user
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                <span>
+                                  {promo.activeFrom 
+                                    ? new Date(promo.activeFrom).toLocaleDateString()
+                                    : 'Always'
+                                  }
+                                </span>
+                              </div>
+                              {promo.activeTo && (
+                                <div className="text-xs text-gray-500">
+                                  to {new Date(promo.activeTo).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleView(promo)}
+                              >
+                                <Eye className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEdit(promo)}
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDelete(promo.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
 
-                          {/* Activate Button for inactive promo codes */}
-                          {!promo.isactive && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  style={{ borderColor: '#10b981', color: '#10b981' }}
-                                  className="hover:bg-green-50"
-                                  title="Activate promo code"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Activate Promo Code</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    <div className="space-y-2">
-                                      <p>Are you sure you want to activate "{promo.code}"?</p>
-                                      <p className="text-sm text-green-600">
-                                        ℹ️ <strong>Info:</strong> This will make the promo code available to users again.
-                                      </p>
-                                      <p className="text-sm text-gray-600">
-                                        Make sure the promo code is still valid and not expired.
-                                      </p>
-                                    </div>
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleActivate(promo)}
-                                    className="bg-green-600 hover:bg-green-700"
-                                  >
-                                    Activate
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                         
-                         {/* Delete Button (use with caution) */}
-                         <AlertDialog>
-                           <AlertDialogTrigger asChild>
-                             <Button 
-                               variant="outline" 
-                               size="sm"
-                               style={{ borderColor: '#dc2626', color: '#dc2626' }}
-                               className="hover:bg-red-50"
-                             >
-                               <Trash2 className="h-4 w-4" />
-                             </Button>
-                           </AlertDialogTrigger>
-                                                       <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Promo Code</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  <div className="space-y-2">
-                                    <p>Are you sure you want to delete "{promo.code}"?</p>
-                                    <p className="text-sm text-red-600">
-                                      ⚠️ <strong>Warning:</strong> This action cannot be undone and may fail if the promo code is in use.
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      Consider deactivating it first instead of deleting.
-                                    </p>
-                                  </div>
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(promo.id)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete Anyway
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                         </AlertDialog>
-                       </div>
-                     </TableCell>
-                   </TableRow>
-                 );
-                 })}
-              </TableBody>
-            </Table>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <div className="text-sm text-gray-600">
+                    Showing {((currentPage - 1) * 20) + 1} to {Math.min(currentPage * 20, totalItems)} of {totalItems} results
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                        if (pageNum > totalPages) return null
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={pageNum === currentPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* View Promo Code Details Modal */}
+      <Dialog open={isViewing} onOpenChange={setIsViewing}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Promo Code Details</DialogTitle>
+          </DialogHeader>
+          
+          {viewingPromo && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Code</Label>
+                  <p className="text-sm text-gray-600 font-mono">{viewingPromo.code}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Name</Label>
+                  <p className="text-sm text-gray-600">{viewingPromo.name}</p>
+                </div>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">Description</Label>
+                <p className="text-sm text-gray-600">{viewingPromo.description || 'No description'}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Type</Label>
+                  <p className="text-sm text-gray-600">{getPromoCodeTypeLabel(viewingPromo)}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Discount</Label>
+                  <p className="text-sm text-gray-600">{formatDiscountDisplay(viewingPromo)}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Usage</Label>
+                  <p className="text-sm text-gray-600">
+                    {viewingPromo.currentUsage || 0} / {viewingPromo.globalUsageLimit || 100}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Per User Limit</Label>
+                  <p className="text-sm text-gray-600">{viewingPromo.maxUsagePerUser || 1}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Active From</Label>
+                  <p className="text-sm text-gray-600">
+                    {viewingPromo.activeFrom 
+                      ? new Date(viewingPromo.activeFrom).toLocaleString()
+                      : 'Always'
+                    }
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Active Until</Label>
+                  <p className="text-sm text-gray-600">
+                    {viewingPromo.activeTo 
+                      ? new Date(viewingPromo.activeTo).toLocaleString()
+                      : 'No expiration'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

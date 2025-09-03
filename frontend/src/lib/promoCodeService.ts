@@ -1,282 +1,218 @@
-// Promo Code Service - API Integration
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
+// Promo Code Service - Based on Backend API Documentation
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
 
-console.log('API_BASE_URL set to:', API_BASE_URL);
-
-// Types
+// Types based on backend API documentation
 export interface PromoCode {
   id: string;
   code: string;
-  name?: string;
-  description: string;
-  discounttype: 'percentage' | 'fixed';
-  discountvalue: number;
-  minimumamount: number;
-  maximumdiscount: number | null;
-  maxusageperuser: number;
-  maxtotalusage: number;
+  name: string;
+  description?: string;
+  promoType: 'GENERAL' | 'GROUP_SPECIFIC' | 'USER_SPECIFIC' | 'WELCOME';
+  targetGroup?: 'STUDENT' | 'MEMBER' | null;
+  targetUserIds?: string[];
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  maxDiscountAmount?: number;
+  minimumAmount?: number;
+  maxUsagePerUser?: number;
+  globalUsageLimit?: number;
+  activeFrom?: string;
+  activeTo?: string | null;
+  isActive?: boolean;
+  category?: string;
+  priority?: number;
+  currentUsage?: number;
+  usageCount?: number;
+  isExpired?: boolean;
+  isNotYetActive?: boolean;
+  timeStatus?: 'active' | 'expired' | 'not_yet_active';
+  remainingTime?: string;
+  remainingGlobalUses?: number;
+  userUsageCount?: number;
+  remainingUses?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  eligibility?: {
+    isEligible: boolean;
+    reason: string;
+  };
+  
+  // Database field names (snake_case)
+  discounttype?: 'percentage' | 'fixed';
+  discountvalue?: number;
+  maxdiscountamount?: number;
+  minimumamount?: number;
+  maxusageperuser?: number;
+  globalusagelimit?: number;
+  activefrom?: string;
+  activeto?: string;
+  isactive?: boolean;
   currentusage?: number;
-  activefrom: string;
-  activeto: string | null;
-  isactive: boolean;
-  category?: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
   createdat?: string;
   updatedat?: string;
-  usageCount?: number;
 }
 
 export interface PromoCodeUsage {
   id: string;
-  promoCodeId: string;
-  userId: string;
-  usedAt: string;
-  discountAmount: number;
-  originalAmount: number;
-  finalAmount: number;
-  bookingId?: string;
-  packageId?: string;
+  promocodeid: string;
+  userid: string;
+  bookingid: string;
+  usedat: string;
+  createdat: string;
+  discountAmount: number | null;
+  originalAmount: number | null;
+  finalAmount: number | null;
+  PromoCode?: PromoCode;
 }
 
 export interface PromoCodeCalculation {
+  originalAmount: number;
   discountAmount: number;
   finalAmount: number;
-  isValid: boolean;
-  message: string;
 }
 
-export interface PromoCodeResponse {
-  success: boolean;
-  message: string;
-  data?: PromoCode;
-  error?: string;
-}
-
-export interface AvailablePromosResponse {
-  success: boolean;
-  message: string;
-  data: PromoCode[];
-  error?: string;
-}
-
-export interface UsedPromosResponse {
-  success: boolean;
-  message: string;
-  data: PromoCodeUsage[];
-  error?: string;
+export interface PromoCodeEligibility {
+  isEligible: boolean;
+  reason: string;
 }
 
 export interface ApplyPromoCodeRequest {
   promoCode: string;
   userId: string;
   bookingAmount: number;
-  bookingId?: string;
-  packageId?: string;
 }
 
 export interface ApplyPromoCodeResponse {
-  success: boolean;
   message: string;
-  data?: {
-    promoCode: PromoCode;
-    discountAmount: number;
-    finalAmount: number;
-  };
+  promoCode: PromoCode;
+  calculation: PromoCodeCalculation;
+  eligibility: PromoCodeEligibility;
   error?: string;
 }
 
-// API Functions
+export interface AvailablePromosResponse {
+  availablePromos: PromoCode[];
+  totalCount: number;
+  userInfo: {
+    memberType: string;
+    studentVerificationStatus: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export interface UsedPromosResponse {
+  usedPromos: PromoCodeUsage[];
+  totalCount: number;
+}
+
+export interface AdminPromoCodesResponse {
+  promoCodes: PromoCode[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  filters: {
+    status: string;
+    promoType: string;
+    targetGroup: string;
+  };
+}
+
+// User/Client API Functions
 export const applyPromoCode = async (request: ApplyPromoCodeRequest): Promise<ApplyPromoCodeResponse> => {
-  const url = `${API_BASE_URL}/promocode/apply`;
-  console.log('Calling applyPromoCode with URL:', url);
-  console.log('Request body:', request);
-  
   try {
-    // Transform the request to match API expectations
-    const apiRequest = {
-      promoCode: request.promoCode,
-      userId: request.userId,
-      bookingAmount: request.bookingAmount,
-      ...(request.bookingId && { bookingId: request.bookingId }),
-      ...(request.packageId && { packageId: request.packageId })
-    };
-    
-    console.log('Transformed API request:', apiRequest);
-    console.log('Full request details:', {
-      url,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(apiRequest)
-    });
-    
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE_URL}/promocode/apply`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(apiRequest),
+      body: JSON.stringify(request),
     });
 
-    console.log('API response status:', response.status);
-    console.log('API response headers:', Object.fromEntries(response.headers.entries()));
-    
     const result = await response.json();
-    console.log('API response body:', result);
     
     if (!response.ok) {
-      console.error('API request failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: result.error,
-        details: result
-      });
-      
       return {
-        success: false,
         message: result.error || 'Failed to apply promo code',
-        error: result.error || 'Failed to apply promo code',
+        promoCode: {} as PromoCode,
+        calculation: {
+          originalAmount: request.bookingAmount,
+          discountAmount: 0,
+          finalAmount: request.bookingAmount
+        },
+        eligibility: {
+          isEligible: false,
+          reason: result.error || 'Failed to apply promo code'
+        },
+        error: result.error || 'Failed to apply promo code'
       };
     }
 
     return result;
   } catch (error) {
     console.error('Error applying promo code:', error);
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : 'No stack trace'
-    });
-    
     return {
-      success: false,
       message: 'Network error occurred',
-      error: 'Network error occurred',
+      promoCode: {} as PromoCode,
+      calculation: {
+        originalAmount: request.bookingAmount,
+        discountAmount: 0,
+        finalAmount: request.bookingAmount
+      },
+      eligibility: {
+        isEligible: false,
+        reason: 'Network error occurred'
+      },
+      error: 'Network error occurred'
     };
   }
 };
 
-export const getAvailablePromoCodes = async (userId: string): Promise<AvailablePromosResponse> => {
-  // First try to get full promo code details from admin endpoint
+export const getUserAvailablePromoCodes = async (userId: string): Promise<AvailablePromosResponse> => {
   try {
-    const adminResponse = await fetch(`${API_BASE_URL}/promocode/admin/all`, {
+    const response = await fetch(`${API_BASE_URL}/promocode/user/${userId}/available`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    if (adminResponse.ok) {
-      const adminResult = await adminResponse.json();
-      console.log('Admin endpoint response:', adminResult);
-      
-      if (adminResult.promoCodes && Array.isArray(adminResult.promoCodes)) {
-                 // Filter active promo codes and map to PromoCode interface
-         const availablePromos = adminResult.promoCodes
-           .filter((promo: any) => {
-             // Only show active promo codes
-             if (promo.isactive !== true) return false;
-             
-             // Check if promo code is within valid date range
-             const now = new Date();
-             const activeFrom = new Date(promo.activefrom);
-             
-             // Must be active from now or in the past (allow future start dates for preview)
-             if (activeFrom > now) return false;
-             
-             // If there's an expiry date, must not be expired
-             if (promo.activeto) {
-               const activeTo = new Date(promo.activeto);
-               if (activeTo < now) return false;
-             }
-             
-             // Check if promo code hasn't reached its total usage limit
-             if (promo.maxtotalusage && promo.currentusage >= promo.maxtotalusage) return false;
-             
-             // Additional validation: ensure promo code has valid discount values
-             if (promo.discountvalue <= 0) return false;
-             if (promo.minimumamount < 0) return false;
-             
-             return true;
-           })
-           .map((promo: any) => ({
-             id: promo.id,
-             code: promo.code,
-             name: promo.name,
-             description: promo.description,
-             discounttype: promo.discounttype,
-             discountvalue: promo.discountvalue,
-             minimumamount: promo.minimumamount,
-             maximumdiscount: promo.maximumdiscount,
-             maxusageperuser: promo.maxusageperuser,
-             maxtotalusage: promo.maxtotalusage,
-             currentusage: promo.currentusage,
-             activefrom: promo.activefrom,
-             activeto: promo.activeto,
-             isactive: promo.isactive,
-             category: promo.category,
-             createdat: promo.createdat,
-             updatedat: promo.updatedat,
-             usageCount: promo.usageCount
-           }));
-        
-        return {
-          success: true,
-          data: availablePromos,
-          message: 'Promo codes fetched successfully from admin endpoint'
-        };
-      }
-    }
-  } catch (error) {
-    console.log('Admin endpoint failed, falling back to user endpoint:', error);
-  }
-
-  // Fallback to user endpoint if admin endpoint fails
-  const url = `${API_BASE_URL}/promocode/user/${userId}/available`;
-  console.log('Calling getAvailablePromoCodes with fallback URL:', url);
-  
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log('API response status:', response.status);
     const result = await response.json();
-    console.log('API response body:', result);
     
     if (!response.ok) {
+      console.error('Failed to fetch available promo codes:', result.error);
       return {
-        success: false,
-        data: [],
-        error: result.error || 'Failed to fetch available promo codes',
-        message: 'Failed to fetch available promo codes',
+        availablePromos: [],
+        totalCount: 0,
+        userInfo: {
+          memberType: '',
+          studentVerificationStatus: '',
+          firstName: '',
+          lastName: ''
+        }
       };
     }
 
-    // Handle the actual API response format
-    if (result.availablePromos && Array.isArray(result.availablePromos)) {
-      return {
-        success: true,
-        data: result.availablePromos,
-        message: 'Promo codes fetched successfully from user endpoint'
-      };
-    }
-
-    // Fallback to direct data if not in expected format
     return result;
   } catch (error) {
     console.error('Error fetching available promo codes:', error);
     return {
-      success: false,
-      data: [],
-      error: 'Network error occurred',
-      message: 'Network error occurred',
+      availablePromos: [],
+      totalCount: 0,
+      userInfo: {
+        memberType: '',
+        studentVerificationStatus: '',
+        firstName: '',
+        lastName: ''
+      }
     };
   }
 };
 
-export const getUsedPromoCodes = async (userId: string): Promise<UsedPromosResponse> => {
+export const getUserUsedPromoCodes = async (userId: string): Promise<UsedPromosResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/promocode/user/${userId}/used`, {
       method: 'GET',
@@ -288,11 +224,10 @@ export const getUsedPromoCodes = async (userId: string): Promise<UsedPromosRespo
     const result = await response.json();
     
     if (!response.ok) {
+      console.error('Failed to fetch used promo codes:', result.error);
       return {
-        success: false,
-        data: [],
-        error: result.error || 'Failed to fetch used promo codes',
-        message: 'Failed to fetch used promo codes',
+        usedPromos: [],
+        totalCount: 0
       };
     }
 
@@ -300,10 +235,8 @@ export const getUsedPromoCodes = async (userId: string): Promise<UsedPromosRespo
   } catch (error) {
     console.error('Error fetching used promo codes:', error);
     return {
-      success: false,
-      data: [],
-      error: 'Network error occurred',
-      message: 'Network error occurred',
+      usedPromos: [],
+      totalCount: 0
     };
   }
 };
@@ -311,19 +244,23 @@ export const getUsedPromoCodes = async (userId: string): Promise<UsedPromosRespo
 // Admin API Functions
 export const createPromoCode = async (promoData: {
   code: string;
-  name?: string;
-  description: string;
+  name: string;
+  description?: string;
   discounttype: 'percentage' | 'fixed';
   discountvalue: number;
-  minimumamount: number;
-  maximumdiscount?: number;
-  maxusageperuser: number;
-  maxtotalusage: number;
-  category?: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
-  isactive: boolean;
-  activefrom: string;
-  activeto?: string | null;
-}): Promise<PromoCodeResponse> => {
+  maxDiscountAmount?: number;
+  minimumamount?: number;
+  activefrom?: string;
+  activeto?: string;
+  promoType: 'GENERAL' | 'GROUP_SPECIFIC' | 'USER_SPECIFIC' | 'WELCOME';
+  targetGroup?: 'STUDENT' | 'MEMBER';
+  targetUserIds?: string[];
+  maxusageperuser?: number;
+  globalUsageLimit?: number;
+  isactive?: boolean;
+  category?: string;
+  priority?: number;
+}): Promise<{ success: boolean; message: string; promoCode?: PromoCode; error?: string }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/promocode/admin/create`, {
       method: 'POST',
@@ -343,7 +280,11 @@ export const createPromoCode = async (promoData: {
       };
     }
 
-    return result;
+    return {
+      success: true,
+      message: result.message || 'Promo code created successfully',
+      promoCode: result.promoCode
+    };
   } catch (error) {
     console.error('Error creating promo code:', error);
     return {
@@ -356,19 +297,23 @@ export const createPromoCode = async (promoData: {
 
 export const updatePromoCode = async (id: string, promoData: Partial<{
   code: string;
-  name?: string;
-  description: string;
+  name: string;
+  description?: string;
   discounttype: 'percentage' | 'fixed';
   discountvalue: number;
-  minimumamount: number;
-  maximumdiscount?: number;
-  maxusageperuser: number;
-  maxtotalusage: number;
-  category?: 'STUDENT' | 'WELCOME' | 'MEMBER' | 'GENERAL';
-  isactive: boolean;
-  activefrom: string;
-  activeto?: string | null;
-}>): Promise<PromoCodeResponse> => {
+  maxDiscountAmount?: number;
+  minimumamount?: number;
+  activefrom?: string;
+  activeto?: string;
+  promoType: 'GENERAL' | 'GROUP_SPECIFIC' | 'USER_SPECIFIC' | 'WELCOME';
+  targetGroup?: 'STUDENT' | 'MEMBER';
+  targetUserIds?: string[];
+  maxusageperuser?: number;
+  globalUsageLimit?: number;
+  isactive?: boolean;
+  category?: string;
+  priority?: number;
+}>): Promise<{ success: boolean; message: string; promoCode?: PromoCode; error?: string }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'PUT',
@@ -388,7 +333,11 @@ export const updatePromoCode = async (id: string, promoData: Partial<{
       };
     }
 
-    return result;
+    return {
+      success: true,
+      message: result.message || 'Promo code updated successfully',
+      promoCode: result.promoCode
+    };
   } catch (error) {
     console.error('Error updating promo code:', error);
     return {
@@ -399,10 +348,8 @@ export const updatePromoCode = async (id: string, promoData: Partial<{
   }
 };
 
-export const deletePromoCode = async (id: string): Promise<PromoCodeResponse> => {
+export const deletePromoCode = async (id: string): Promise<{ success: boolean; message: string; error?: string }> => {
   try {
-    console.log('Attempting to delete promo code:', id);
-    
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'DELETE',
       headers: {
@@ -411,43 +358,99 @@ export const deletePromoCode = async (id: string): Promise<PromoCodeResponse> =>
     });
 
     const result = await response.json();
-    console.log('Delete response:', { status: response.status, result });
     
     if (!response.ok) {
-      // Handle specific error cases
-      let errorMessage = 'Failed to delete promo code';
-      
-      if (result.error) {
-        if (result.error.includes('usage')) {
-          errorMessage = 'Cannot delete promo code that is currently in use. Please deactivate it first.';
-        } else if (result.error.includes('constraint')) {
-          errorMessage = 'Cannot delete promo code due to existing references. Please deactivate it first.';
-        } else {
-          errorMessage = result.error;
-        }
-      }
-      
       return {
         success: false,
         error: result.error || 'Failed to delete promo code',
-        message: errorMessage,
+        message: 'Failed to delete promo code',
       };
     }
 
-    return result;
+    return {
+      success: true,
+      message: result.message || 'Promo code deleted successfully'
+    };
   } catch (error) {
     console.error('Error deleting promo code:', error);
     return {
       success: false,
       error: 'Network error occurred',
-      message: 'Network error occurred. Please try again.',
+      message: 'Network error occurred',
     };
   }
 };
 
-export const getAllPromoCodes = async (): Promise<AvailablePromosResponse> => {
+export const getAllPromoCodes = async (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  promoType?: string;
+  targetGroup?: string;
+}): Promise<AdminPromoCodesResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/promocode/admin/all`, {
+    // Build query string from parameters
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.promoType) queryParams.append('promoType', params.promoType);
+    if (params?.targetGroup) queryParams.append('targetGroup', params.targetGroup);
+
+    const url = `${API_BASE_URL}/promocode/admin/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      console.error('Failed to fetch all promo codes:', result.error);
+      return {
+        promoCodes: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0
+        },
+        filters: {
+          status: 'all',
+          promoType: 'all',
+          targetGroup: 'all'
+        }
+      };
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error fetching all promo codes:', error);
+    return {
+      promoCodes: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0
+      },
+      filters: {
+        status: 'all',
+        promoType: 'all',
+        targetGroup: 'all'
+      }
+    };
+  }
+};
+
+export const getPromoCodeDetails = async (id: string): Promise<{ success: boolean; promoCode?: PromoCode; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -459,111 +462,93 @@ export const getAllPromoCodes = async (): Promise<AvailablePromosResponse> => {
     if (!response.ok) {
       return {
         success: false,
-        data: [],
-        error: result.error || 'Failed to fetch all promo codes',
-        message: 'Failed to fetch all promo codes',
+        error: result.error || 'Failed to fetch promo code details',
       };
     }
 
-    // Handle the API response structure where data is in 'promoCodes' array
-    if (result.promoCodes && Array.isArray(result.promoCodes)) {
-      console.log('Raw API response promoCodes:', result.promoCodes);
-      
-             // Map the response to match our snake_case interface
-       const mappedPromoCodes = result.promoCodes.map((promo: any) => {
-         const mapped = {
-           id: promo.id,
-           code: promo.code,
-           name: promo.name,
-           description: promo.description,
-           discounttype: promo.discounttype || promo.discountType,
-           discountvalue: promo.discountvalue || promo.discountValue,
-           minimumamount: promo.minimumamount || promo.minimumAmount,
-           maximumdiscount: promo.maximumdiscount || promo.maxDiscountAmount,
-           maxusageperuser: promo.maxusageperuser || promo.maxUsagePerUser,
-           maxtotalusage: promo.maxtotalusage || promo.maxTotalUsage,
-           currentusage: promo.currentusage || promo.currentUsage,
-           activefrom: promo.activefrom || promo.activeFrom,
-           activeto: promo.activeto || promo.activeTo,
-           isactive: promo.isactive || promo.isActive,
-           category: promo.category,
-           createdat: promo.createdat || promo.createdAt,
-           updatedat: promo.updatedat || promo.updatedAt,
-           usageCount: promo.usageCount
-         };
-         console.log('Mapped promo code:', mapped);
-         return mapped;
-       });
-      
-      return {
-        success: true,
-        data: mappedPromoCodes,
-        message: 'Promo codes fetched successfully'
-      };
-    }
-
-    // Fallback to direct data if not in expected format
-    return result;
+    return {
+      success: true,
+      promoCode: result.promoCode
+    };
   } catch (error) {
-    console.error('Error fetching all promo codes:', error);
+    console.error('Error fetching promo code details:', error);
     return {
       success: false,
-      data: [],
       error: 'Network error occurred',
-      message: 'Network error occurred',
     };
   }
 };
 
-// Local Utility Functions (for immediate validation and calculation)
+// Local Utility Functions
 export const validatePromoCodeLocally = (promoCode: PromoCode, amount: number): { isValid: boolean; message: string } => {
   // Check if promo code is active
-  if (!promoCode.isactive) {
+  const isActive = promoCode.isactive !== undefined ? promoCode.isactive : promoCode.isActive;
+  if (isActive === false) {
     return { isValid: false, message: 'Promo code is not active' };
   }
 
-  // Check usage limit
-  if (promoCode.usageCount && promoCode.usageCount >= promoCode.maxusageperuser) {
-    return { isValid: false, message: 'Promo code usage limit reached' };
+  // Check date validity
+  const now = new Date();
+  if (promoCode.activeFrom) {
+    const activeFrom = new Date(promoCode.activeFrom);
+    if (activeFrom > now) {
+      return { isValid: false, message: 'Promo code is not yet active' };
+    }
+  }
+  
+  if (promoCode.activeTo) {
+    const activeTo = new Date(promoCode.activeTo);
+    if (activeTo < now) {
+      return { isValid: false, message: 'Promo code has expired' };
+    }
   }
 
-  // Check minimum amount requirement if available
-  if (promoCode.minimumamount && amount < promoCode.minimumamount) {
+  // Check minimum amount requirement
+  const minAmount = promoCode.minimumAmount || 0;
+  if (amount < minAmount) {
     return { 
       isValid: false, 
-      message: `Minimum order amount of $${promoCode.minimumamount} required. Your order is $${amount}.` 
+      message: `Minimum booking amount of SGD ${minAmount} required for this promo code` 
     };
   }
 
+  // Check usage limits
+  const currentUsage = promoCode.currentUsage || 0;
+  const maxUsage = promoCode.maxUsagePerUser || 0;
+  if (maxUsage > 0 && currentUsage >= maxUsage) {
+    return { isValid: false, message: `You have already used this promo code ${maxUsage} times` };
+  }
+
+  const globalLimit = promoCode.globalUsageLimit || 0;
+  if (globalLimit > 0 && currentUsage >= globalLimit) {
+    return { isValid: false, message: 'Promo code usage limit reached' };
+  }
+
   return { isValid: true, message: 'Promo code is valid' };
- };
+};
 
 export const calculateDiscountLocally = (promoCode: PromoCode, amount: number): { discountAmount: number; finalAmount: number } => {
-  // Check if promo code is active first
-  if (!promoCode.isactive) {
+  const isActive = promoCode.isactive !== undefined ? promoCode.isactive : promoCode.isActive;
+  if (isActive === false) {
     return { discountAmount: 0, finalAmount: amount };
   }
 
-  // Check minimum amount requirement first
-  if (promoCode.minimumamount && amount < promoCode.minimumamount) {
+  const minAmount = promoCode.minimumAmount || 0;
+  if (amount < minAmount) {
     return { discountAmount: 0, finalAmount: amount };
   }
 
   let discountAmount = 0;
 
-  if (promoCode.discounttype === 'percentage' && promoCode.discountvalue) {
-    // Calculate percentage discount
-    discountAmount = (amount * promoCode.discountvalue) / 100;
+  if (promoCode.discountType === 'percentage') {
+    discountAmount = (amount * promoCode.discountValue) / 100;
     
-    // Apply maximum discount limit if specified
-    if (promoCode.maximumdiscount && discountAmount > promoCode.maximumdiscount) {
-      discountAmount = promoCode.maximumdiscount;
+    if (promoCode.maxDiscountAmount && discountAmount > promoCode.maxDiscountAmount) {
+      discountAmount = promoCode.maxDiscountAmount;
     }
-  } else if (promoCode.discounttype === 'fixed' && promoCode.discountvalue) {
-    // Fixed amount discount
-    discountAmount = promoCode.discountvalue;
+  } else if (promoCode.discountType === 'fixed') {
+    discountAmount = promoCode.discountValue;
     
-    // Ensure discount doesn't exceed the order amount
     if (discountAmount > amount) {
       discountAmount = amount;
     }
@@ -574,24 +559,69 @@ export const calculateDiscountLocally = (promoCode: PromoCode, amount: number): 
   return { discountAmount, finalAmount };
 };
 
-export const checkMinimumAmountRequirement = (promoCode: PromoCode, amount: number): boolean => {
-  if (!promoCode.minimumamount) return true;
-  return amount >= promoCode.minimumamount;
-};
-
 export const formatDiscountDisplay = (promoCode: PromoCode): string => {
-  if (promoCode.discounttype === 'percentage' && promoCode.discountvalue) {
-    return `${promoCode.discountvalue}% off`;
-  } else if (promoCode.discounttype === 'fixed' && promoCode.discountvalue) {
-    return `$${promoCode.discountvalue} off`;
+  if (promoCode.discountType === 'percentage') {
+    return `${promoCode.discountValue}% off`;
+  } else if (promoCode.discountType === 'fixed') {
+    return `SGD ${promoCode.discountValue} off`;
   }
   return 'Discount available';
 };
 
+export const getPromoCodeTypeLabel = (promoCode: PromoCode): string => {
+  switch (promoCode.promoType) {
+    case 'GENERAL':
+      return 'General Public';
+    case 'GROUP_SPECIFIC':
+      return `Group: ${promoCode.targetGroup || 'Unknown'}`;
+    case 'USER_SPECIFIC':
+      return 'Specific Users';
+    case 'WELCOME':
+      return 'Welcome Code';
+    default:
+      return 'Unknown';
+  }
+};
+
 export const getPromoCodeStatusColor = (promoCode: PromoCode): string => {
-  if (promoCode.usageCount && promoCode.usageCount >= promoCode.maxusageperuser) {
-    return 'text-red-500';
+  const isActive = promoCode.isactive !== undefined ? promoCode.isactive : promoCode.isActive;
+  if (isActive === false) return 'text-red-500';
+  
+  const now = new Date();
+  if (promoCode.activeFrom) {
+    const activeFrom = new Date(promoCode.activeFrom);
+    if (activeFrom > now) return 'text-yellow-500';
+  }
+  
+  if (promoCode.activeTo) {
+    const activeTo = new Date(promoCode.activeTo);
+    if (activeTo < now) return 'text-red-500';
   }
   
   return 'text-green-500';
+};
+
+export const getPromoCodeStatusBadge = (promoCode: PromoCode): { variant: string; className: string; text: string } => {
+  // Check both isactive (API response) and isActive (interface) for compatibility
+  const isActive = promoCode.isactive !== undefined ? promoCode.isactive : promoCode.isActive;
+  if (isActive === false) {
+    return { variant: 'secondary', className: 'bg-red-100 text-red-800', text: 'Inactive' };
+  }
+  
+  const now = new Date();
+  if (promoCode.activeFrom) {
+    const activeFrom = new Date(promoCode.activeFrom);
+    if (activeFrom > now) {
+      return { variant: 'secondary', className: 'bg-yellow-100 text-yellow-800', text: 'Not Yet Active' };
+    }
+  }
+  
+  if (promoCode.activeTo) {
+    const activeTo = new Date(promoCode.activeTo);
+    if (activeTo < now) {
+      return { variant: 'secondary', className: 'bg-red-100 text-red-800', text: 'Expired' };
+    }
+  }
+  
+  return { variant: 'default', className: 'bg-green-100 text-green-800', text: 'Active' };
 };

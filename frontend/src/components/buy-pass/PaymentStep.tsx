@@ -12,7 +12,6 @@ type PaymentMethod = 'payNow' | 'creditCard'
 
 type Props = {
   subtotal: number
-  tax: number
   total: number
   paymentMethod: 'card' | 'paynow'
   onPaymentMethodChange: (v: 'card' | 'paynow') => void
@@ -30,7 +29,6 @@ type Props = {
 
 export default function PaymentStep({
   subtotal,
-  tax,
   total,
   paymentMethod,
   onPaymentMethodChange,
@@ -152,10 +150,7 @@ export default function PaymentStep({
             <span>Subtotal:</span>
             <span>${subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>GST (9%):</span>
-            <span>${tax.toFixed(2)}</span>
-          </div>
+
           {creditCardFee > 0 && (
             <div className="flex justify-between text-orange-600">
               <span>Credit Card Fee:</span>

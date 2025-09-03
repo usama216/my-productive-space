@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react'
-import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getAvailablePromoCodes, applyPromoCode } from '@/lib/promoCodeService';
+import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode } from '@/lib/promoCodeService';
 
 export type UserPackage = {
   id: string
@@ -122,9 +122,8 @@ export function EntitlementTabs({
 
 
 
-  // Load available promo codes from API
+    // Load available promo codes from API
   const loadAvailablePromoCodes = useCallback(async () => {
-    console.log('loadAvailablePromoCodes called with userId:', userId);
     if (!userId) {
       console.log('No userId provided, skipping promo code load');
       return;
@@ -132,23 +131,12 @@ export function EntitlementTabs({
     
     setIsLoadingPromos(true);
     try {
-      console.log('Calling getAvailablePromoCodes API...');
-      const response = await getAvailablePromoCodes(userId);
-      console.log('API response:', response);
-      if (response.success) {
-        console.log('Promo codes loaded with details:', response.data);
-        // Log each promo code's discount details
-        response.data.forEach((promo: PromoCode) => {
-          console.log(`Promo ${promo.code}:`, {
-            discounttype: promo.discounttype,
-            discountvalue: promo.discountvalue,
-            minimumamount: promo.minimumamount,
-            maximumdiscount: promo.maximumdiscount
-          });
-        });
-        setAvailablePromos(response.data);
+      const response = await getUserAvailablePromoCodes(userId);
+      if (response.availablePromos) {
+        setAvailablePromos(response.availablePromos);
+        console.log('Available promo codes loaded:', response.availablePromos);
+        console.log('User info:', response.userInfo);
       } else {
-        console.error('Failed to load promo codes:', response.error);
         setAvailablePromos([]);
       }
     } catch (error) {
@@ -161,24 +149,19 @@ export function EntitlementTabs({
 
   // Load available promo codes when component mounts
   useEffect(() => {
-    console.log('EntitlementTabs useEffect triggered with mode:', mode);
-    console.log('Props received:', { userId, bookingAmount, mode });
-    
-    if (userId && mode === 'promo') {
+    if (mode === 'promo' && userId) {
       loadAvailablePromoCodes()
     }
-  }, [userId, mode, loadAvailablePromoCodes]);
+  }, [mode, userId, loadAvailablePromoCodes]);
 
-  // Validate and apply promo code
+    // Validate and apply promo code
   const handleValidatePromo = useCallback(async () => {
-    console.log('handleValidatePromo called with:', { localPromo, userId, bookingAmount });
     if (!localPromo.trim()) {
       setPromoFeedback({ isValid: false, message: 'Please enter a promo code' });
       return;
     }
 
     if (!userId || !bookingAmount) {
-      console.log('Missing userId or bookingAmount:', { userId, bookingAmount });
       setPromoFeedback({ isValid: false, message: 'User ID or booking amount not available' });
       return;
     }
@@ -205,105 +188,31 @@ export function EntitlementTabs({
       const apiResponse = await applyPromoCode({
         promoCode: foundPromo.code,
         userId,
-        bookingAmount: bookingAmount,
+        bookingAmount
       });
 
-      if (apiResponse.success && apiResponse.data) {
-        const { promoCode: appliedPromo, discountAmount, finalAmount } = apiResponse.data;
-        
-        // If API doesn't provide proper discount calculation, use local calculation
-        let actualDiscountAmount = discountAmount;
-        let actualFinalAmount = finalAmount;
-        
-        if (discountAmount === 0 && finalAmount === bookingAmount) {
-          // API didn't calculate discount, use local calculation
-          const localCalculation = calculateDiscountLocally(appliedPromo, bookingAmount);
-          actualDiscountAmount = localCalculation.discountAmount;
-          actualFinalAmount = localCalculation.finalAmount;
-          
-          console.log('API returned no discount, using local calculation:', localCalculation);
-        }
-        
-        setSelectedPromoCode(appliedPromo);
+      if (apiResponse.eligibility.isEligible) {
+        setSelectedPromoCode(apiResponse.promoCode);
         setDiscountCalculation({
-          discountAmount: actualDiscountAmount,
-          finalAmount: actualFinalAmount,
+          discountAmount: apiResponse.calculation.discountAmount,
+          finalAmount: apiResponse.calculation.finalAmount,
           isValid: true,
           message: 'Promo code applied successfully!'
         });
         setPromoFeedback({ isValid: true, message: 'Promo code applied successfully!' });
         
-        // Call onChange with discount info
-        // Ensure finalAmount is always the discounted amount and never increases the total
-        const calculatedDiscountAmount = Math.max(0, actualDiscountAmount || 0);
-        const calculatedFinalAmount = Math.max(0, bookingAmount - calculatedDiscountAmount);
-        
-        // Safety check: final amount should never be more than original amount
-        const safeFinalAmount = Math.min(calculatedFinalAmount, bookingAmount);
-        
-        console.log('Promo code applied - Debug info:', {
-          originalAmount: bookingAmount,
-          discountAmount: calculatedDiscountAmount,
-          calculatedFinalAmount,
-          safeFinalAmount,
-          apiFinalAmount: finalAmount,
-          localCalculation: { actualDiscountAmount, actualFinalAmount }
-        });
-        
         onChange({
           type: 'promo',
-          id: appliedPromo.id,
-          discountAmount: calculatedDiscountAmount,
-          finalAmount: safeFinalAmount,
-          promoCode: appliedPromo
+          id: apiResponse.promoCode.id,
+          discountAmount: apiResponse.calculation.discountAmount,
+          finalAmount: apiResponse.calculation.finalAmount,
+          promoCode: apiResponse.promoCode
         });
       } else {
-        console.error('Promo code validation failed:', {
-          apiResponse,
-          request: {
-            promoCode: foundPromo.code,
-            userId,
-            bookingAmount
-          },
-          localValidation
+        setPromoFeedback({ 
+          isValid: false, 
+          message: apiResponse.eligibility.reason || 'Failed to apply promo code' 
         });
-        
-        // If API fails, try local validation as fallback
-        if (localValidation.isValid) {
-          console.log('API failed, using local validation as fallback');
-          
-          // Use local calculation for discount
-          const localCalculation = calculateDiscountLocally(foundPromo, bookingAmount);
-          
-          // Use local validation result
-          setSelectedPromoCode(foundPromo);
-          setDiscountCalculation({
-            discountAmount: localCalculation.discountAmount,
-            finalAmount: localCalculation.finalAmount,
-            isValid: true,
-            message: `Promo code validated locally: ${localCalculation.discountAmount > 0 ? `$${localCalculation.discountAmount} off` : 'No discount applied'}`
-          });
-          setPromoFeedback({ 
-            isValid: true, 
-            message: localCalculation.discountAmount > 0 ? 
-              `Promo code applied: $${localCalculation.discountAmount} off` : 
-              'Promo code valid but no discount applied'
-          });
-          
-          // Call onChange with local calculation
-          onChange({
-            type: 'promo',
-            id: foundPromo.id,
-            discountAmount: localCalculation.discountAmount,
-            finalAmount: localCalculation.finalAmount,
-            promoCode: foundPromo
-          });
-        } else {
-          setPromoFeedback({ 
-            isValid: false, 
-            message: apiResponse.error || apiResponse.message || 'Failed to apply promo code' 
-          });
-        }
       }
     } catch (error) {
       console.error('Error applying promo code:', error);
@@ -645,12 +554,12 @@ export function EntitlementTabs({
                       </Badge>
                     </div>
                     
-                    <div className="text-sm text-green-700">
-                      <p>{selectedPromoCode.description}</p>
-                      {selectedPromoCode.maxusageperuser > 0 && (
-                        <p className="text-xs mt-1">Uses remaining: {selectedPromoCode.maxusageperuser - selectedPromoCode.usageCount}</p>
-                      )}
-                    </div>
+                                                              <div className="text-sm text-green-700">
+                       <p>{selectedPromoCode.description}</p>
+                       {selectedPromoCode.remainingUses !== undefined && selectedPromoCode.remainingUses > 0 && (
+                         <p className="text-xs mt-1">Uses remaining: {selectedPromoCode.remainingUses}</p>
+                       )}
+                     </div>
 
                     {/* Discount Calculation */}
                     <div className="border-t pt-3 space-y-2">
@@ -711,19 +620,19 @@ export function EntitlementTabs({
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-600 mt-1">{promo.description}</p>
-                            {promo.minimumamount && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Min. order: ${promo.minimumamount}
-                              </p>
-                            )}
+                                                         {promo.minimumAmount && (
+                               <p className="text-xs text-gray-500 mt-1">
+                                 Min. order: ${promo.minimumAmount}
+                               </p>
+                             )}
                           </div>
                         </div>
-                        <div className="text-right text-xs text-gray-500">
-                          <p>Uses: {promo.usageCount}/{promo.maxusageperuser}</p>
-                          <p className="text-green-600 font-medium">
-                            {promo.maxusageperuser - promo.usageCount} uses left
-                          </p>
-                        </div>
+                                                                          <div className="text-right text-xs text-gray-500">
+                           <p>Uses: {promo.userUsageCount || 0}/{promo.maxUsagePerUser || 1}</p>
+                           <p className="text-green-600 font-medium">
+                             {promo.remainingUses || 0} uses left
+                           </p>
+                         </div>
                       </div>
                     </CardContent>
                   </Card>

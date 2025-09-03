@@ -605,8 +605,7 @@ export default function BookingClient() {
   const subtotal = promoDiscountInfo ? promoDiscountInfo.finalAmount : baseSubtotal
   const discountAmount = promoDiscountInfo ? promoDiscountInfo.discountAmount : 0
 
-  const tax = subtotal * 0.09 // 9% tax
-  const total = subtotal + tax
+  const total = subtotal
 
   // Debug logging for pricing calculations
   console.log('Pricing calculations:', {
@@ -618,7 +617,6 @@ export default function BookingClient() {
     promoCodeInfo,
     subtotal,
     discountAmount,
-    tax,
     total
   });
 
@@ -1160,7 +1158,6 @@ export default function BookingClient() {
 
                           <PaymentStep
                             subtotal={subtotal}
-                            tax={tax}
                             total={total}
                             discountAmount={discountAmount}
                             selectedPackage={selectedPackage}
@@ -1493,19 +1490,9 @@ export default function BookingClient() {
                             return discountedAmount.toFixed(2);
                           }
                           return subtotal.toFixed(2);
-                        })()}</span>
+                        })()}</span> 
                       </div>
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>GST (9%)</span>
-                        <span>${(() => {
-                          if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
-                            // Ensure the discounted amount is never more than the original
-                            const discountedAmount = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
-                            return (discountedAmount * 0.09).toFixed(2);
-                          }
-                          return tax.toFixed(2);
-                        })()}</span>
-                      </div>
+
                       {selectedPaymentMethod === 'creditCard' && (
                         <div className="flex justify-between text-amber-600">
                           <span>Credit Card Fee (5%)</span>
@@ -1513,9 +1500,7 @@ export default function BookingClient() {
                             if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
                               // Ensure the discounted amount is never more than the original
                               const discountedSubtotal = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
-                              const discountedTax = discountedSubtotal * 0.09;
-                              const discountedTotal = discountedSubtotal + discountedTax;
-                              return (discountedTotal * 0.05).toFixed(2);
+                              return (discountedSubtotal * 0.05).toFixed(2);
                             }
                             return (total * 0.05).toFixed(2);
                           })()}</span>
@@ -1527,12 +1512,10 @@ export default function BookingClient() {
                           if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
                             // Ensure the discounted amount is never more than the original
                             const discountedSubtotal = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
-                            const discountedTax = discountedSubtotal * 0.09;
-                            const discountedTotal = discountedSubtotal + discountedTax;
                             if (selectedPaymentMethod === 'creditCard') {
-                              return (discountedTotal * 1.05).toFixed(2); // Add 5% credit card fee
+                              return (discountedSubtotal * 1.05).toFixed(2); // Add 5% credit card fee
                             }
-                            return discountedTotal.toFixed(2);
+                            return discountedSubtotal.toFixed(2);
                           }
                           return finalTotal > 0 ? finalTotal.toFixed(2) : total.toFixed(2);
                         })()}</span>
