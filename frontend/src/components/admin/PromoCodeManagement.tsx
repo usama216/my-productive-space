@@ -54,10 +54,11 @@ export function PromoCodeManagement() {
     discountvalue: 0,
     maxDiscountAmount: 0,
     minimumamount: 0,
+    minimum_hours: 0,
     activefrom: '',
     activeto: '',
     promoType: 'GENERAL' as 'GENERAL' | 'GROUP_SPECIFIC' | 'USER_SPECIFIC' | 'WELCOME',
-    targetGroup: '' as '' | 'STUDENT' | 'MEMBER',
+    targetGroup: '' as '' | 'STUDENT' | 'MEMBER' | 'TUTOR',
     targetUserIds: [] as string[],
     maxusageperuser: 1,
     globalUsageLimit: 100,
@@ -105,6 +106,7 @@ export function PromoCodeManagement() {
       discountvalue: 0,
       maxDiscountAmount: 0,
       minimumamount: 0,
+      minimum_hours: 0,
       activefrom: '',
       activeto: '',
       promoType: 'GENERAL',
@@ -182,6 +184,7 @@ export function PromoCodeManagement() {
         discountvalue: formData.discountvalue,
         maxDiscountAmount: formData.maxDiscountAmount,
         minimumamount: formData.minimumamount,
+        minimum_hours: formData.minimum_hours,
         activefrom: formData.activefrom && formData.activefrom.trim() ? formData.activefrom : undefined,
         activeto: formData.activeto && formData.activeto.trim() ? formData.activeto : undefined,
         promoType: formData.promoType,
@@ -226,6 +229,10 @@ export function PromoCodeManagement() {
   }
 
   const handleEdit = (promo: PromoCode) => {
+    console.log('Editing promo:', promo)
+    console.log('minimum_hours:', promo.minimum_hours)
+    console.log('minimumhours:', promo.minimumhours)
+    console.log('minimumHours:', promo.minimumHours)
     setEditingPromo(promo)
     setIsEditing(true)
     setFormData({
@@ -236,6 +243,7 @@ export function PromoCodeManagement() {
       discountvalue: promo.discountvalue || promo.discountValue || 0,
       maxDiscountAmount: promo.maxDiscountAmount || 0,
       minimumamount: promo.minimumamount || promo.minimumAmount || 0,
+      minimum_hours: promo.minimum_hours || promo.minimumhours || promo.minimumHours || 0,
       activefrom: promo.activefrom ? new Date(promo.activefrom).toISOString().slice(0, 16) : (promo.activeFrom ? new Date(promo.activeFrom).toISOString().slice(0, 16) : ''),
       activeto: promo.activeto ? new Date(promo.activeto).toISOString().slice(0, 16) : (promo.activeTo ? new Date(promo.activeTo).toISOString().slice(0, 16) : ''),
       promoType: promo.promoType,
@@ -247,6 +255,7 @@ export function PromoCodeManagement() {
       category: promo.category || '',
       priority: promo.priority || 1
     })
+    console.log('Form data set with minimum_hours:', promo.minimum_hours || promo.minimumhours || promo.minimumHours || 0)
     setIsCreateDialogOpen(true)
   }
 
@@ -438,6 +447,7 @@ export function PromoCodeManagement() {
                       <SelectContent>
                         <SelectItem value="STUDENT">Students</SelectItem>
                         <SelectItem value="MEMBER">Members</SelectItem>
+                        <SelectItem value="TUTOR">Tutors</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-gray-500 mt-1">Select which user group can use this promo code</p>
@@ -509,6 +519,20 @@ export function PromoCodeManagement() {
                     placeholder="0 (no minimum)"
                   />
                   <p className="text-xs text-gray-500 mt-1">Minimum order amount required to use this promo code</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="minimum_hours">Minimum Hours</Label>
+                  <Input
+                    id="minimum_hours"
+                    type="number"
+                    value={formData.minimum_hours}
+                    onChange={(e) => setFormData({...formData, minimum_hours: parseFloat(e.target.value) || 0})}
+                    min="0"
+                    step="0.5"
+                    placeholder="0 (no minimum)"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Minimum booking duration in hours required to use this promo code</p>
                 </div>
               </div>
 
@@ -708,6 +732,7 @@ export function PromoCodeManagement() {
                   <SelectItem value="all">All Groups</SelectItem>
                   <SelectItem value="STUDENT">Students</SelectItem>
                   <SelectItem value="MEMBER">Members</SelectItem>
+                  <SelectItem value="TUTOR">Tutors</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -797,6 +822,11 @@ export function PromoCodeManagement() {
                               {promo.minimumAmount && (
                                 <div className="text-xs text-gray-500">
                                   Min: SGD {promo.minimumAmount}
+                                </div>
+                              )}
+                              {(promo.minimum_hours || promo.minimumHours || promo.minimumhours) && (
+                                <div className="text-xs text-blue-600">
+                                  Min: {promo.minimum_hours || promo.minimumHours || promo.minimumhours}h
                                 </div>
                               )}
                             </div>
@@ -964,6 +994,21 @@ export function PromoCodeManagement() {
                 <div>
                   <Label className="text-sm font-medium">Per User Limit</Label>
                   <p className="text-sm text-gray-600">{viewingPromo.maxUsagePerUser || 1}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Minimum Amount (SGD)</Label>
+                  <p className="text-sm text-gray-600">
+                    {viewingPromo.minimumAmount || viewingPromo.minimumamount || 0}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Minimum Hours</Label>
+                  <p className="text-sm text-gray-600">
+                    {viewingPromo.minimum_hours || viewingPromo.minimumHours || viewingPromo.minimumhours || 0}
+                  </p>
                 </div>
               </div>
               

@@ -68,7 +68,9 @@ export default function PaymentStep({
         purpose: 'Test Order Payment for My Productive Space',
         reference_number: `${bookingId || 'DEMO'}`,
         redirect_url: redirectUrl,
-        webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
+        // webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
+        webhook: `https://productive-space-backend.vercel.app/hitpay/webhook`,
+
         payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)], // Array of strings
         bookingId: bookingId || null, // Add bookingId field
       }

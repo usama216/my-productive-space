@@ -75,6 +75,7 @@ export default function BookingClient() {
 
   const [studentsValidated, setStudentsValidated] = useState(false)
   const [validatedStudents, setValidatedStudents] = useState<StudentValidationStatus[]>([])
+  
   useEffect(() => {
     if (searchParams.get('step') === '3') {
       setBookingStep(3)
@@ -201,6 +202,13 @@ export default function BookingClient() {
 
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
+  
+  // Booking duration for minimum hours validation
+  const [bookingDuration, setBookingDuration] = useState<{
+    startAt: string;
+    endAt: string;
+    durationHours: number;
+  } | undefined>(undefined)
 
   // Additional booking details
   const [customerName, setCustomerName] = useState('')
@@ -218,6 +226,24 @@ export default function BookingClient() {
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
   const [finalTotal, setFinalTotal] = useState(0) // Will be set after total is calculated
+
+  // Calculate booking duration when dates change
+  useEffect(() => {
+    if (startDate && endDate) {
+      const startAt = startDate.toISOString();
+      const endAt = endDate.toISOString();
+      const durationMs = endDate.getTime() - startDate.getTime();
+      const durationHours = durationMs / (1000 * 60 * 60);
+      
+      setBookingDuration({
+        startAt,
+        endAt,
+        durationHours
+      });
+    } else {
+      setBookingDuration(undefined);
+    }
+  }, [startDate, endDate])
 
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
@@ -925,6 +951,26 @@ export default function BookingClient() {
                           )}
                         </div>
                       </div>
+                      
+                      {/* Booking Duration Display */}
+                      {bookingDuration && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-800">
+                              Booking Duration: {bookingDuration.durationHours.toFixed(1)} hours
+                            </span>
+                          </div>
+                          <p className="text-xs text-blue-600 mt-1">
+                            {bookingDuration.startAt && bookingDuration.endAt && (
+                              <>
+                                From {new Date(bookingDuration.startAt).toLocaleString()} to {new Date(bookingDuration.endAt).toLocaleString()}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      
                       {peopleBreakdown.coStudents > 0 && user && (
                         <div>
                           <StudentValidation
@@ -1109,6 +1155,7 @@ export default function BookingClient() {
 
                           userId={userId}
                           bookingAmount={baseSubtotal}
+                          bookingDuration={bookingDuration}
                         />
                       )}
                       {/* ──────────────────────────────────────────────── */}
@@ -1157,7 +1204,7 @@ export default function BookingClient() {
                         <p className="text-sm text-gray-600 mb-4">
 
                           <PaymentStep
-                            subtotal={subtotal}
+                            subtotal={baseSubtotal}
                             total={total}
                             discountAmount={discountAmount}
                             selectedPackage={selectedPackage}

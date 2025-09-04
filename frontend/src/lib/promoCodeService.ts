@@ -8,12 +8,13 @@ export interface PromoCode {
   name: string;
   description?: string;
   promoType: 'GENERAL' | 'GROUP_SPECIFIC' | 'USER_SPECIFIC' | 'WELCOME';
-  targetGroup?: 'STUDENT' | 'MEMBER' | null;
+  targetGroup?: 'STUDENT' | 'MEMBER' | 'TUTOR' | null;
   targetUserIds?: string[];
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   maxDiscountAmount?: number;
   minimumAmount?: number;
+  minimumHours?: number; // NEW: Minimum booking duration in hours
   maxUsagePerUser?: number;
   globalUsageLimit?: number;
   activeFrom?: string;
@@ -42,6 +43,8 @@ export interface PromoCode {
   discountvalue?: number;
   maxdiscountamount?: number;
   minimumamount?: number;
+  minimumhours?: number; // NEW: Database field name
+  minimum_hours?: number; // NEW: API field name
   maxusageperuser?: number;
   globalusagelimit?: number;
   activefrom?: string;
@@ -76,10 +79,18 @@ export interface PromoCodeEligibility {
   reason: string;
 }
 
+export interface BookingDuration {
+  startAt: string;
+  endAt: string;
+  durationHours: number;
+}
+
 export interface ApplyPromoCodeRequest {
   promoCode: string;
   userId: string;
   bookingAmount: number;
+  startAt?: string; // NEW: Booking start time
+  endAt?: string;   // NEW: Booking end time
 }
 
 export interface ApplyPromoCodeResponse {
@@ -625,3 +636,46 @@ export const getPromoCodeStatusBadge = (promoCode: PromoCode): { variant: string
   
   return { variant: 'default', className: 'bg-green-100 text-green-800', text: 'Active' };
 };
+
+// NEW: Utility functions for booking duration and minimum hours validation
+export function calculateBookingDuration(startAt: string, endAt: string): number {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const durationMs = end.getTime() - start.getTime();
+  return durationMs / (1000 * 60 * 60); // Convert to hours
+}
+
+export function validateMinimumHours(promo: PromoCode, bookingDuration: BookingDuration): {
+  isValid: boolean;
+  message: string;
+} {
+  if (!promo.minimumHours) {
+    return { isValid: true, message: '' };
+  }
+
+  const durationHours = bookingDuration.durationHours;
+  const minimumHours = promo.minimumHours;
+
+  if (durationHours >= minimumHours) {
+    return { 
+      isValid: true, 
+      message: `✅ Meets minimum ${minimumHours} hours requirement` 
+    };
+  } else {
+    return { 
+      isValid: false, 
+      message: `❌ Requires minimum ${minimumHours} hours. Your booking is ${durationHours.toFixed(1)} hours.` 
+    };
+  }
+}
+
+export function formatDurationDisplay(hours: number): string {
+  if (hours < 1) {
+    const minutes = Math.round(hours * 60);
+    return `${minutes} minutes`;
+  } else if (hours === Math.floor(hours)) {
+    return `${hours} hours`;
+  } else {
+    return `${hours.toFixed(1)} hours`;
+  }
+}

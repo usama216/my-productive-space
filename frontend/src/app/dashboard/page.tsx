@@ -415,7 +415,7 @@ export default function Dashboard() {
                           </Badge>
                         </div>
                       </div>
-                      <Button 
+                      {/* <Button 
                         variant="outline" 
                         size="sm"
                         onClick={handleEditProfile}
@@ -423,7 +423,7 @@ export default function Dashboard() {
                       >
                         <Edit className="w-4 h-4 mr-2" />
                         {isEditingProfile ? 'Cancel' : 'Edit Profile'}
-                      </Button>
+                      </Button> */}
                     </div>
 
                     {/* Detailed Information */}

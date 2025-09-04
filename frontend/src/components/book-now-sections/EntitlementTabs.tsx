@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react'
-import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode } from '@/lib/promoCodeService';
+import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode, calculateBookingDuration, validateMinimumHours, formatDurationDisplay, BookingDuration } from '@/lib/promoCodeService';
 
 export type UserPackage = {
   id: string
@@ -93,6 +93,7 @@ type Props = {
   promoValid?: boolean
   userId?: string
   bookingAmount?: number
+  bookingDuration?: BookingDuration // NEW: Booking duration for minimum hours validation
 }
 
 export function EntitlementTabs({
@@ -103,7 +104,8 @@ export function EntitlementTabs({
   promoCode,
   promoValid,
   userId,
-  bookingAmount = 0
+  bookingAmount = 0,
+  bookingDuration
 }: Props) {
   console.log('EntitlementTabs rendered with mode:', mode);
   console.log('All props:', { mode, onChange, onModeChange, selectedPackage, promoCode, promoValid, userId, bookingAmount });
@@ -188,7 +190,9 @@ export function EntitlementTabs({
       const apiResponse = await applyPromoCode({
         promoCode: foundPromo.code,
         userId,
-        bookingAmount
+        bookingAmount,
+        startAt: bookingDuration?.startAt,
+        endAt: bookingDuration?.endAt
       });
 
       if (apiResponse.eligibility.isEligible) {
@@ -602,9 +606,21 @@ export function EntitlementTabs({
               </div>
             ) : availablePromos.length > 0 ? (
               <div className="space-y-2">
-                {availablePromos.map((promo) => (
-                  <Card key={promo.id} className="border-gray-200 hover:border-gray-300 transition-colors">
-                    <CardContent className="p-3">
+                {availablePromos.map((promo) => {
+                  // Check if promo meets minimum hours requirement
+                  const meetsMinimumHours = !promo.minimumHours || !bookingDuration || 
+                    validateMinimumHours(promo, bookingDuration).isValid;
+                  
+                  return (
+                    <Card 
+                      key={promo.id} 
+                      className={`border-gray-200 transition-colors ${
+                        meetsMinimumHours 
+                          ? 'hover:border-gray-300' 
+                          : 'opacity-60 bg-gray-50 border-gray-300'
+                      }`}
+                    >
+                      <CardContent className="p-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -620,11 +636,35 @@ export function EntitlementTabs({
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-600 mt-1">{promo.description}</p>
-                                                         {promo.minimumAmount && (
-                               <p className="text-xs text-gray-500 mt-1">
-                                 Min. order: ${promo.minimumAmount}
-                               </p>
-                             )}
+                            <div className="flex flex-col gap-1 mt-1">
+                              {promo.minimumAmount && (
+                                <p className="text-xs text-gray-500">
+                                  Min. order: ${promo.minimumAmount}
+                                </p>
+                              )}
+                              {promo.minimumHours && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-blue-500" />
+                                  <p className="text-xs text-blue-600 font-medium">
+                                    Min. {promo.minimumHours} hours required
+                                  </p>
+                                </div>
+                              )}
+                              {bookingDuration && promo.minimumHours && (
+                                <div className="mt-1">
+                                  {(() => {
+                                    const validation = validateMinimumHours(promo, bookingDuration);
+                                    return (
+                                      <p className={`text-xs font-medium ${
+                                        validation.isValid ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {validation.message}
+                                      </p>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                                                                           <div className="text-right text-xs text-gray-500">
@@ -636,7 +676,8 @@ export function EntitlementTabs({
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Card className="bg-gray-50 border-gray-200">
