@@ -63,9 +63,36 @@ const validateStudentAccount = async (email: string): Promise<StudentVerificatio
        }
 }
 
+// Bulk validation API call
+const validateAllStudents = async (emails: string[]): Promise<StudentVerificationResponse[]> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/student/check-multiple`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ emails: emails.map(email => email.trim()) }),
+    })
+
+    const data = await response.json()
+    return data.results || data // Handle different response formats
+  } catch (error) {
+    console.error('Bulk student validation error:', error)
+    // Return individual error responses for each email
+    return emails.map(email => ({
+      isStudent: false,
+      verificationStatus: 'NOT_FOUND' as const,
+      message: 'Network error. Please try again.',
+      email: email,
+      name: 'Unknown'
+    }))
+  }
+}
+
 export function StudentValidation({ numberOfStudents, onValidationChange }: StudentValidationProps) {
   const { toast } = useToast()
   const [validations, setValidations] = useState<StudentValidationStatus[]>([])
+  const [isValidatingAll, setIsValidatingAll] = useState(false)
 
   useEffect(() => {
     // Adjust slots when number changes
@@ -177,18 +204,140 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
     })
   }
 
+  const handleValidateAll = async () => {
+    // Get all emails that have been entered
+    const emailsToValidate = validations
+      .map(v => v.studentId.trim())
+      .filter(email => email.length > 0)
+
+    if (emailsToValidate.length === 0) {
+      toast({
+        title: "No Students to Validate",
+        description: "Please enter at least one student email address.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const invalidEmails = emailsToValidate.filter(email => !emailRegex.test(email))
+    
+    if (invalidEmails.length > 0) {
+      toast({
+        title: "Invalid Email Addresses",
+        description: `Please check these email addresses: ${invalidEmails.join(', ')}`,
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsValidatingAll(true)
+    
+    // Set all slots to validating state
+    setValidations(prev => prev.map(v => ({
+      ...v,
+      isValidating: v.studentId.trim().length > 0,
+      error: null
+    })))
+
+    try {
+      const results = await validateAllStudents(emailsToValidate)
+      
+      // Update each slot with its result
+      setValidations(prev => prev.map(v => {
+        if (!v.studentId.trim()) return v
+        
+        const result = results.find(r => r.email === v.studentId.trim())
+        if (!result) return v
+
+        if (result.isStudent && result.verificationStatus === 'VERIFIED') {
+          return {
+            ...v,
+            isValidating: false,
+            isValid: true,
+            studentData: {
+              id: 'verified',
+              email: result.email,
+              name: result.name,
+              memberType: 'STUDENT',
+              verifiedAt: new Date().toISOString()
+            },
+            error: null
+          }
+        } else {
+          return {
+            ...v,
+            isValidating: false,
+            isValid: false,
+            studentData: null,
+            error: result.message
+          }
+        }
+      }))
+
+      const successCount = results.filter(r => r.isStudent && r.verificationStatus === 'VERIFIED').length
+      const totalCount = results.length
+
+      toast({
+        title: "Bulk Validation Complete",
+        description: `${successCount} out of ${totalCount} students validated successfully.`,
+      })
+
+    } catch (error) {
+      console.error('Bulk validation error:', error)
+      toast({
+        title: "Validation Failed",
+        description: "Failed to validate students. Please try again.",
+        variant: "destructive"
+      })
+      
+      // Reset validating state
+      setValidations(prev => prev.map(v => ({
+        ...v,
+        isValidating: false
+      })))
+    } finally {
+      setIsValidatingAll(false)
+    }
+  }
+
   if (numberOfStudents === 0) return null
 
      return (
      <Card className="bg-orange-50 border-orange-200">
        <CardHeader>
-         <CardTitle className="flex items-center text-orange-800">
-           <GraduationCap className="h-5 w-5 mr-2" /> 
-           Validate {numberOfStudents} Student{numberOfStudents > 1 ? 's' : ''}
-         </CardTitle>
-         <p className="text-sm text-orange-600 font-normal">
-           Enter student email addresses to verify their student status
-         </p>
+         <div className="flex items-center justify-between">
+           <div>
+             <CardTitle className="flex items-center text-orange-800">
+               <GraduationCap className="h-5 w-5 mr-2" /> 
+               Validate {numberOfStudents} Student{numberOfStudents > 1 ? 's' : ''}
+             </CardTitle>
+             <p className="text-sm text-orange-600 font-normal">
+               Enter student email addresses to verify their student status
+             </p>
+           </div>
+           {numberOfStudents > 1 && (
+             <Button
+               onClick={handleValidateAll}
+               disabled={isValidatingAll || validations.every(v => !v.studentId.trim())}
+               className="bg-orange-600 hover:bg-orange-700 text-white"
+               size="sm"
+             >
+               {isValidatingAll ? (
+                 <>
+                   <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                   Validating All...
+                 </>
+               ) : (
+                 <>
+                   <Users className="h-4 w-4 mr-2" />
+                   Validate All
+                 </>
+               )}
+             </Button>
+           )}
+         </div>
        </CardHeader>
       <CardContent className="space-y-4">
         {validations.map((v, i) => (

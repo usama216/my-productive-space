@@ -45,6 +45,11 @@ export function PromoCodeManagement() {
   const [viewingPromo, setViewingPromo] = useState<PromoCode | null>(null)
   const [isViewing, setIsViewing] = useState(false)
   
+  // Delete confirmation modal state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [promoToDelete, setPromoToDelete] = useState<PromoCode | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  
   // Form fields
   const [formData, setFormData] = useState({
     code: '',
@@ -281,17 +286,25 @@ export function PromoCodeManagement() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this promo code?')) return
+  const handleDeleteClick = (promo: PromoCode) => {
+    setPromoToDelete(promo)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!promoToDelete) return
     
+    setIsDeleting(true)
     try {
-      const response = await deletePromoCode(id)
+      const response = await deletePromoCode(promoToDelete.id)
       if (response.success) {
         toast({
           title: "Success",
           description: "Promo code deleted successfully"
         })
         fetchPromoCodes()
+        setDeleteConfirmOpen(false)
+        setPromoToDelete(null)
       } else {
         toast({
           title: "Error",
@@ -305,7 +318,14 @@ export function PromoCodeManagement() {
         description: "Failed to delete promo code",
         variant: "destructive"
       })
+    } finally {
+      setIsDeleting(false)
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false)
+    setPromoToDelete(null)
   }
 
   const getPromoTypeIcon = (type: string) => {
@@ -881,7 +901,7 @@ export function PromoCodeManagement() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleDelete(promo.id)}
+                                onClick={() => handleDeleteClick(promo)}
                                 className="text-red-600 hover:text-red-700"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -1031,6 +1051,79 @@ export function PromoCodeManagement() {
                     }
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-600">
+              <Trash2 className="h-5 w-5 mr-2" />
+              Delete Promo Code
+            </DialogTitle>
+          </DialogHeader>
+          
+          {promoToDelete && (
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">
+                  Are you sure you want to delete this promo code? This action cannot be undone.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium">Code:</span>
+                  <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                    {promoToDelete.code}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium">Name:</span>
+                  <span className="text-sm text-gray-600">{promoToDelete.name}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium">Type:</span>
+                  <span className="text-sm text-gray-600">{getPromoCodeTypeLabel(promoToDelete)}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium">Usage:</span>
+                  <span className="text-sm text-gray-600">
+                    {promoToDelete.currentUsage || 0} / {promoToDelete.globalUsageLimit || 100}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleDeleteCancel}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}
