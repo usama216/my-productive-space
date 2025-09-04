@@ -491,7 +491,7 @@ export function EntitlementTabs({
                 ) : selectedPromoCode ? (
                   'Promo Applied'
                 ) : (
-                  'Validate'
+                  'APPLY PROMO'
                 )}
               </Button>
             </div>
