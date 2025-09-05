@@ -198,6 +198,9 @@ export default function BookingForm() {
   }
 
   const handleContinueToBooking = () => {
+    // Clear home page localStorage before navigating
+    clearHomePageStorage()
+    
     // Create URL with prefilled data
     const params = new URLSearchParams({
       location: location.toString(),
@@ -237,6 +240,13 @@ export default function BookingForm() {
       if (people !== newBreakdown.total) {
         setPeople(newBreakdown.total)
       }
+    }
+  }
+
+  // Function to clear home page localStorage
+  const clearHomePageStorage = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('home-page-people-selector')
     }
   }
   const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
@@ -297,6 +307,8 @@ export default function BookingForm() {
                     onChange={handlePeopleChange}
                     showBreakdown={true}
                     onBreakdownChange={handleBreakdownChange}
+                    storageKey="home-page-people-selector"
+                    enablePersistence={false}
                   />
                 </PopoverContent>
               </Popover>

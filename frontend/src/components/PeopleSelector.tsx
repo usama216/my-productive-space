@@ -20,6 +20,10 @@ type PeopleSelectorProps = {
   onChange?: (newVal: number) => void
   showBreakdown?: boolean
   onBreakdownChange?: (breakdown: UserCounts & { total: number }) => void
+  storageKey?: string // Add optional storage key prop
+  enablePersistence?: boolean // Add option to enable/disable persistence
+  initialBreakdown?: UserCounts // Add initial breakdown from props (URL params)
+  isInitialLoad?: boolean // Flag to indicate if this is initial load from URL params
 }
 
 export function PeopleSelector({
@@ -30,37 +34,42 @@ export function PeopleSelector({
   onChange,
   showBreakdown = false,
   onBreakdownChange,
+  storageKey = 'people-selector', // Default key for backward compatibility
+  enablePersistence = true, // Default to true for backward compatibility
+  initialBreakdown, // Initial breakdown from URL params
+  isInitialLoad = false, // Flag for initial load
 }: PeopleSelectorProps) {
-  // 🔑 Stable storage key
-  const componentKey = `people-selector`
+  // 🔑 Dynamic storage key based on prop
+  const componentKey = storageKey
 
-  // Load breakdown from localStorage or use default
+  // Load breakdown with priority: URL params > localStorage > default
   const getInitialBreakdown = (): UserCounts => {
-    if (typeof window === 'undefined') {
-      return {
-        coWorkers: min,
-        coTutors: 0,
-        coStudents: 0,
-      }
+    // Priority 1: Use initial breakdown from props (URL params)
+    if (initialBreakdown) {
+      return initialBreakdown
     }
 
-    const saved = localStorage.getItem(componentKey)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (
-          parsed &&
-          typeof parsed.coWorkers === 'number' &&
-          typeof parsed.coTutors === 'number' &&
-          typeof parsed.coStudents === 'number'
-        ) {
-          return parsed
+    // Priority 2: Use localStorage if persistence is enabled
+    if (typeof window !== 'undefined' && enablePersistence) {
+      const saved = localStorage.getItem(componentKey)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (
+            parsed &&
+            typeof parsed.coWorkers === 'number' &&
+            typeof parsed.coTutors === 'number' &&
+            typeof parsed.coStudents === 'number'
+          ) {
+            return parsed
+          }
+        } catch (e) {
+          console.log('Failed to parse saved breakdown:', e)
         }
-      } catch (e) {
-        console.log('Failed to parse saved breakdown:', e)
       }
     }
 
+    // Priority 3: Default values
     return {
       coWorkers: min,
       coTutors: 0,
@@ -69,13 +78,29 @@ export function PeopleSelector({
   }
 
   const [breakdown, setBreakdown] = useState<UserCounts>(getInitialBreakdown)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false)
 
-  // Save breakdown to localStorage whenever it changes
+  // Save breakdown to localStorage only after user interaction
   const saveBreakdown = (newBreakdown: UserCounts) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && enablePersistence && hasUserInteracted) {
       localStorage.setItem(componentKey, JSON.stringify(newBreakdown))
     }
   }
+
+  // Function to clear localStorage for this component
+  const clearStorage = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(componentKey)
+    }
+  }
+
+  // Expose clearStorage function to parent components
+  useEffect(() => {
+    if (onBreakdownChange) {
+      // Add clearStorage to the breakdown change callback
+      (onBreakdownChange as any).clearStorage = clearStorage
+    }
+  }, [onBreakdownChange, componentKey])
 
   // Track if we've already sent the initial breakdown to parent
   const hasNotifiedParent = useRef(false)
@@ -99,6 +124,7 @@ export function PeopleSelector({
     }
 
     setBreakdown(newBreakdown)
+    setHasUserInteracted(true) // Mark as user interaction
     saveBreakdown(newBreakdown)
 
     if (!showBreakdown) {
@@ -122,6 +148,7 @@ export function PeopleSelector({
       newBreakdown.coWorkers + newBreakdown.coTutors + newBreakdown.coStudents
     if (finalTotal <= max && finalTotal >= min) {
       setBreakdown(newBreakdown)
+      setHasUserInteracted(true) // Mark as user interaction
       saveBreakdown(newBreakdown)
 
       // Notify parent
@@ -202,7 +229,7 @@ export function PeopleSelector({
 
       {/* Breakdown by User Type */}
       <div className="space-y-3">
-        {(Object.keys(breakdown) as Array<keyof UserCounts>).map((type) => (
+        {(['coWorkers', 'coTutors', 'coStudents'] as Array<keyof UserCounts>).map((type) => (
           <div key={type} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-base">{getUserTypeIcon(type)}</span>

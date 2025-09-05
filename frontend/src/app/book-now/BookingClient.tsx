@@ -879,7 +879,6 @@ export default function BookingClient() {
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className={`w-full justify-start ${!user ? "bg-gray-50" : ""}`} disabled={!user}>
-                                <Users className="w-4 h-4 mr-2" />
                                 {people} {people === 1 ? 'Person' : 'People'}
                                 {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
                                   <span className="ml-2 text-xs text-gray-500">
@@ -896,6 +895,10 @@ export default function BookingClient() {
                                 onChange={handlePeopleChange}
                                 showBreakdown={true}
                                 onBreakdownChange={handleBreakdownChange}
+                                storageKey="book-now-people-selector"
+                                enablePersistence={true}
+                                initialBreakdown={peopleBreakdown}
+                                isInitialLoad={true}
                               />
                             </PopoverContent>
                           </Popover>
