@@ -31,7 +31,12 @@ model User {
   lastName                  String?
   memberType                MemberType         @default(MEMBER)
   contactNumber             String?
-  studentVerificationStatus VerificationStatus @default(NA)
+  studentVerificationStatus String?            @default("PENDING") // PENDING, VERIFIED, REJECTED, NA
+  
+  // Student verification fields (matching existing DB schema)
+  studentVerificationImageUrl String?         // URL to uploaded document in Supabase Storage
+  studentVerificationDate     DateTime?       // When verification was processed
+  studentRejectionReason      String?         // Reason for rejection if rejected
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -43,6 +48,7 @@ model User {
 
   @@index([memberType])
   @@index([email])
+  @@index([studentVerificationStatus])
 }
 
 // ---------- Bookings (M2) ----------

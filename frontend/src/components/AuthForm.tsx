@@ -16,6 +16,8 @@ import ReCAPTCHA from 'react-google-recaptcha'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/hooks/use-toast'
+import { StudentDocumentUpload } from '@/components/StudentDocumentUpload'
+import { uploadStudentDocument } from '@/lib/studentDocumentService'
 
 import 'react-international-phone/style.css'
 
@@ -42,7 +44,6 @@ export function AuthForm({ type }: Props) {
   // Form state
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [signupStep, setSignupStep] = useState(1)
   const [phoneTouched, setPhoneTouched] = useState(false)
   
   // Google reCAPTCHA
@@ -67,6 +68,14 @@ export function AuthForm({ type }: Props) {
     memberType: 'member' as 'student' | 'member' | 'tutor',
     acceptedTerms: false
   })
+
+  // Student document upload state
+  const [studentDocument, setStudentDocument] = useState<{
+    url: string
+    name: string
+    size: number
+    mimeType: string
+  } | null>(null)
 
   const resetCaptcha = () => {
     recaptchaRef.current?.reset()
@@ -112,59 +121,9 @@ export function AuthForm({ type }: Props) {
     }
   }
 
-  const handleBasicSignup = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!captchaToken) {
-      toast({
-        title: "Error",
-        description: "Please complete the captcha verification",
-        variant: "destructive",
-      })
-      return
-    }
+  // Removed handleBasicSignup - now using single step
 
-    // Validation
-    if (!signupData.email || !signupData.password || !signupData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-    
-    if (signupData.password !== signupData.confirmPassword) {
-      toast({
-        title: "Error", 
-        description: "Passwords do not match",
-        variant: "destructive",
-      })
-      return
-    }
-    
-    if (signupData.password.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive",
-      })
-      return
-    }
-    
-    if (!signupData.acceptedTerms) {
-      toast({
-        title: "Error",
-        description: "Please accept the terms and conditions",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSignupStep(2)
-  }
-
-  const handleFullSignup = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
@@ -178,6 +137,48 @@ export function AuthForm({ type }: Props) {
       return
     }
 
+    // Basic validation
+    if (!signupData.email || !signupData.password || !signupData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+    
+    if (signupData.password !== signupData.confirmPassword) {
+      toast({
+        title: "Error", 
+        description: "Passwords do not match",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+    
+    if (signupData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+    
+    if (!signupData.acceptedTerms) {
+      toast({
+        title: "Error",
+        description: "Please accept the terms and conditions",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    // Detailed validation
     if (!signupData.firstName || !signupData.lastName || !signupData.contactNumber) {
       toast({
         title: "Error",
@@ -192,6 +193,17 @@ export function AuthForm({ type }: Props) {
       toast({
         title: "Error",
         description: "Please enter a valid phone number",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    // Validate student document upload
+    if (signupData.memberType === 'student' && !studentDocument) {
+      toast({
+        title: "Error",
+        description: "Please upload a student verification document",
         variant: "destructive",
       })
       setLoading(false)
@@ -242,7 +254,11 @@ export function AuthForm({ type }: Props) {
              lastName: signupData.lastName,
              memberType: signupData.memberType.toUpperCase() as 'STUDENT' | 'MEMBER' | 'TUTOR',
              contactNumber: signupData.contactNumber,
-             studentVerificationStatus: signupData.memberType === 'student' ? 'PENDING' : 'PENDING',
+             studentVerificationStatus: signupData.memberType === 'student' ? 'PENDING' : 'NA',
+             // Include student document data if available
+             ...(signupData.memberType === 'student' && studentDocument && {
+               studentVerificationImageUrl: studentDocument.url
+             }),
              createdAt: new Date().toISOString(),
              updatedAt: new Date().toISOString()
            }
@@ -259,6 +275,41 @@ export function AuthForm({ type }: Props) {
           }
           
           console.log('User profile created successfully')
+
+          // If student document was uploaded during signup, upload it now
+          if (signupData.memberType === 'student' && studentDocument) {
+            try {
+              console.log('Uploading student document...')
+              
+              // Create a File object from the document data
+              const response = await fetch(studentDocument.url)
+              const blob = await response.blob()
+              const file = new File([blob], studentDocument.name, { type: studentDocument.mimeType })
+              
+              // Upload to Supabase Storage
+              const uploadResult = await uploadStudentDocument(file, authData.user.id)
+              
+              if (uploadResult.success && uploadResult.data) {
+                // Update the user record with the actual document URL
+                const { error: updateError } = await supabase
+                  .from('User')
+                  .update({
+                    studentVerificationImageUrl: uploadResult.data.url,
+                    updatedAt: new Date().toISOString()
+                  })
+                  .eq('id', authData.user.id)
+
+                if (updateError) {
+                  console.error('Failed to update user with document URL:', updateError)
+                } else {
+                  console.log('Student document uploaded and saved successfully')
+                }
+              }
+            } catch (docError) {
+              console.error('Student document upload error:', docError)
+              // Don't fail the entire signup if document upload fails
+            }
+          }
         } catch (profileError: any) {
           console.error('Profile creation error:', profileError)
           throw new Error(`Failed to create user profile: ${profileError.message}`)
@@ -266,7 +317,13 @@ export function AuthForm({ type }: Props) {
       }
 
       resetCaptcha()
-      router.push(`/?toastType=signUp`)
+      
+      // Different redirect based on member type
+      if (signupData.memberType === 'student') {
+        router.push(`/?toastType=studentSignUp`)
+      } else {
+        router.push(`/?toastType=signUp`)
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -279,87 +336,177 @@ export function AuthForm({ type }: Props) {
     }
   }
 
-  if (!isLoginForm && signupStep === 1) {
-    // Signup Step 1: Basic Info
+  if (!isLoginForm) {
+    // Single Step Signup Form - Vertical Layout
     return (
-      <form onSubmit={handleBasicSignup}>
-        <CardContent className="grid w-full items-center gap-4">
-          {/* hCaptcha */}
-          
+      <form onSubmit={handleSignup} className="space-y-2">
+        <div className="space-y-2">
+          {/* Personal Information */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="first-name" className="text-xs font-medium text-gray-700">First Name *</Label>
+              <Input
+                id="first-name"
+                value={signupData.firstName}
+                onChange={(e) => setSignupData({ ...signupData, firstName: e.target.value })}
+                className="h-8 text-xs"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="last-name" className="text-xs font-medium text-gray-700">Last Name *</Label>
+              <Input
+                id="last-name"
+                value={signupData.lastName}
+                onChange={(e) => setSignupData({ ...signupData, lastName: e.target.value })}
+                className="h-8 text-xs"
+                required
+                disabled={loading}
+              />
+            </div>
+          </div>
 
-          <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="signup-email">Email</Label>
+          {/* Email */}
+          <div className="flex flex-col space-y-1">
+            <Label htmlFor="signup-email" className="text-xs font-medium text-gray-700">Email *</Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Mail className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
               <Input
                 id="signup-email"
                 type="email"
                 placeholder="Enter your email"
                 value={signupData.email}
                 onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                className="pl-10"
+                className="pl-7 h-8 text-xs"
                 required
                 disabled={loading}
               />
             </div>
           </div>
 
-          <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="signup-password">Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                id="signup-password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Create a password"
-                value={signupData.password}
-                onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                className="pl-10 pr-10"
-                required
-                disabled={loading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+          {/* Contact Number and Member Type */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="contact-number" className="text-xs font-medium text-gray-700">Contact Number *</Label>
+              <div className="relative">
+                <Phone className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 z-10" />
+                <PhoneInput
+                  defaultCountry="sg"
+                  value={signupData.contactNumber}
+                  onChange={(value) => {
+                    setSignupData({ ...signupData, contactNumber: value })
+                    setPhoneTouched(true)
+                  }}
+                  onFocus={() => setPhoneTouched(true)}
+                  placeholder="Enter phone number"
+                  disabled={loading}
+                />
+              </div>
+              {phoneTouched && signupData.contactNumber && !isPhoneValid(signupData.contactNumber) && (
+                <p className="text-xs text-red-600">
+                  Please enter a valid phone number.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="member-type" className="text-xs font-medium text-gray-700">Member Type *</Label>
+              <Select
+                value={signupData.memberType}
+                onValueChange={(value: 'student' | 'member' | 'tutor') =>
+                  setSignupData({ ...signupData, memberType: value })
+                }
                 disabled={loading}
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="tutor">Tutor</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="confirm-password">Confirm Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="Confirm your password"
-                value={signupData.confirmPassword}
-                onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                className="pl-10"
-                required
+          {/* Student Document Upload - Only show when memberType is student */}
+          {signupData.memberType === 'student' && (
+            <div className="mt-1">
+              <StudentDocumentUpload
+                onDocumentUploaded={(documentData) => setStudentDocument(documentData)}
+                onDocumentRemoved={() => setStudentDocument(null)}
+                initialDocument={studentDocument}
                 disabled={loading}
               />
             </div>
+          )}
+
+          {/* Password Fields */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="signup-password" className="text-xs font-medium text-gray-700">Password *</Label>
+              <div className="relative">
+                <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                <Input
+                  id="signup-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create password"
+                  value={signupData.password}
+                  onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                  className="pl-7 pr-7 h-8 text-xs"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                  disabled={loading}
+                >
+                  {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="confirm-password" className="text-xs font-medium text-gray-700">Confirm Password *</Label>
+              <div className="relative">
+                <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm password"
+                  value={signupData.confirmPassword}
+                  onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
+                  className="pl-7 h-8 text-xs"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          {/* Terms and Conditions */}
+          <div className="flex items-start space-x-2">
             <Checkbox
               id="accept-terms"
               checked={signupData.acceptedTerms}
               onCheckedChange={(checked) => setSignupData({ ...signupData, acceptedTerms: !!checked })}
               disabled={loading}
+              className="mt-0.5"
             />
-            <Label htmlFor="accept-terms" className="text-sm">
-              I have read and accept the{' '}
-              <Link href="/terms" target="_blank" className="text-orange-600 hover:underline">
+            <Label htmlFor="accept-terms" className="text-xs text-gray-600 leading-tight">
+              I accept the{' '}
+              <Link href="/terms" target="_blank" className="text-orange-600 hover:underline font-medium">
                 Terms and Conditions
               </Link>
             </Label>
           </div>
+        </div>
+
+        <div className="space-y-2">
           <div className="flex justify-center">
             <ReCAPTCHA
               ref={recaptchaRef}
@@ -369,223 +516,74 @@ export function AuthForm({ type }: Props) {
               onError={() => setCaptchaToken(null)}
             />
           </div>
-        </CardContent>
 
-        <CardFooter className="mt-4 flex flex-col gap-6">
           <Button 
             type="submit" 
-            className="w-full bg-orange-500 hover:bg-orange-600"
-            disabled={loading || !captchaToken}
+            className="w-full bg-orange-500 hover:bg-orange-600 h-8 text-xs font-medium"
+            disabled={loading || !captchaToken || !isPhoneValid(signupData.contactNumber)}
           >
-            {loading ? <Loader2 className="animate-spin" /> : "Continue"}
+            {loading ? <Loader2 className="animate-spin w-3 h-3" /> : "Create Account"}
           </Button>
           
-          <p className="text-xs">
+          <p className="text-center text-xs text-gray-600">
             Already have an account?{' '}
             <Link
               href="/login"
-              className={`text-blue-500 underline ${loading ? "pointer-events-none opacity-50" : ""}`}
+              className={`text-orange-600 hover:underline font-medium ${loading ? "pointer-events-none opacity-50" : ""}`}
             >
               Login
             </Link>
           </p>
-        </CardFooter>
+        </div>
       </form>
     )
   }
 
-  if (!isLoginForm && signupStep === 2) {
-    // Signup Step 2: Detailed Info
-    return (
-      <form onSubmit={handleFullSignup}>
-        <CardContent className="grid w-full items-center gap-4">
-          {/* hCaptcha */}
-    
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="first-name">First Name</Label>
-              <Input
-                id="first-name"
-                value={signupData.firstName}
-                onChange={(e) => setSignupData({ ...signupData, firstName: e.target.value })}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <Label htmlFor="last-name">Last Name</Label>
-              <Input
-                id="last-name"
-                value={signupData.lastName}
-                onChange={(e) => setSignupData({ ...signupData, lastName: e.target.value })}
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label>Email</Label>
-            <Input
-              value={signupData.email}
-              disabled
-              className="bg-gray-50"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="contact-number">Contact Number</Label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
-              <PhoneInput
-                defaultCountry="sg"
-                value={signupData.contactNumber}
-                onChange={(value) => {
-                  setSignupData({ ...signupData, contactNumber: value })
-                  setPhoneTouched(true)
-                }}
-                onFocus={() => setPhoneTouched(true)}
-                placeholder="Enter phone number"
-                disabled={loading}
-              />
-            </div>
-            {phoneTouched && signupData.contactNumber && !isPhoneValid(signupData.contactNumber) && (
-              <p className="mt-1 text-sm text-red-600">
-                Please enter a valid phone number.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="member-type">Member Type</Label>
-            <Select
-              value={signupData.memberType}
-                             onValueChange={(value: 'student' | 'member' | 'tutor') =>
-                 setSignupData({ ...signupData, memberType: value })
-               }
-              disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-                             <SelectContent>
-                 <SelectItem value="student">Student</SelectItem>
-                 <SelectItem value="member">Member</SelectItem>
-                 <SelectItem value="tutor">Tutor</SelectItem>
-               </SelectContent>
-            </Select>
-          </div>
-          <div className="flex justify-center">
-            <ReCAPTCHA
-              ref={recaptchaRef}
-              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-              onChange={setCaptchaToken}
-              onExpired={() => setCaptchaToken(null)}
-              onError={() => setCaptchaToken(null)}
-            />
-          </div>
-
-
-        </CardContent>
-
-        <CardFooter className="mt-4 flex flex-col gap-6">
-          <div className="flex space-x-3 w-full">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setSignupStep(1)}
-              className="flex-1"
-              disabled={loading}
-            >
-              Back
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading || !captchaToken || !isPhoneValid(signupData.contactNumber)}
-              className="flex-1 bg-orange-500 hover:bg-orange-600"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : "Create Account"}
-            </Button>
-          </div>
-
-          <p className="text-xs">
-            Already have an account?{' '}
-            <Link
-              href="/login"
-              className={`text-blue-500 underline ${loading ? "pointer-events-none opacity-50" : ""}`}
-            >
-              Login
-            </Link>
-          </p>
-        </CardFooter>
-      </form>
-    )
-  }
-
-  // Login Form
+  // Login Form - Vertical Layout
   return (
-    <form onSubmit={handleLogin}>
-      <CardContent className="grid w-full items-center gap-4">
-    
-        <div className="flex flex-col space-y-1.5">
-          <Label htmlFor="login-email">Email</Label>
+    <form onSubmit={handleLogin} className="space-y-2">
+      <div className="space-y-2">
+        <div className="flex flex-col space-y-1">
+          <Label htmlFor="login-email" className="text-xs font-medium text-gray-700">Email</Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Mail className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
             <Input
               id="login-email"
               type="email"
               placeholder="Enter your email"
               value={loginData.email}
               onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-              className="pl-10"
+              className="pl-7 h-8 text-xs"
               required
               disabled={loading}
             />
           </div>
         </div>
 
-        <div className="flex flex-col space-y-1.5">
-          <Label htmlFor="login-password">Password</Label>
+        <div className="flex flex-col space-y-1">
+          <Label htmlFor="login-password" className="text-xs font-medium text-gray-700">Password</Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
             <Input
               id="login-password"
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
               value={loginData.password}
               onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-              className="pl-10 pr-10"
+              className="pl-7 pr-7 h-8 text-xs"
               required
               disabled={loading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2"
               disabled={loading}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             </button>
           </div>
-          
         </div>
-
-        {/* <div className="flex flex-col space-y-1.5">
-          <Label htmlFor="user-type">Login As</Label>
-          <Select
-            value={loginData.userType}
-            onValueChange={(value: 'user' | 'admin') => setLoginData({ ...loginData, userType: value })}
-            disabled={loading}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="user">User</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
-        </div> */}
 
         <div className="flex items-center space-x-2">
           <Checkbox
@@ -594,10 +592,11 @@ export function AuthForm({ type }: Props) {
             onCheckedChange={(checked) => setLoginData({ ...loginData, rememberMe: !!checked })}
             disabled={loading}
           />
-          <Label htmlFor="remember-me" className="text-sm">Remember me</Label>
+          <Label htmlFor="remember-me" className="text-xs text-gray-600">Remember me</Label>
         </div>
+      </div>
 
-        {/* Google reCAPTCHA */}
+      <div className="space-y-2">
         <div className="flex justify-center">
           <ReCAPTCHA
             ref={recaptchaRef}
@@ -608,36 +607,33 @@ export function AuthForm({ type }: Props) {
           />
         </div>
 
-      </CardContent>
-
-      <CardFooter className="mt-4 flex flex-col gap-6">
         <Button
           type="submit"
-          className="w-full bg-orange-500 hover:bg-orange-600"
+          className="w-full bg-orange-500 hover:bg-orange-600 h-8 text-xs font-medium"
           disabled={loading || !captchaToken}
         >
-          {loading ? <Loader2 className="animate-spin" /> : "Login"}
+          {loading ? <Loader2 className="animate-spin w-3 h-3" /> : "Login"}
         </Button>
 
         <div className="text-center">
           <Link
             href="/forgot-password"
-            className="text-sm text-orange-600 hover:underline"
+            className="text-xs text-orange-600 hover:underline font-medium"
           >
             Forgot your password?
           </Link>
         </div>
 
-        <p className="text-xs">
+        <p className="text-center text-xs text-gray-600">
           Don't have an account yet?{' '}
           <Link
             href="/sign-up"
-            className={`text-blue-500 underline ${loading ? "pointer-events-none opacity-50" : ""}`}
+            className={`text-orange-600 hover:underline font-medium ${loading ? "pointer-events-none opacity-50" : ""}`}
           >
             Sign Up
           </Link>
         </p>
-      </CardFooter>
+      </div>
     </form>
   )
 }
