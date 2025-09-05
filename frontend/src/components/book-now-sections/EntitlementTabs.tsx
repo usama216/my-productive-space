@@ -156,6 +156,45 @@ export function EntitlementTabs({
     }
   }, [mode, userId, loadAvailablePromoCodes]);
 
+  // Recalculate promo code discount when bookingAmount changes
+  useEffect(() => {
+    if (selectedPromoCode && bookingAmount > 0) {
+      // Recalculate discount with new booking amount
+      const localValidation = validatePromoCodeLocally(selectedPromoCode, bookingAmount);
+      if (localValidation.isValid) {
+        const newCalculation = calculateDiscountLocally(selectedPromoCode, bookingAmount);
+        
+        // Only update if the calculation has actually changed to prevent infinite loops
+        setDiscountCalculation(prev => {
+          if (prev && 
+              prev.discountAmount === newCalculation.discountAmount && 
+              prev.finalAmount === newCalculation.finalAmount) {
+            return prev; // No change, return same object to prevent re-render
+          }
+          
+          return {
+            discountAmount: newCalculation.discountAmount,
+            finalAmount: newCalculation.finalAmount,
+            isValid: true,
+            message: 'Promo code recalculated for new amount'
+          };
+        });
+        
+        // Notify parent component with updated discount info
+        onChange({
+          type: 'promo',
+          id: selectedPromoCode.id,
+          discountAmount: newCalculation.discountAmount,
+          finalAmount: newCalculation.finalAmount,
+          promoCode: selectedPromoCode
+        });
+      } else {
+        // If promo code is no longer valid with new amount, remove it
+        handleRemovePromo();
+      }
+    }
+  }, [bookingAmount, selectedPromoCode]);
+
     // Validate and apply promo code
   const handleValidatePromo = useCallback(async () => {
     if (!localPromo.trim()) {
