@@ -1,7 +1,7 @@
 // src/app/admin/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Users, 
   Calendar, 
@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
+import { getAllUsers } from '@/lib/userService'
 import Navbar from '@/components/Navbar'
 import {FooterSection} from '@/components/landing-page-sections/FooterSection'
 import AdminHeader from '@/components/admin/AdminHeader'
@@ -112,6 +113,36 @@ const mockUsers: UserAccount[] = [
     joinDate: '2024-02-20',
     totalBookings: 2,
     totalSpent: 150
+  },
+  {
+    id: '3',
+    email: 'mike.student@nus.edu.sg',
+    name: 'Mike Chen',
+    memberType: 'student',
+    verificationStatus: 'pending',
+    joinDate: '2024-03-10',
+    totalBookings: 1,
+    totalSpent: 75
+  },
+  {
+    id: '4',
+    email: 'sarah.student@ntu.edu.sg',
+    name: 'Sarah Lee',
+    memberType: 'student',
+    verificationStatus: 'pending',
+    joinDate: '2024-03-15',
+    totalBookings: 0,
+    totalSpent: 0
+  },
+  {
+    id: '5',
+    email: 'alex.professional@company.com',
+    name: 'Alex Johnson',
+    memberType: 'professional',
+    verificationStatus: 'verified',
+    joinDate: '2024-01-20',
+    totalBookings: 8,
+    totalSpent: 2000
   }
 ]
 
@@ -125,6 +156,49 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [isLoading, setIsLoading] = useState(false)
+  const [pendingStudents, setPendingStudents] = useState<any[]>([])
+  const [isLoadingPendingStudents, setIsLoadingPendingStudents] = useState(false)
+
+  // Fetch pending students from API
+  const fetchPendingStudents = async () => {
+    setIsLoadingPendingStudents(true)
+    try {
+      const response = await getAllUsers({
+        memberType: 'STUDENT',
+        limit: 10, // Get first 10 pending students
+        includeStats: true
+      })
+      
+      if (response.success && response.users) {
+        // Filter for pending verification status
+        const pending = response.users.filter(user => 
+          user.studentVerificationStatus === 'PENDING'
+        )
+        setPendingStudents(pending)
+      } else {
+        console.error('Failed to fetch pending students:', response.error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch pending students",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching pending students:', error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch pending students",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingPendingStudents(false)
+    }
+  }
+
+  // Load pending students on component mount
+  useEffect(() => {
+    fetchPendingStudents()
+  }, [])
 
   // Handle cancellation approval
   const handleCancellationAction = async (cancellation: CancellationRequest, action: 'approve' | 'reject') => {
@@ -203,6 +277,9 @@ export default function AdminDashboard() {
           : u
       ))
       
+      // Refresh pending students list
+      fetchPendingStudents()
+      
       console.log(`User ${action}ed:`, user.id)
       toast({
         title: "User verification updated",
@@ -269,6 +346,8 @@ export default function AdminDashboard() {
           setActiveTab={setActiveTab}
           cancellations={cancellations}
           users={users}
+          pendingStudents={pendingStudents}
+          isLoadingPendingStudents={isLoadingPendingStudents}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           filterStatus={filterStatus}
@@ -293,6 +372,7 @@ export default function AdminDashboard() {
         setSelectedUser={setSelectedUser}
         handleUserVerification={handleUserVerification}
         isLoading={isLoading}
+        onRefresh={fetchPendingStudents}
       />
 
       <FooterSection />

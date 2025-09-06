@@ -15,6 +15,8 @@ export default function AdminTabs({
   setActiveTab,
   cancellations,
   users,
+  pendingStudents,
+  isLoadingPendingStudents,
   searchTerm,
   setSearchTerm,
   filterStatus,
@@ -29,6 +31,8 @@ export default function AdminTabs({
   setActiveTab: (value: string) => void
   cancellations: any[]
   users: any[]
+  pendingStudents: any[]
+  isLoadingPendingStudents: boolean
   searchTerm: string
   setSearchTerm: (value: string) => void
   filterStatus: string
@@ -42,7 +46,14 @@ export default function AdminTabs({
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
       <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="overview">
+          Overview
+          {pendingStudents.length > 0 && (
+            <span className="ml-2 bg-orange-500 text-white text-xs rounded-full px-2 py-1">
+              {pendingStudents.length}
+            </span>
+          )}
+        </TabsTrigger>
         {/* <TabsTrigger value="cancellations">
           Cancellations
           {cancellations.filter(c => c.status === 'pending').length > 0 && (
@@ -99,24 +110,56 @@ export default function AdminTabs({
           {/* Pending Verifications */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="w-5 h-5 mr-2" />
-                Pending Verifications
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Clock className="w-5 h-5 mr-2" />
+                  Pending Student Verifications
+                </div>
+                <span className="bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full">
+                  {pendingStudents.length}
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {users.filter(u => u.verificationStatus === 'pending').slice(0, 3).map(user => (
-                <div key={user.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
-                  <div>
-                    <p className="font-medium text-sm">{user.name}</p>
-                    <p className="text-xs text-gray-600">{user.email}</p>
-                  </div>
-                  <div className="text-right">
-                    <StatusBadge status={user.verificationStatus} />
-                  </div>
+              {isLoadingPendingStudents ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-500">Loading pending students...</p>
                 </div>
-              ))}
-              <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab('users')}>
+              ) : (
+                <>
+                  {pendingStudents.slice(0, 3).map(student => (
+                    <div key={student.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
+                      <div>
+                        <p className="font-medium text-sm">
+                          {student.firstName && student.lastName 
+                            ? `${student.firstName} ${student.lastName}` 
+                            : student.email.split('@')[0]
+                          }
+                        </p>
+                        <p className="text-xs text-gray-600">{student.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={student.studentVerificationStatus} />
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setSelectedUser(student)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Review
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {pendingStudents.length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">No pending student verifications</p>
+                    </div>
+                  )}
+                </>
+              )}
+              <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab('user-management')}>
                 View All Users
               </Button>
             </CardContent>
