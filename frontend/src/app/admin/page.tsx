@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useToast } from '@/hooks/use-toast'
 import Navbar from '@/components/Navbar'
 import {FooterSection} from '@/components/landing-page-sections/FooterSection'
 import AdminHeader from '@/components/admin/AdminHeader'
@@ -115,6 +116,7 @@ const mockUsers: UserAccount[] = [
 ]
 
 export default function AdminDashboard() {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('overview')
   const [cancellations, setCancellations] = useState<CancellationRequest[]>(mockCancellations)
   const [users, setUsers] = useState<UserAccount[]>(mockUsers)
@@ -141,9 +143,15 @@ export default function AdminDashboard() {
     console.log(`Email sent to: ${cancellation.userEmail}`)
     
     if (action === 'approve') {
-      alert(`Refund of $${cancellation.refundAmount} approved for ${cancellation.bookingReference}. Email sent to customer.`)
+      toast({
+        title: "Cancellation approved",
+        description: `Refund of $${cancellation.refundAmount} approved for ${cancellation.bookingReference}. Email sent to customer.`,
+      })
     } else {
-      alert(`Cancellation rejected for ${cancellation.bookingReference}. Email sent to customer.`)
+      toast({
+        title: "Cancellation rejected",
+        description: `Cancellation rejected for ${cancellation.bookingReference}. Email sent to customer.`,
+      })
     }
     
     setSelectedCancellation(null)
@@ -151,23 +159,67 @@ export default function AdminDashboard() {
   }
 
   // Handle user verification
-  const handleUserVerification = async (user: UserAccount, action: 'verify' | 'reject') => {
+  const handleUserVerification = async (user: UserAccount, action: 'verify' | 'reject', rejectionReason?: string) => {
     setIsLoading(true)
     
-    // mock API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    setUsers(prev => prev.map(u => 
-      u.id === user.id 
-        ? { ...u, verificationStatus: action === 'verify' ? 'verified' : 'rejected' }
-        : u
-    ))
-    
-    console.log(`User ${action}ed:`, user.id)
-    alert(`User ${user.name} has been ${action}ed. Email notification sent.`)
-    
-    setSelectedUser(null)
-    setIsLoading(false)
+    try {
+      if (action === 'reject' && !rejectionReason) {
+        toast({
+          title: "Rejection reason required",
+          description: "Please provide a reason for rejection.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Call your API
+      const response = await fetch(`http://localhost:8000/api/booking/admin/users/${user.id}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentVerificationStatus: action === 'verify' ? 'VERIFIED' : 'REJECTED',
+          ...(action === 'reject' && rejectionReason && { rejectionReason })
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log('API Response:', result)
+      
+      // Update local state
+      setUsers(prev => prev.map(u => 
+        u.id === user.id 
+          ? { 
+              ...u, 
+              verificationStatus: action === 'verify' ? 'verified' : 'rejected',
+              ...(action === 'reject' && rejectionReason && { rejectionReason })
+            }
+          : u
+      ))
+      
+      console.log(`User ${action}ed:`, user.id)
+      toast({
+        title: "User verification updated",
+        description: `User ${user.name} has been ${action}ed. Email notification sent.`,
+      })
+      
+    } catch (error) {
+      console.error('Error updating user verification:', error)
+      toast({
+        title: "Verification failed",
+        description: `Failed to ${action} user. Please try again.`,
+        variant: "destructive",
+      })
+    } finally {
+      setSelectedUser(null)
+      setIsLoading(false)
+    }
   }
 
   const StatusBadge = ({ status }: { status: string }) => {

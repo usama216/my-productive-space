@@ -32,8 +32,7 @@ interface StudentDocumentUploadProps {
 const ACCEPTED_FILE_TYPES = [
   'image/jpeg',
   'image/jpg', 
-  'image/png',
-  'application/pdf'
+  'image/png'
 ]
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -60,7 +59,7 @@ export function StudentDocumentUpload({
     
     // Validate file type
     if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-      setError('Please upload a valid file type (JPG, PNG, or PDF)')
+      setError('Please upload a valid image file (JPG or PNG)')
       return
     }
     
@@ -157,8 +156,8 @@ export function StudentDocumentUpload({
         }
 
         toast({
-          title: "Document uploaded successfully!",
-          description: "Your student verification document has been uploaded and will be reviewed by our admin team.",
+          title: "Image uploaded successfully!",
+          description: "Your student verification image has been uploaded and will be reviewed by our admin team.",
         })
       } else {
         // Preview mode during signup - just prepare the data
@@ -170,8 +169,8 @@ export function StudentDocumentUpload({
         }
 
         toast({
-          title: "Document ready for upload!",
-          description: "Your document will be uploaded when you complete the signup process.",
+          title: "Image ready for upload!",
+          description: "Your image will be uploaded when you complete the signup process.",
         })
       }
 
@@ -185,10 +184,10 @@ export function StudentDocumentUpload({
       }
     } catch (error) {
       console.error('Upload error:', error)
-      setError(error instanceof Error ? error.message : 'Failed to upload document. Please try again.')
+      setError(error instanceof Error ? error.message : 'Failed to upload image. Please try again.')
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload image. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -215,14 +214,14 @@ export function StudentDocumentUpload({
         await removeUserStudentDocument(userId)
         
         toast({
-          title: "Document removed",
-          description: "Your student verification document has been removed.",
+          title: "Image removed",
+          description: "Your student verification image has been removed.",
         })
       } catch (error) {
         console.error('Remove error:', error)
         toast({
           title: "Remove failed",
-          description: "Failed to remove document. Please try again.",
+          description: "Failed to remove image. Please try again.",
           variant: "destructive",
         })
       }
@@ -252,16 +251,16 @@ export function StudentDocumentUpload({
         <CardHeader className="pb-1">
           <CardTitle className="flex items-center gap-2 text-orange-800 text-xs">
             <GraduationCap className="w-3 h-3" />
-            Student Verification Document
+            Student Verification Image
           </CardTitle>
           <p className="text-xs text-orange-700">
-            Upload a valid student document to verify your student status.
+            Upload a valid student image to verify your student status.
           </p>
         </CardHeader>
         <CardContent className="space-y-2">
           {/* File Upload Area */}
           <div>
-            <Label className="text-xs font-medium mb-1 block">Upload Document *</Label>
+            <Label className="text-xs font-medium mb-1 block">Upload Image *</Label>
             <div
               className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${
                 disabled 
@@ -275,7 +274,7 @@ export function StudentDocumentUpload({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={ACCEPTED_FILE_TYPES.join(',')}
+                accept="image/jpeg,image/jpg,image/png"
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={disabled}
@@ -326,7 +325,7 @@ export function StudentDocumentUpload({
                       Click to upload or drag and drop
                     </p>
                     <p className="text-xs text-gray-500">
-                      JPG, PNG, or PDF (max 5MB)
+                      JPG or PNG (max 5MB)
                     </p>
                   </div>
                 </div>
@@ -338,10 +337,15 @@ export function StudentDocumentUpload({
           {isUploading && (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span>Uploading...</span>
-                <span>{Math.round(uploadProgress)}%</span>
+                <span className="text-orange-700 font-medium">Uploading...</span>
+                <span className="text-orange-600 font-semibold">{Math.round(uploadProgress)}%</span>
               </div>
-              <Progress value={uploadProgress} className="w-full h-1" />
+              <div className="w-full h-1 bg-orange-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-orange-500 transition-all duration-300 ease-in-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
             </div>
           )}
 
@@ -361,7 +365,7 @@ export function StudentDocumentUpload({
               disabled={disabled}
             >
               <Upload className="w-3 h-3 mr-1" />
-              Upload Document
+              Upload Image
             </Button>
           )}
 
@@ -408,10 +412,10 @@ export function StudentDocumentUpload({
 
       {/* Help Text */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-1">
-        <h4 className="font-medium text-blue-800 mb-1 text-xs">📋 Document Requirements</h4>
+        <h4 className="font-medium text-blue-800 mb-1 text-xs">📋 Image Requirements</h4>
         <ul className="text-xs text-blue-700 space-y-0.5">
-          <li>• Document must clearly show your name and student status</li>
-          <li>• Accepted formats: JPG, PNG, PDF (max 5MB)</li>
+          <li>• Image must clearly show your name and student status</li>
+          <li>• Accepted formats: JPG, PNG (max 5MB)</li>
           <li>• Verification typically takes 1-2 business days</li>
         </ul>
       </div>

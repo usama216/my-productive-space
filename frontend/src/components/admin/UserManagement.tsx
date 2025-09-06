@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { 
@@ -27,7 +29,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Download
+  Download,
+  AlertCircle
 } from 'lucide-react'
 import { 
   User, 
@@ -67,7 +70,9 @@ export function UserManagement() {
   // Dialog states
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
   const [editFormData, setEditFormData] = useState({
     firstName: '',
     lastName: '',
@@ -278,24 +283,56 @@ export function UserManagement() {
 
   // Removed suspend and activate functions as they're not part of the new API
 
-  const handleVerifyStudent = async (userId: string, status: 'VERIFIED' | 'REJECTED') => {
+  const handleRejectClick = (user: User) => {
+    setSelectedUser(user)
+    setRejectionReason('')
+    setIsRejectDialogOpen(true)
+  }
+
+  const handleConfirmRejection = async () => {
+    if (!selectedUser || !rejectionReason.trim()) {
+      toast({
+        title: "Rejection reason required",
+        description: "Please provide a reason for rejection.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    await handleVerifyStudent(selectedUser.id, 'REJECTED', rejectionReason.trim())
+    setIsRejectDialogOpen(false)
+    setRejectionReason('')
+  }
+
+  const handleVerifyStudent = async (userId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
     try {
       setIsSubmitting(true)
-      const response = await updateStudentVerification(userId, status)
       
-      if (response.success) {
-        toast({
-          title: "Success",
-          description: `Student ${status === 'VERIFIED' ? 'approved' : 'rejected'} successfully`,
+      // Call your API with rejection reason if provided
+      const response = await fetch(`http://localhost:8000/api/booking/admin/users/${userId}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentVerificationStatus: status,
+          ...(status === 'REJECTED' && rejectionReason && { rejectionReason })
         })
-        loadUsers()
-      } else {
-        toast({
-          title: "Error",
-          description: response.error || `Failed to ${status === 'VERIFIED' ? 'approve' : 'reject'} student`,
-          variant: "destructive",
-        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.statusText}`)
       }
+
+      const result = await response.json()
+      console.log('API Response:', result)
+      
+      toast({
+        title: "Success",
+        description: `Student ${status === 'VERIFIED' ? 'approved' : 'rejected'} successfully`,
+      })
+      loadUsers()
+      
     } catch (error) {
       console.error('Error updating student verification:', error)
       toast({
@@ -577,7 +614,7 @@ export function UserManagement() {
                                <Button
                                  variant="outline"
                                  size="sm"
-                                 onClick={() => handleVerifyStudent(user.id, 'REJECTED')}
+                                 onClick={() => handleRejectClick(user)}
                                  disabled={isSubmitting}
                                  className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
                                >
@@ -808,6 +845,64 @@ export function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Rejection Confirmation Dialog */}
+      <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              Confirm Rejection
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedUser && (
+            <div className="space-y-4">
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  You are about to reject the student verification for <strong>{selectedUser.firstName} {selectedUser.lastName}</strong>.
+                  This action will notify the user and they will need to resubmit their documents.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="rejectionReason" className="text-sm font-medium">
+                  Rejection Reason <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="rejectionReason"
+                  placeholder="Please provide a clear reason for rejection (e.g., Document is not clear, Invalid student ID, etc.)"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="min-h-[100px] resize-none"
+                  disabled={isSubmitting}
+                />
+              
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsRejectDialogOpen(false)}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleConfirmRejection}
+                  disabled={isSubmitting || !rejectionReason.trim()}
+                  className="flex-1"
+                >
+                  {isSubmitting ? 'Rejecting...' : 'Confirm Rejection'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

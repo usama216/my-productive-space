@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-
+import { useToast } from '@/hooks/use-toast'
 
 import { PeopleSelector } from '@/components/PeopleSelector'
 import Navbar from '@/components/Navbar'
@@ -50,6 +50,7 @@ const locations = [
 ]
 
 export default function BookingClient() {
+  const { toast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
   // Auth state
@@ -668,21 +669,33 @@ export default function BookingClient() {
 
     // Validate seat selection
     if (selectedSeats.length !== people) {
-      alert(`Please select exactly ${people} seat${people !== 1 ? 's' : ''} for your booking.`)
+      toast({
+        title: "Seat selection required",
+        description: `Please select exactly ${people} seat${people !== 1 ? 's' : ''} for your booking.`,
+        variant: "destructive",
+      })
       return
     }
 
     // Check if there are enough available seats
     const availableSeats = DEMO_LAYOUT.length - bookedSeats.length
     if (availableSeats < people) {
-      alert(`Sorry, only ${availableSeats} seat${availableSeats !== 1 ? 's are' : ' is'} available for this time slot. Please select a different time or reduce the number of people.`)
+      toast({
+        title: "Not enough seats available",
+        description: `Sorry, only ${availableSeats} seat${availableSeats !== 1 ? 's are' : ' is'} available for this time slot. Please select a different time or reduce the number of people.`,
+        variant: "destructive",
+      })
       return
     }
 
     // Validate booking constraints
     const validation = validateBookingConstraints()
     if (!validation.isValid) {
-      alert(validation.message)
+      toast({
+        title: "Booking validation failed",
+        description: validation.message,
+        variant: "destructive",
+      })
       return
     }
 
@@ -756,7 +769,11 @@ export default function BookingClient() {
 
     } catch (error) {
       console.error('Error creating booking:', error)
-      alert(`Failed to create booking: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast({
+        title: "Booking creation failed",
+        description: `Failed to create booking: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
