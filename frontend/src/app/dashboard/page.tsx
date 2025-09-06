@@ -75,7 +75,7 @@ export default function Dashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(false)
-    const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
+  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
@@ -108,7 +108,7 @@ export default function Dashboard() {
   // Load user profile data
   const loadUserProfile = async () => {
     if (!authUser?.id) return
-    
+
     setIsLoadingProfile(true)
     try {
       const profile = await getUserProfile(authUser.id)
@@ -121,7 +121,7 @@ export default function Dashboard() {
           memberType: profile.memberType
         })
         setOriginalMemberType(profile.memberType)
-        
+
         // Load existing student document if user is a student
         if (profile.memberType === 'STUDENT' && profile.studentVerificationImageUrl) {
           setStudentDocument({
@@ -148,7 +148,7 @@ export default function Dashboard() {
   // Handle save profile changes
   const handleSaveProfile = async () => {
     if (!authUser?.id || !userProfile) return
-    
+
     // Check if user is changing to student but hasn't uploaded a document
     if (editFormData.memberType === 'STUDENT' && originalMemberType !== 'STUDENT' && !studentDocument) {
       toast({
@@ -158,7 +158,7 @@ export default function Dashboard() {
       })
       return
     }
-    
+
     setIsLoadingProfile(true)
     try {
       // Prepare profile data with student document info
@@ -215,7 +215,7 @@ export default function Dashboard() {
   // Handle member type change
   const handleMemberTypeChange = (newMemberType: 'STUDENT' | 'MEMBER' | 'TUTOR') => {
     setEditFormData(prev => ({ ...prev, memberType: newMemberType }))
-    
+
     // If changing from student to another type, clear the document
     if (originalMemberType === 'STUDENT' && newMemberType !== 'STUDENT') {
       setStudentDocument(null)
@@ -303,7 +303,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="flex items-center">
             <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                                    <span>{new Date(booking.date).toLocaleDateString()}</span>
+            <span>{new Date(booking.date).toLocaleDateString()}</span>
           </div>
           <div className="flex items-center">
             <Clock className="w-4 h-4 mr-2 text-gray-400" />
@@ -378,19 +378,19 @@ export default function Dashboard() {
           </div>
 
           {/* Student Verification Rejection Alert */}
-          {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' && 
-           (userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus) === 'REJECTED' && (
-            <Alert className="mb-6 border-red-200 bg-red-50">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
-                <div className="font-semibold mb-1">Student Verification Rejected</div>
-                <div className="text-sm">
-                  {userProfile?.studentRejectionReason || databaseUser?.studentRejectionReason || 
-                   'Your student verification has been rejected. Please contact support for more information.'}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+          {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' &&
+            (userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus) === 'REJECTED' && (
+              <Alert className="mb-6 border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <div className="font-semibold mb-1">Student Verification Rejected</div>
+                  <div className="text-sm">
+                    {userProfile?.studentRejectionReason || databaseUser?.studentRejectionReason ||
+                      'Your student verification has been rejected. Please contact support for more information.'}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
 
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -438,7 +438,7 @@ export default function Dashboard() {
                       <div className="text-center p-4 bg-blue-50 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600">0</div>
                         <div className="text-sm text-blue-600">Total Bookings</div>
-                    </div>
+                      </div>
                       <div className="text-center p-4 bg-green-50 rounded-lg">
                         <div className="text-2xl font-bold text-green-600">0</div>
                         <div className="text-sm text-green-600">Hours Used</div>
@@ -453,13 +453,13 @@ export default function Dashboard() {
             <TabsContent value="profile">
               <div className="space-y-6">
                 {/* Profile Header */}
-              <Card>
-                <CardHeader>
+                <Card>
+                  <CardHeader>
                     <CardTitle className="flex items-center">
                       <User className="w-5 h-5 mr-2" />
                       Profile Information
                     </CardTitle>
-                                      <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600">
                       Manage your account information and preferences
                     </p>
                     {isLoadingProfile && (
@@ -478,7 +478,7 @@ export default function Dashboard() {
                         </AlertDescription>
                       </Alert>
                     )}
-                </CardHeader>
+                  </CardHeader>
                   <CardContent className="space-y-6">
                     {/* User Avatar and Basic Info */}
                     <div className="flex items-center space-x-6">
@@ -495,28 +495,42 @@ export default function Dashboard() {
                             {userProfile ? getMemberTypeDisplayName(userProfile.memberType) : (databaseUser?.memberType || sampleUserData.memberType)}
                           </Badge>
                           {/* Only show verification status for students */}
-                          {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (
-                            <Badge 
-                              variant="outline" 
-                              className={userProfile ? getVerificationStatusColor(userProfile.studentVerificationStatus) : 
-                                (databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus) === 'VERIFIED' 
-                                  ? 'bg-green-50 text-green-700 border-green-200' 
-                                  : (databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus) === 'PENDING'
-                                  ? 'bg-orange-50 text-orange-700 border-orange-200'
-                                  : 'bg-gray-50 text-gray-700 border-gray-200'
-                              }
-                            >
-                              {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
-                               (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
-                               (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
-                               (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'REJECTED' ? 'Verification Rejected' :
-                               'Not Verified'}
-                            </Badge>
-                          )}
+                          {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (() => {
+                            const status =
+                              userProfile?.studentVerificationStatus ||
+                              databaseUser?.studentVerificationStatus ||
+                              sampleUserData.studentVerificationStatus;
+
+                            const statusText =
+                              status === 'VERIFIED'
+                                ? 'Verified'
+                                : status === 'PENDING'
+                                  ? 'Pending'
+                                  : status === 'REJECTED'
+                                    ? 'Rejected'
+                                    : 'Not Verified';
+
+                            const badgeClass =
+                              userProfile
+                                ? getVerificationStatusColor(userProfile.studentVerificationStatus)
+                                : status === 'VERIFIED'
+                                  ? 'bg-green-50 text-green-700 border-green-200'
+                                  : status === 'PENDING'
+                                    ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                    : 'bg-gray-50 text-gray-700 border-gray-200';
+
+                            return (
+                              <Badge variant="outline" className={badgeClass}>
+                                {`Student Verification Status - ${statusText}`}
+                              </Badge>
+                            );
+                          })()}
+
+
                         </div>
                       </div>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={handleEditProfile}
                         disabled={isLoadingProfile}
@@ -529,26 +543,26 @@ export default function Dashboard() {
 
                     {/* Detailed Information */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t">
-                        <div>
-                          <Label htmlFor="firstName">First Name</Label>
-                                                  <Input
+                      <div>
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
                           id="firstName"
                           value={isEditingProfile ? editFormData.firstName : (userProfile?.firstName || databaseUser?.firstName || authUser?.user_metadata?.full_name?.split(' ')[0] || sampleUserData.firstName)}
                           disabled={!isEditingProfile}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, firstName: e.target.value }))}
                           className="mt-1"
                         />
-                        </div>
-                        <div>
-                          <Label htmlFor="lastName">Last Name</Label>
-                          <Input
-                            id="lastName"
-                            value={isEditingProfile ? editFormData.lastName : (userProfile?.lastName || databaseUser?.lastName || authUser?.user_metadata?.full_name?.split(' ').slice(1).join(' ') || sampleUserData.lastName)}
-                            disabled={!isEditingProfile}
-                            onChange={(e) => setEditFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                            className="mt-1"
-                          />
-                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          value={isEditingProfile ? editFormData.lastName : (userProfile?.lastName || databaseUser?.lastName || authUser?.user_metadata?.full_name?.split(' ').slice(1).join(' ') || sampleUserData.lastName)}
+                          disabled={!isEditingProfile}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                          className="mt-1"
+                        />
+                      </div>
                       <div>
                         <Label htmlFor="email">Email Address</Label>
                         <Input
@@ -570,8 +584,8 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <Label htmlFor="memberType">Member Type</Label>
-                        <Select 
-                          disabled={!isEditingProfile} 
+                        <Select
+                          disabled={!isEditingProfile}
                           value={isEditingProfile ? editFormData.memberType : (userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType)}
                           onValueChange={handleMemberTypeChange}
                         >
@@ -584,71 +598,71 @@ export default function Dashboard() {
                             <SelectItem value="TUTOR">Tutor</SelectItem>
                           </SelectContent>
                         </Select>
-                        </div>
-                        {/* Only show student verification dropdown for students */}
-                        {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (
-                          <div>
-                            <Label htmlFor="verificationStatus">Student Verification</Label>
-                            <Select disabled value={userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus}>
-                              <SelectTrigger className="mt-1">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="NA">Not Applicable</SelectItem>
-                                <SelectItem value="PENDING">Pending</SelectItem>
-                                <SelectItem value="VERIFIED">Verified</SelectItem>
-                                <SelectItem value="REJECTED">Rejected</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
                       </div>
+                      {/* Only show student verification dropdown for students */}
+                      {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (
+                        <div>
+                          <Label htmlFor="verificationStatus">Student Verification</Label>
+                          <Select disabled value={userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="NA">Not Applicable</SelectItem>
+                              <SelectItem value="PENDING">Pending</SelectItem>
+                              <SelectItem value="VERIFIED">Verified</SelectItem>
+                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
 
                     {/* View Student Document - Only show for students with uploaded documents */}
-                    {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && 
-                     (userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl) && (
-                      <div className="pt-6 border-t">
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-lg font-semibold text-gray-900 mb-2">Student Verification Document</h4>
-                            <p className="text-sm text-gray-600 mb-4">
-                              Your uploaded student verification document.
-                            </p>
-                          </div>
-                          
-                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                  <FileText className="w-5 h-5 text-orange-600" />
+                    {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' &&
+                      (userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl) && (
+                        <div className="pt-6 border-t">
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">Student Verification Document</h4>
+                              <p className="text-sm text-gray-600 mb-4">
+                                Your uploaded student verification document.
+                              </p>
+                            </div>
+
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                                    <FileText className="w-5 h-5 text-orange-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-orange-800">Student Verification Document</p>
+                                    <p className="text-sm text-orange-600">
+                                      Status: {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
+                                        (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
+                                          (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
+                                            (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'REJECTED' ? 'Verification Rejected' :
+                                              'Not Verified'}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="font-medium text-orange-800">Student Verification Document</p>
-                                  <p className="text-sm text-orange-600">
-                                    Status: {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
-                                             (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
-                                             (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
-                                             (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'REJECTED' ? 'Verification Rejected' :
-                                             'Not Verified'}
-                                  </p>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl, '_blank')}
+                                    className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 hover:text-orange-800"
+                                  >
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Document
+                                  </Button>
                                 </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => window.open(userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl, '_blank')}
-                                  className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 hover:text-orange-800"
-                                >
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Document
-                                </Button>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Student Document Upload - Only show when editing and member type is student */}
                     {isEditingProfile && editFormData.memberType === 'STUDENT' && (
@@ -675,15 +689,15 @@ export default function Dashboard() {
                     {isEditingProfile && (
                       <div className="pt-6 border-t">
                         <div className="flex justify-end space-x-2">
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             onClick={handleCancelEdit}
                             disabled={isLoadingProfile}
                             className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
                           >
                             Cancel
                           </Button>
-                          <Button 
+                          <Button
                             onClick={handleSaveProfile}
                             disabled={isLoadingProfile}
                             className="bg-orange-500 hover:bg-orange-600 text-white"
@@ -734,11 +748,11 @@ export default function Dashboard() {
                               </div>
                             </div>
                             </div> */}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-                
-                      </div>
+
+              </div>
             </TabsContent>
 
             {/* Passes Tab - User Packages */}
