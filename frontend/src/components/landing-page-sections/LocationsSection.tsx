@@ -22,29 +22,7 @@ const locations = [
         'T4, T5: Group tables',
         '.....',
         ],
-    },
-    {
-        src: '/mock_img/zoneB.png',
-        title: 'Bukit Panjang B',
-        desc: '10 seats max, quiet area…',
-        items: ['T1–T2: Window-side solo seats',
-        'T4, T5: Group tables',
-        'T7: Double-seat near pillar',
-        'T1–T2: Window-side solo seats',
-        'T4, T5: Group tables',
-        '.....',],
-    },
-    {
-        src: '/mock_img/zoneC.png',
-        title: 'ANg Mo Kio Zone C',
-        desc: '20 seats max, bright study zone…',
-        items: ['T1–T2: Window-side solo seats',
-        'T4, T5: Group tables',
-        'T7: Double-seat near pillar',
-        'T1–T2: Window-side solo seats',
-        'T4, T5: Group tables',
-        '.....',],
-    },
+    }
 ]
 
 export default function LocationsSection() {

@@ -30,7 +30,7 @@ export default function BookingForm() {
   const router = useRouter()
   const { user, loading } = useAuth()
 
-  const [location, setLocation] = useState<string>('')
+  const [location, setLocation] = useState<string>('kovan')
   const [people, setPeople] = useState<number>(1)
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
@@ -276,9 +276,7 @@ export default function BookingForm() {
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bukit">Bukit Panjang</SelectItem>
                   <SelectItem value="kovan">Kovan</SelectItem>
-                  <SelectItem value="amk">Ang Mo Kio</SelectItem>
                 </SelectContent>
               </Select>
             </div>

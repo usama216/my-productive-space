@@ -44,9 +44,7 @@ import { PromoCode } from '@/lib/promoCodeService'
 
 // Location data with pricing
 const locations = [
-  { id: 'bukit', name: 'Bukit Panjang', price: 25, address: '123 Bukit Panjang Plaza, Singapore 670123' },
-  { id: 'kovan', name: 'Kovan', price: 30, address: '456 Kovan Road, Singapore 560456' },
-  { id: 'amk', name: 'Ang Mo Kio', price: 28, address: '789 Ang Mo Kio Avenue 3, Singapore 560789' }
+  { id: 'kovan', name: 'Kovan', price: 30, address: '456 Kovan Road, Singapore 560456' }
 ]
 
 export default function BookingClient() {
@@ -198,7 +196,7 @@ export default function BookingClient() {
 
 
   // Booking form state
-  const [location, setLocation] = useState<string>('')
+  const [location, setLocation] = useState<string>('kovan')
   const [people, setPeople] = useState<number>(1)
 
   const [startDate, setStartDate] = useState<Date | null>(null)
