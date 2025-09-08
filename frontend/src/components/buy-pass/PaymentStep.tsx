@@ -63,6 +63,9 @@ export default function PaymentStep({
       const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&orderId=${orderId}&userPackageId=${userPackageId}`
 
       // Call the new package payment API endpoint
+      console.log('PaymentStep - userPackageId:', userPackageId)
+      console.log('PaymentStep - orderId:', orderId)
+      
       const paymentData = {
         userPackageId: userPackageId, // ID from the user_packages table
         orderId: orderId, // Order ID for the package purchase

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/styles/globals.css"
+import "@/styles/package-system.css"
 // app/layout.tsx
 // slick carousel styles (must be in the root layout)
 import 'slick-carousel/slick/slick.css'

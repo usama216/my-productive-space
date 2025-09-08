@@ -1,313 +1,486 @@
+// src/components/dashboard/UserPackages.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Package, 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle,
-  ShoppingBag,
-  Gift,
-  CreditCard,
-  ExternalLink
-} from 'lucide-react'
-import { 
-  getUserPackages, 
-  UserPackage, 
-  formatPackagePrice, 
-  formatPackageDate, 
-  formatPackageDateTime,
-  getPackageStatusColor,
-  getPackageStatusText,
-  getPackageProgressPercentage
-} from '@/lib/packageService'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
+import { Package, Clock, Calendar, CheckCircle, XCircle, Loader2, AlertTriangle, RefreshCw, CreditCard, Shield } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
+import { getUserPackages, UserPackage, completePackagePayment, CustomerInfo } from '@/lib/services/packageService'
+import { useAuth } from '@/hooks/useAuth'
 
 interface UserPackagesProps {
   userId: string
 }
 
 export function UserPackages({ userId }: UserPackagesProps) {
-  const [userPackages, setUserPackages] = useState<UserPackage[]>([])
-  const [loading, setLoading] = useState(true)
+  const [packages, setPackages] = useState<UserPackage[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (userId) {
-      loadUserPackages()
-    }
-  }, [userId])
+  const [processingPayment, setProcessingPayment] = useState<string | null>(null)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'paynow_online' | 'card'>('paynow_online')
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [selectedPackage, setSelectedPackage] = useState<UserPackage | null>(null)
+  const { toast } = useToast()
+  const { user, databaseUser } = useAuth()
 
   const loadUserPackages = async () => {
+    if (!userId) return
+
+    setIsLoading(true)
+    setError(null)
+    
     try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await getUserPackages(userId)
-      
-      if (response.success && response.activePackages) {
-        setUserPackages(response.activePackages)
-      } else {
-        setError(response.error || 'Failed to load packages')
-      }
-    } catch (error) {
-      console.error('Error loading user packages:', error)
-      setError('Failed to load packages')
+      console.log('Loading user packages for userId:', userId)
+      const userPackages = await getUserPackages(userId)
+      console.log('User packages loaded:', userPackages)
+      setPackages(userPackages)
+    } catch (err) {
+      console.error('Error loading user packages:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load packages')
+      toast({
+        title: "Error loading packages",
+        description: "Failed to load your packages. Please try again.",
+        variant: "destructive",
+      })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const getPackageIcon = (packageType: string) => {
-    switch (packageType.toLowerCase()) {
-      case 'premium':
-        return <Gift className="h-5 w-5 text-purple-600" />
-      case 'basic':
-        return <Package className="h-5 w-5 text-blue-600" />
-      case 'student':
-        return <Package className="h-5 w-5 text-green-600" />
-      default:
-        return <Package className="h-5 w-5 text-gray-600" />
+  const handleCompletePayment = async (pkg: UserPackage) => {
+    if (!user || !databaseUser) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to complete payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSelectedPackage(pkg)
+    setPaymentModalOpen(true)
+  }
+
+  const handlePaymentSubmit = async () => {
+    if (!selectedPackage || !user || !databaseUser) return
+
+    setProcessingPayment(selectedPackage.id)
+    
+    try {
+      const customerInfo: CustomerInfo = {
+        name: databaseUser.name || user.email || 'User',
+        email: user.email || '',
+        phone: databaseUser.contactNumber || '',
+        company: '',
+        billingAddress: '',
+        postalCode: ''
+      }
+
+      // Calculate total with credit card fee if applicable
+      const creditCardFee = selectedPaymentMethod === 'card' ? selectedPackage.totalAmount * 0.05 : 0
+      const finalAmount = selectedPackage.totalAmount + creditCardFee
+
+      console.log('Completing payment for package:', selectedPackage.id)
+      const result = await completePackagePayment(selectedPackage.id, selectedPackage.orderId, customerInfo, finalAmount, selectedPaymentMethod)
+      
+      if (result.success && result.url) {
+        // Redirect to HitPay payment page
+        window.location.href = result.url
+      } else {
+        throw new Error(result.error || 'Failed to initiate payment')
+      }
+    } catch (err) {
+      console.error('Error completing payment:', err)
+      toast({
+        title: "Payment failed",
+        description: err instanceof Error ? err.message : 'Failed to complete payment. Please try again.',
+        variant: "destructive",
+      })
+    } finally {
+      setProcessingPayment(null)
+      setPaymentModalOpen(false)
     }
   }
 
-  const getStatusIcon = (userPackage: UserPackage) => {
-    if (userPackage.isExpired) {
-      return <XCircle className="h-4 w-4 text-red-500" />
-    }
-    if (userPackage.remainingPasses === 0) {
-      return <AlertTriangle className="h-4 w-4 text-orange-500" />
-    }
-    return <CheckCircle className="h-4 w-4 text-green-500" />
-  }
+  useEffect(() => {
+    loadUserPackages()
+  }, [userId])
 
-  const getStatusBadgeVariant = (userPackage: UserPackage) => {
-    if (userPackage.isExpired) return 'destructive'
-    if (userPackage.remainingPasses === 0) return 'secondary'
-    return 'default'
-  }
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      'ACTIVE': 'bg-green-100 text-green-800',
+      'EXPIRED': 'bg-red-100 text-red-800',
+      'PENDING': 'bg-yellow-100 text-yellow-800',
+      'CANCELLED': 'bg-gray-100 text-gray-800'
+    }
 
-  if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading packages...</p>
+      <Badge className={variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800'}>
+        {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
+      </Badge>
+    )
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const getRemainingDays = (expiresAt: string | null) => {
+    if (!expiresAt) return 0
+    const now = new Date()
+    const expiry = new Date(expiresAt)
+    const diffTime = expiry.getTime() - now.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Package className="w-5 h-5 mr-2" />
+            My Packages
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            <span className="ml-2 text-gray-600">Loading your packages...</span>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     )
   }
 
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Package className="w-5 h-5 mr-2" />
+            My Packages
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+            </AlertDescription>
+          </Alert>
+          <Button onClick={loadUserPackages} variant="outline" className="w-full">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
 
-  if (userPackages.length === 0) {
+  if (packages.length === 0) {
     return (
-      <div className="text-center py-8">
-        <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Packages Found</h3>
-        <p className="text-muted-foreground mb-4">
-          You haven't purchased any packages yet. Browse our available packages to get started.
-        </p>
-        <Button asChild>
-          <a href="/buy-pass">
-            Browse Packages
-          </a>
-        </Button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Package className="w-5 h-5 mr-2" />
+            My Packages
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No packages found</h3>
+            <p className="text-gray-600 mb-4">You don't have any packages yet.</p>
+            <Button onClick={() => window.location.href = '/buy-pass'} className="bg-orange-600 hover:bg-orange-700">
+              Buy Packages
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">My Packages</h2>
-          <p className="text-muted-foreground">
-            Manage your purchased packages and track usage
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <a href="/buy-pass" className="flex items-center gap-2">
-            <ShoppingBag className="h-4 w-4" />
-            Buy More Packages
-          </a>
-        </Button>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Package Summary</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Package className="w-5 h-5 mr-2" />
+              My Packages
+            </div>
+            <Button onClick={loadUserPackages} variant="outline" size="sm">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {userPackages.length}
-              </div>
-              <div className="text-sm text-muted-foreground">Total Packages</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {userPackages.reduce((sum, pkg) => sum + pkg.remainingPasses, 0)}
-              </div>
-              <div className="text-sm text-muted-foreground">Available Passes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {userPackages.reduce((sum, pkg) => sum + pkg.usedPasses, 0)}
-              </div>
-              <div className="text-sm text-muted-foreground">Used Passes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {formatPackagePrice(userPackages.reduce((sum, pkg) => sum + pkg.totalAmount, 0))}
-              </div>
-              <div className="text-sm text-muted-foreground">Total Spent</div>
-            </div>
+          <div className="space-y-4">
+            {packages.map((pkg) => {
+              const remainingDays = getRemainingDays(pkg.expiresAt)
+              const isExpiringSoon = remainingDays <= 7 && remainingDays > 0
+              const isExpired = remainingDays <= 0 || pkg.isExpired
+              const isPending = pkg.paymentStatus === 'PENDING'
+              const isCompleted = pkg.paymentStatus === 'COMPLETED'
+
+              return (
+                <Card key={pkg.id} className={`${isExpiringSoon ? 'border-orange-200 bg-orange-50' : isExpired ? 'border-red-200 bg-red-50' : isPending ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200'}`}>
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-semibold text-lg text-gray-900">{pkg.packageName}</h4>
+                        <p className="text-sm text-gray-600">Order ID: {pkg.orderId}</p>
+                        <p className="text-xs text-gray-500">Package ID: {pkg.packageId}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(pkg.paymentStatus)}
+                        {isExpiringSoon && !isExpired && isCompleted && (
+                          <Badge variant="outline" className="border-orange-300 text-orange-700">
+                            Expires Soon
+                          </Badge>
+                        )}
+                        {isPending && (
+                          <Badge variant="outline" className="border-yellow-300 text-yellow-700">
+                            Payment Pending
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <div>
+                          <div className="font-medium">Purchased</div>
+                          <div>{formatDate(pkg.createdAt)}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <div>
+                          <div className="font-medium">Expires</div>
+                          <div className={isExpired ? 'text-red-600' : isExpiringSoon ? 'text-orange-600' : ''}>
+                            {pkg.expiresAt ? formatDate(pkg.expiresAt) : 'Not activated'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Package className="w-4 h-4 mr-2" />
+                        <div>
+                          <div className="font-medium">Quantity</div>
+                          <div>{pkg.quantity}</div>
+                        </div>
+                      </div>
+                    </div>
+s for
+                    {/* Package Contents */}
+                    {pkg.packageContents && (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <h5 className="font-medium text-gray-900 mb-2">Package Contents</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          {pkg.packageContents?.totalHours && pkg.packageContents.totalHours > 0 && (
+                            <div>
+                              <div className="text-gray-600">Total Hours</div>
+                              <div className="font-medium">{pkg.packageContents.totalHours} hrs</div>
+                            </div>
+                          )}
+                          {pkg.packageContents?.halfDayPasses && pkg.packageContents.halfDayPasses > 0 && (
+                            <div>
+                              <div className="text-gray-600">Half-Day Passes</div>
+                              <div className="font-medium">{pkg.packageContents.halfDayPasses}</div>
+                            </div>
+                          )}
+                          {pkg.packageContents?.fullDayPasses && pkg.packageContents.fullDayPasses > 0 && (
+                            <div>
+                              <div className="text-gray-600">Full-Day Passes</div>
+                              <div className="font-medium">{pkg.packageContents.fullDayPasses}</div>
+                            </div>
+                          )}
+                          {pkg.packageContents?.complimentaryHours && pkg.packageContents.complimentaryHours > 0 && (
+                            <div>
+                              <div className="text-gray-600">Complimentary Hours</div>
+                              <div className="font-medium">{pkg.packageContents.complimentaryHours} hrs</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment Information */}
+                    <div className="p-4 mb-4">
+                      <h5 className="font-medium text-orange-900 mb-2">Payment Information</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-orange-600">Total Amount</div>
+                          <div className="font-medium">SGD ${pkg.totalAmount}</div>
+                        </div>
+                        <div>
+                          <div className="text-orange-600">Status</div>
+                          <div className="font-medium">{pkg.paymentStatus}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-600">
+                        {isPending ? (
+                          <span className="text-yellow-600 font-medium">Payment pending - package not activated</span>
+                        ) : isExpired ? (
+                          <span className="text-red-600 font-medium">Package has expired</span>
+                        ) : isExpiringSoon ? (
+                          <span className="text-orange-600 font-medium">
+                            Expires in {remainingDays} day{remainingDays !== 1 ? 's' : ''}
+                          </span>
+                        ) : isCompleted && pkg.expiresAt ? (
+                          <span className="text-green-600 font-medium">
+                            {remainingDays} days remaining
+                          </span>
+                        ) : (
+                          <span className="text-gray-600 font-medium">Package details available</span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        {isCompleted && !isExpired && pkg.expiresAt && (
+                          <Button size="sm" onClick={() => window.location.href = '/book-now'} className="bg-orange-500 hover:bg-orange-600 text-white">
+                            Book Now
+                          </Button>
+                        )}
+                        {isPending && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleCompletePayment(pkg)}
+                            disabled={processingPayment === pkg.id}
+                          >
+                            {processingPayment === pkg.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              'Complete Payment'
+                            )}
+                          </Button>
+                        )}
+                      
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </CardContent>
       </Card>
-      
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {userPackages.map((userPackage) => (
-          <Card key={userPackage.id} className="relative overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  {getPackageIcon(userPackage.packageType)}
-                  <div>
-                    <CardTitle className="text-lg">{userPackage.packageName}</CardTitle>
-                    <p className="text-sm text-muted-foreground capitalize">
-                      {userPackage.packageType} Package
-                    </p>
+
+      {/* Payment Method Selection Modal */}
+      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Payment Method</DialogTitle>
+          </DialogHeader>
+          
+          {selectedPackage && (
+            <div className="space-y-6">
+              {/* Package Info */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-2">{selectedPackage.packageName}</h4>
+                <div className="text-sm text-gray-600">
+                  <div className="flex justify-between">
+                    <span>Package Price:</span>
+                    <span>SGD ${selectedPackage.totalAmount}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(userPackage)}
-                  <Badge variant={getStatusBadgeVariant(userPackage)}>
-                    {getPackageStatusText(userPackage)}
-                  </Badge>
                 </div>
               </div>
-            </CardHeader>
 
-            <CardContent className="space-y-4">
-              {/* Package Description */}
-              {userPackage.description && (
-                <p className="text-sm text-muted-foreground">
-                  {userPackage.description}
-                </p>
-              )}
-
-              {/* Bonus Description */}
-              {userPackage.bonusDescription && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Gift className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-800">Bonus</span>
+              {/* Payment Method Selection */}
+              <div>
+                <Label className="text-base font-medium mb-3 block">Choose Payment Method</Label>
+                <RadioGroup value={selectedPaymentMethod} onValueChange={(value: 'paynow_online' | 'card') => setSelectedPaymentMethod(value)}>
+                  <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-gray-50">
+                    <RadioGroupItem value="paynow_online" id="paynow_online" />
+                    <label htmlFor="paynow_online" className="flex-1 cursor-pointer">
+                      <div className="flex items-center">
+                        <Shield className="w-5 h-5 mr-2" />
+                        <span>PayNow</span>
+                      </div>
+                    </label>
                   </div>
-                  <p className="text-sm text-green-700 mt-1">
-                    {userPackage.bonusDescription}
-                  </p>
-                </div>
-              )}
+                  <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-gray-50">
+                    <RadioGroupItem value="card" id="card" />
+                    <label htmlFor="card" className="flex-1 cursor-pointer">
+                      <div className="flex items-center">
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        <span>Credit/Debit Card</span>
+                        <span className="ml-2 text-sm text-gray-500">(+5% fee)</span>
+                      </div>
+                    </label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-              {/* Usage Progress */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Usage Progress</span>
-                  <span className="font-medium">
-                    {userPackage.usedPasses} / {userPackage.totalPasses} passes
-                  </span>
-                </div>
-                <Progress 
-                  value={getPackageProgressPercentage(userPackage)} 
-                  className="h-2"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{userPackage.usedPasses} used</span>
-                  <span>{userPackage.remainingPasses} remaining</span>
-                  {userPackage.expiredPasses > 0 && (
-                    <span className="text-red-500">{userPackage.expiredPasses} expired</span>
+              {/* Cost Breakdown */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium mb-3">Payment Summary</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Package Price:</span>
+                    <span>SGD ${selectedPackage.totalAmount}</span>
+                  </div>
+                  {selectedPaymentMethod === 'card' && (
+                    <div className="flex justify-between text-orange-600">
+                      <span>Credit Card Fee (5%):</span>
+                      <span>SGD ${(selectedPackage.totalAmount * 0.05).toFixed(2)}</span>
+                    </div>
                   )}
-                </div>
-              </div>
-
-              {/* Package Stats */}
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-green-600">
-                    {userPackage.remainingPasses}
+                  <div className="flex justify-between font-medium border-t pt-2">
+                    <span>Total:</span>
+                    <span>SGD ${(selectedPackage.totalAmount + (selectedPaymentMethod === 'card' ? selectedPackage.totalAmount * 0.05 : 0)).toFixed(2)}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">Available</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-blue-600">
-                    {formatPackagePrice(userPackage.totalAmount)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total Paid</div>
                 </div>
               </div>
 
-              {/* Package Dates */}
-              <div className="space-y-2 pt-2 border-t">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Purchased:</span>
-                  <span>{formatPackageDate(userPackage.purchasedAt)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Expires:</span>
-                  <span className={userPackage.isExpired ? 'text-red-500' : ''}>
-                    {formatPackageDate(userPackage.expiresAt)}
-                  </span>
-                </div>
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setPaymentModalOpen(false)}
+                  className="flex-1"
+                  disabled={processingPayment === selectedPackage.id}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handlePaymentSubmit}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600"
+                  disabled={processingPayment === selectedPackage.id}
+                >
+                  {processingPayment === selectedPackage.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    `Pay ${selectedPaymentMethod === 'card' ? 'with Card' : 'with PayNow'}`
+                  )}
+                </Button>
               </div>
-
-              {/* Payment Status */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Payment:</span>
-                  <Badge 
-                    variant={userPackage.paymentStatus === 'completed' ? 'default' : 'secondary'}
-                    className="text-xs"
-                  >
-                    {userPackage.paymentStatus}
-                  </Badge>
-                </div>
-                {userPackage.remainingPasses > 0 && !userPackage.isExpired && (
-                  <Button size="sm" variant="outline" asChild>
-                    <a href="/book-now" className="flex items-center gap-1">
-                      Use Package
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Summary Stats */}
-   
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

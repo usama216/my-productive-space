@@ -18,69 +18,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react'
 import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode, calculateBookingDuration, validateMinimumHours, formatDurationDisplay, BookingDuration } from '@/lib/promoCodeService';
-
-export type UserPackage = {
-  id: string
-  name: string
-  total_passes: number
-  passes_used: number
-  purchased_at: string
-  expires_at: string
-  package_type: 'full-day' | 'half-day' | 'study-hour'
-  is_expired: boolean
-}
-
-
-
-// Mock user packages data
-const mockActivePackages: UserPackage[] = [
-  {
-    id: 'pkg1',
-    name: '20-Day Pass',
-    total_passes: 20,
-    passes_used: 4,
-    purchased_at: '2025-01-15T00:00:00Z',
-    expires_at: '2025-03-15T23:59:59Z',
-    package_type: 'full-day',
-    is_expired: false
-  },
-  {
-    id: 'pkg2',
-    name: '15-Half-Day Pass',
-    total_passes: 15,
-    passes_used: 3,
-    purchased_at: '2025-01-20T00:00:00Z',
-    expires_at: '2025-02-20T23:59:59Z',
-    package_type: 'half-day',
-    is_expired: false
-  }
-]
-
-const mockExpiredPackages: UserPackage[] = [
-  {
-    id: 'pkg_exp1',
-    name: '10-Day Pass',
-    total_passes: 10,
-    passes_used: 10,
-    purchased_at: '2024-11-15T00:00:00Z',
-    expires_at: '2024-12-15T23:59:59Z',
-    package_type: 'full-day',
-    is_expired: true
-  },
-  {
-    id: 'pkg_exp2',
-    name: '8-Half-Day Pass',
-    total_passes: 8,
-    passes_used: 5,
-    purchased_at: '2024-12-01T00:00:00Z',
-    expires_at: '2024-12-31T23:59:59Z',
-    package_type: 'half-day',
-    is_expired: true
-  }
-]
+import { getUserPackages, UserPackage as ApiUserPackage } from '@/lib/services/packageService';
 
 type DiscountInfo = 
-  | { type: 'package'; id: string }
+  | { type: 'package'; id: string; discountAmount?: number; finalAmount?: number }
   | { type: 'promo'; id: string; discountAmount: number; finalAmount: number; promoCode: PromoCode }
   | null;
 
@@ -93,7 +34,7 @@ type Props = {
   promoValid?: boolean
   userId?: string
   bookingAmount?: number
-  bookingDuration?: BookingDuration // NEW: Booking duration for minimum hours validation
+  bookingDuration?: BookingDuration
 }
 
 export function EntitlementTabs({
@@ -107,11 +48,8 @@ export function EntitlementTabs({
   bookingAmount = 0,
   bookingDuration
 }: Props) {
-  console.log('EntitlementTabs rendered with mode:', mode);
-  console.log('All props:', { mode, onChange, onModeChange, selectedPackage, promoCode, promoValid, userId, bookingAmount });
   const [localPromo, setLocalPromo] = useState(promoCode || '')
   const [promoFeedback, setPromoFeedback] = useState<{ isValid: boolean; message: string } | null>(null)
-  const [showExpiredPackages, setShowExpiredPackages] = useState(false)
   const [availablePromos, setAvailablePromos] = useState<PromoCode[]>([])
   const [isLoadingPromos, setIsLoadingPromos] = useState(false)
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null)
@@ -121,10 +59,32 @@ export function EntitlementTabs({
     isValid: boolean
     message: string
   } | null>(null)
+  const [userPackages, setUserPackages] = useState<ApiUserPackage[]>([])
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false)
 
+  // Load user packages from API
+  const loadUserPackages = useCallback(async () => {
+    if (!userId) {
+      console.log('No userId provided, skipping package load');
+      return;
+    }
+    
+    setIsLoadingPackages(true);
+    try {
+      const packages = await getUserPackages(userId);
+      // Filter only packages with COMPLETED payment status
+      const completedPackages = packages.filter(pkg => pkg.paymentStatus === 'COMPLETED');
+      setUserPackages(completedPackages);
+      console.log('User packages loaded:', completedPackages);
+    } catch (error) {
+      console.error('Error loading user packages:', error);
+      setUserPackages([]);
+    } finally {
+      setIsLoadingPackages(false);
+    }
+  }, [userId]);
 
-
-    // Load available promo codes from API
+  // Load available promo codes from API
   const loadAvailablePromoCodes = useCallback(async () => {
     if (!userId) {
       console.log('No userId provided, skipping promo code load');
@@ -137,7 +97,6 @@ export function EntitlementTabs({
       if (response.availablePromos) {
         setAvailablePromos(response.availablePromos);
         console.log('Available promo codes loaded:', response.availablePromos);
-        console.log('User info:', response.userInfo);
       } else {
         setAvailablePromos([]);
       }
@@ -149,27 +108,28 @@ export function EntitlementTabs({
     }
   }, [userId]);
 
-  // Load available promo codes when component mounts
+  // Load packages and promo codes when component mounts
   useEffect(() => {
-    if (mode === 'promo' && userId) {
-      loadAvailablePromoCodes()
+    if (userId) {
+      loadUserPackages();
+      if (mode === 'promo') {
+        loadAvailablePromoCodes();
+      }
     }
-  }, [mode, userId, loadAvailablePromoCodes]);
+  }, [mode, userId, loadUserPackages, loadAvailablePromoCodes]);
 
   // Recalculate promo code discount when bookingAmount changes
   useEffect(() => {
     if (selectedPromoCode && bookingAmount > 0) {
-      // Recalculate discount with new booking amount
       const localValidation = validatePromoCodeLocally(selectedPromoCode, bookingAmount);
       if (localValidation.isValid) {
         const newCalculation = calculateDiscountLocally(selectedPromoCode, bookingAmount);
         
-        // Only update if the calculation has actually changed to prevent infinite loops
         setDiscountCalculation(prev => {
           if (prev && 
               prev.discountAmount === newCalculation.discountAmount && 
               prev.finalAmount === newCalculation.finalAmount) {
-            return prev; // No change, return same object to prevent re-render
+            return prev;
           }
           
           return {
@@ -180,7 +140,6 @@ export function EntitlementTabs({
           };
         });
         
-        // Notify parent component with updated discount info
         onChange({
           type: 'promo',
           id: selectedPromoCode.id,
@@ -189,13 +148,12 @@ export function EntitlementTabs({
           promoCode: selectedPromoCode
         });
       } else {
-        // If promo code is no longer valid with new amount, remove it
         handleRemovePromo();
       }
     }
   }, [bookingAmount, selectedPromoCode]);
 
-    // Validate and apply promo code
+  // Validate and apply promo code
   const handleValidatePromo = useCallback(async () => {
     if (!localPromo.trim()) {
       setPromoFeedback({ isValid: false, message: 'Please enter a promo code' });
@@ -208,7 +166,6 @@ export function EntitlementTabs({
     }
 
     try {
-      // First, find the promo code in available promos
       const foundPromo = availablePromos.find(promo => 
         promo.code.toLowerCase() === localPromo.toLowerCase()
       );
@@ -218,14 +175,12 @@ export function EntitlementTabs({
         return;
       }
 
-      // Validate locally first for immediate feedback
       const localValidation = validatePromoCodeLocally(foundPromo, bookingAmount);
       if (!localValidation.isValid) {
         setPromoFeedback({ isValid: false, message: localValidation.message });
         return;
       }
 
-      // Apply promo code through API
       const apiResponse = await applyPromoCode({
         promoCode: foundPromo.code,
         userId,
@@ -271,20 +226,62 @@ export function EntitlementTabs({
     onChange(null);
   }, [onChange]);
 
-
-
   const getPackageTypeIcon = (type: string) => {
     switch (type) {
-      case 'full-day': return '🌅'
-      case 'half-day': return '🌤️'
-      case 'study-hour': return '📚'
+      case 'FULL_DAY': return '🌅'
+      case 'HALF_DAY': return '🌤️'
+      case 'SEMESTER_BUNDLE': return '📚'
       default: return '📦'
     }
   }
 
-  // Check if user has any valid (non-expired, non-fully-used) packages
-  const hasValidPackages = mockActivePackages.some(pkg =>
-    !pkg.is_expired && (pkg.total_passes - pkg.passes_used) > 0
+  // Get package hours from packageContents API data
+  const getPackageHours = (pkg: ApiUserPackage) => {
+    if (!pkg.packageContents) return 0
+    
+    if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
+      return pkg.packageContents.fullDayHours
+    }
+    if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
+      return pkg.packageContents.halfDayHours
+    }
+    if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
+      return pkg.packageContents.totalHours
+    }
+    
+    return pkg.packageContents.totalHours || 0
+  }
+
+  // Calculate package discount based on booking hours
+  const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number) => {
+    const packageHours = getPackageHours(pkg)
+    const hoursToUse = Math.min(bookingHours, packageHours)
+    const hourlyRate = bookingAmount / bookingHours
+    const discountAmount = hoursToUse * hourlyRate
+    const remainingAmount = bookingAmount - discountAmount
+    
+    return {
+      hoursToUse,
+      discountAmount,
+      remainingAmount,
+      canUse: hoursToUse > 0
+    }
+  }
+
+  // Check if package is valid for current booking
+  const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
+    if (pkg.isExpired || pkg.remainingPasses <= 0) return false
+    
+    // Full-day package: minimum 6 hours required
+    if (pkg.packageType === 'FULL_DAY' && bookingHours < 6) return false
+    
+    // Half-day and semester bundle: any hours allowed
+    return true
+  }
+
+  // Check if user has any valid packages
+  const hasValidPackages = userPackages.some(pkg =>
+    !pkg.isExpired && pkg.remainingPasses > 0
   )
 
   return (
@@ -293,32 +290,18 @@ export function EntitlementTabs({
       <Tabs 
         value={mode} 
         onValueChange={(newMode) => {
-          console.log('Tab changed from', mode, 'to', newMode);
-          console.log('Current mode state:', mode);
-          console.log('New mode requested:', newMode);
-          // Clear any existing discount when switching tabs
           onChange(null);
-          // Notify parent component about mode change
           if (onModeChange && newMode !== mode) {
-            console.log('Calling onModeChange with:', newMode);
             onModeChange(newMode as 'package' | 'promo');
           }
         }}
       >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger 
-            value="package" 
-            className="flex items-center gap-2"
-            onClick={() => console.log('Package tab clicked!')}
-          >
+          <TabsTrigger value="package" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Use Package
           </TabsTrigger>
-          <TabsTrigger 
-            value="promo" 
-            className="flex items-center gap-2"
-            onClick={() => console.log('Promo tab clicked!')}
-          >
+          <TabsTrigger value="promo" className="flex items-center gap-2">
             <Ticket className="w-4 h-4" />
             Apply Promo
           </TabsTrigger>
@@ -326,164 +309,175 @@ export function EntitlementTabs({
 
         <TabsContent value="package" className="mt-4 space-y-4">
           <div className="relative">
-            {/* Blurred content when no valid packages */}
-            <div className={hasValidPackages ? '' : 'blur-sm pointer-events-none'}>
-              {mockActivePackages.length > 0 ? (
-                <>
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Active Passes</Label>
-                    <Select
-                      value={selectedPackage || ''}
-                      onValueChange={(val) => onChange({ type: 'package', id: val })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a pass to use..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {mockActivePackages.map((pkg) => {
-                          const remaining = pkg.total_passes - pkg.passes_used
-                          return (
-                            <SelectItem key={pkg.id} value={pkg.id} disabled={remaining === 0}>
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center gap-2">
-                                  <span>{getPackageTypeIcon(pkg.package_type)}</span>
-                                  <div>
-                                    <span className="font-medium">{pkg.name}</span>
-                                    <span className="text-sm text-gray-500 ml-2">
-                                      ({remaining} of {pkg.total_passes} left)
-                                    </span>
+            {isLoadingPackages ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                <span className="ml-2 text-gray-600">Loading your packages...</span>
+              </div>
+            ) : (
+              <>
+                <div className={hasValidPackages ? '' : 'blur-sm pointer-events-none'}>
+                  {userPackages.length > 0 ? (
+                    <>
+                      <div>
+                        <Label className="text-sm font-medium mb-2 block">Active Packages</Label>
+                        <Select
+                          value={selectedPackage || ''}
+                          onValueChange={(val) => {
+                            const pkg = userPackages.find(p => p.id === val)
+                            const bookingHours = bookingDuration?.durationHours || 0
+                            const discount = pkg && bookingHours > 0 ? calculatePackageDiscount(pkg, bookingHours) : null
+                            
+                            onChange({ 
+                              type: 'package', 
+                              id: val,
+                              discountAmount: discount?.discountAmount || 0,
+                              finalAmount: discount?.remainingAmount || bookingAmount
+                            })
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a package to use..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userPackages.map((pkg) => {
+                              const remaining = pkg.remainingPasses
+                              const bookingHours = bookingDuration?.durationHours || 0
+                              const isValid = isPackageValidForBooking(pkg, bookingHours)
+                              const discount = bookingHours > 0 ? calculatePackageDiscount(pkg, bookingHours) : null
+                              const packageHours = getPackageHours(pkg)
+                              
+                              return (
+                                <SelectItem key={pkg.id} value={pkg.id} disabled={!isValid || remaining === 0}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                      <span>{getPackageTypeIcon(pkg.packageType)}</span>
+                                      <div>
+                                        <span className="font-medium">{pkg.packageName}</span>
+                                        <span className="text-sm text-gray-500 ml-2">
+                                          ({remaining} of {pkg.totalPasses} left)
+                                        </span>
+                                        {discount && (
+                                          <div className="text-xs text-green-600 mt-1">
+                                            Save ${discount.discountAmount.toFixed(2)} • {discount.hoursToUse}h free
+                                          </div>
+                                        )}
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {packageHours}h available
+                                        </div>
+                                        {!isValid && bookingHours > 0 && (
+                                          <div className="text-xs text-red-600 mt-1">
+                                            {pkg.packageType === 'FULL_DAY' ? 'Min. 6 hours required' : 'Cannot use'}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Selected Package Details */}
+                      {selectedPackage && (
+                        <Card className="bg-green-50 border-green-200">
+                          <CardContent className="p-4">
+                            {(() => {
+                              const pkg = userPackages.find(p => p.id === selectedPackage)
+                              if (!pkg) return null
+                              const remaining = pkg.remainingPasses
+                              
+                              return (
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span>{getPackageTypeIcon(pkg.packageType)}</span>
+                                      <span className="font-medium text-green-800">{pkg.packageName}</span>
+                                    </div>
+                                    <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                      {remaining} passes left
+                                    </Badge>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-4 text-sm text-green-700">
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-4 h-4" />
+                                      <span>Expires: {pkg.expiresAt ? new Date(pkg.expiresAt).toLocaleDateString() : 'N/A'}</span>
+                                    </div>
+                                    <span>Type: {pkg.packageType}</span>
+                                  </div>
+                                  <div className="flex justify-end pt-2 border-t border-green-200">
+                                    <Button
+                                      type="button"
+                                      onClick={() => onChange(null)}
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-green-300 text-green-700 hover:bg-green-100"
+                                    >
+                                      Remove Package
+                                    </Button>
                                   </div>
                                 </div>
-                              </div>
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Selected Package Details */}
-                  {selectedPackage && (
-                    <Card className="bg-green-50 border-green-200">
-                      <CardContent className="p-4">
-                        {(() => {
-                          const pkg = mockActivePackages.find(p => p.id === selectedPackage)
-                          if (!pkg) return null
-                          const remaining = pkg.total_passes - pkg.passes_used
-                          return (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span>{getPackageTypeIcon(pkg.package_type)}</span>
-                                  <span className="font-medium text-green-800">{pkg.name}</span>
-                                </div>
-                                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                  {remaining} passes left
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-green-700">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>Expires: {new Date(pkg.expires_at).toLocaleDateString()}</span>
-                                </div>
-                                <span>Code: {pkg.package_type}_user123</span>
-                              </div>
-                            </div>
-                          )
-                        })()}
+                              )
+                            })()}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  ) : (
+                    <Card className="bg-white border-black">
+                      <CardContent className="p-4 text-center">
+                        <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
+                        <p className="text-orange-800 font-medium">No Active Packages</p>
+                        <p className="text-sm text-orange-700 mt-1">
+                          Purchase a package to unlock member discounts
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 border-orange-300 text-orange-700 hover:bg-orange-100"
+                        >
+                          Buy Passes →
+                        </Button>
                       </CardContent>
                     </Card>
                   )}
-
-                  {/* Expired Packages Section */}
-                  <div className="border-t pt-4">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowExpiredPackages(!showExpiredPackages)}
-                      className="text-gray-600 hover:text-gray-800"
-                    >
-                      {showExpiredPackages ? 'Hide' : 'Show'} Expired Packages ({mockExpiredPackages.length})
-                    </Button>
-
-                    {showExpiredPackages && (
-                      <div className="mt-3 space-y-2">
-                        {mockExpiredPackages.map((pkg) => (
-                          <Card key={pkg.id} className="bg-gray-50 border-gray-200">
-                            <CardContent className="p-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="opacity-50">{getPackageTypeIcon(pkg.package_type)}</span>
-                                  <div>
-                                    <span className="font-medium text-gray-600">{pkg.name}</span>
-                                    <span className="text-sm text-gray-500 ml-2">
-                                      ({pkg.passes_used}/{pkg.total_passes} used)
-                                    </span>
-                                  </div>
-                                </div>
-                                <Badge variant="secondary" className="bg-red-100 text-red-800">
-                                  Expired {new Date(pkg.expires_at).toLocaleDateString()}
-                                </Badge>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
+                </div>
+                {!hasValidPackages && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-lg border-2 border-dashed border-orange-300">
+                    <Card className="bg-white shadow-lg border-orange-200 max-w-xs">
+                      <CardContent className="p-4 text-center">
+                        <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-3" />
+                        <h3 className="text-base font-semibold text-gray-900 mb-2">
+                          No Valid Passes Found
+                        </h3>
+                        <p className="text-gray-600 mb-3 text-sm leading-relaxed">
+                          Save money by purchasing pass packages or individual passes.
+                        </p>
+                        <div className="space-y-2">
+                          <Link
+                            href="/pricing#packages"
+                            className="inline-flex items-center justify-center w-full px-3 py-1.5 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 transition-colors font-medium"
+                          >
+                            View Packages
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </Link>
+                          <Link
+                            href="/buy-pass"
+                            className="inline-flex items-center justify-center w-full px-3 py-1.5 border border-orange-300 text-orange-700 rounded text-sm hover:bg-orange-50 transition-colors font-medium"
+                          >
+                            Buy Passes
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </>
-              ) : (
-                <Card className="bg-white border-black">
-                  <CardContent className="p-4 text-center">
-                    <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-                    <p className="text-orange-800 font-medium">No Active Packages</p>
-                    <p className="text-sm text-orange-700 mt-1">
-                      Purchase a package to unlock member discounts
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 border-orange-300 text-orange-700 hover:bg-orange-100"
-                    >
-                      Buy Passes →
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-            {/* Overlay message when no valid packages */}
-            {!hasValidPackages && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-lg border-2 border-dashed border-orange-300">
-                <Card className="bg-white shadow-lg border-orange-200 max-w-xs">
-                  <CardContent className="p-4 text-center">
-                    <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-3" />
-                    <h3 className="text-base font-semibold text-gray-900 mb-2">
-                      No Valid Passes Found
-                    </h3>
-                    <p className="text-gray-600 mb-3 text-sm leading-relaxed">
-                      Save money by purchasing pass packages or individual passes.
-                    </p>
-                    <div className="space-y-2">
-                      <Link
-                        href="/pricing#packages"
-                        className="inline-flex items-center justify-center w-full px-3 py-1.5 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 transition-colors font-medium"
-                      >
-                        View Packages
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </Link>
-                      <Link
-                        href="/buy-pass"
-                        className="inline-flex items-center justify-center w-full px-3 py-1.5 border border-orange-300 text-orange-700 rounded text-sm hover:bg-orange-50 transition-colors font-medium"
-                      >
-                        Buy Passes
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                )}
+              </>
             )}
           </div>
           <div className="mt-4 pt-4 border-t border-gray-200">
@@ -535,7 +529,6 @@ export function EntitlementTabs({
               </Button>
             </div>
 
-            {/* Info message when promo code is already applied */}
             {selectedPromoCode && (
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
                 <p className="flex items-center gap-1">
@@ -545,7 +538,6 @@ export function EntitlementTabs({
               </div>
             )}
 
-            {/* Promo Code Feedback */}
             {promoFeedback && (
               <div className={`mt-3 p-3 rounded-md ${
                 !promoFeedback.isValid
@@ -566,23 +558,9 @@ export function EntitlementTabs({
                     {promoFeedback.message}
                   </p>
                 </div>
-                
-                {/* Show additional help for API errors */}
-                {!promoFeedback.isValid && promoFeedback.message.includes('Failed to check promo code usage') && (
-                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                    <p className="font-medium">💡 Troubleshooting Tips:</p>
-                    <ul className="mt-1 space-y-1">
-                      <li>• Check if your backend server is running</li>
-                      <li>• Verify database connection is working</li>
-                      <li>• Check backend logs for detailed error</li>
-                      <li>• Try refreshing the page and try again</li>
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
 
-                        {/* Selected Promo Code Details */}
             {selectedPromoCode && discountCalculation && (
               <Card className="bg-green-50 border-green-200">
                 <CardContent className="p-4">
@@ -597,14 +575,13 @@ export function EntitlementTabs({
                       </Badge>
                     </div>
                     
-                                                              <div className="text-sm text-green-700">
+                    <div className="text-sm text-green-700">
                        <p>{selectedPromoCode.description}</p>
                        {selectedPromoCode.remainingUses !== undefined && selectedPromoCode.remainingUses > 0 && (
                          <p className="text-xs mt-1">Uses remaining: {selectedPromoCode.remainingUses}</p>
                        )}
                      </div>
 
-                    {/* Discount Calculation */}
                     <div className="border-t pt-3 space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>Original Amount:</span>
@@ -635,7 +612,6 @@ export function EntitlementTabs({
             )}
           </div>
 
-          {/* Available Promo Codes */}
           <div>
             <Label className="text-sm font-medium mb-2 block">Available Promo Codes</Label>
             {isLoadingPromos ? (
@@ -646,15 +622,17 @@ export function EntitlementTabs({
             ) : availablePromos.length > 0 ? (
               <div className="space-y-2">
                 {availablePromos.map((promo) => {
-                  // Check if promo meets minimum hours requirement
-                  const meetsMinimumHours = !promo.minimumHours || !bookingDuration || 
+                  const meetsMinimumHours = !bookingDuration || bookingDuration.durationHours >= 3;
+                  const meetsPromoMinimumHours = !promo.minimumHours || !bookingDuration || 
                     validateMinimumHours(promo, bookingDuration).isValid;
+                  
+                  const isEligible = meetsMinimumHours && meetsPromoMinimumHours;
                   
                   return (
                     <Card 
                       key={promo.id} 
                       className={`border-gray-200 transition-colors ${
-                        meetsMinimumHours 
+                        isEligible 
                           ? 'hover:border-gray-300' 
                           : 'opacity-60 bg-gray-50 border-gray-300'
                       }`}
@@ -689,6 +667,18 @@ export function EntitlementTabs({
                                   </p>
                                 </div>
                               )}
+                              {bookingDuration && (
+                                <div className="mt-1">
+                                  <p className={`text-xs font-medium ${
+                                    meetsMinimumHours ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {meetsMinimumHours 
+                                      ? '✅ Meets 3+ hours requirement' 
+                                      : '❌ Requires minimum 3 hours. Your booking is ' + bookingDuration.durationHours.toFixed(1) + ' hours.'
+                                    }
+                                  </p>
+                                </div>
+                              )}
                               {bookingDuration && promo.minimumHours && (
                                 <div className="mt-1">
                                   {(() => {
@@ -706,7 +696,7 @@ export function EntitlementTabs({
                             </div>
                           </div>
                         </div>
-                                                                          <div className="text-right text-xs text-gray-500">
+                        <div className="text-right text-xs text-gray-500">
                            <p>Uses: {promo.userUsageCount || 0}/{promo.maxUsagePerUser || 1}</p>
                            <p className="text-green-600 font-medium">
                              {promo.remainingUses || 0} uses left
@@ -727,8 +717,6 @@ export function EntitlementTabs({
               </Card>
             )}
           </div>
-
-
         </TabsContent>
       </Tabs>
     </div>

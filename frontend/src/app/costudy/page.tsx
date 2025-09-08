@@ -9,6 +9,9 @@ import { Carousel } from '@/components/Carousel'
 
 import { ContactSection } from '@/components/landing-page-sections/ContactSection'
 import { useRouter } from 'next/navigation'
+import { usePackages } from '@/hooks/useNewPackages'
+import { NewPackage } from '@/lib/services/packageService'
+import { useAuth } from '@/hooks/useAuth'
 const rateHeaders = ['1 hr', '> 1 hr']
 const rateRows = [
   { label: 'Student', values: ['3', '3'] },
@@ -46,32 +49,37 @@ const promos = [
 // ]
 
 export default function CoLearningPage() {
-  // const [tab, setTab] = useState<'rates'|'packages'|'all'>('rates')
+  const router = useRouter()
+  const { user, databaseUser } = useAuth()
+  const { packages, loading: packagesLoading, error: packagesError } = usePackages('STUDENT')
 
-  // // Rates for study + meeting rooms
-  // const studyRates = [
-  //   { label: 'Any Seat (per hr)', price: 'SGD 3.10' },
-  //   { label: 'Half-Day (6h deal)', price: 'SGD 15.90' },
-  //   { label: 'Full-Day (12h deal)', price: 'SGD 27.90' },
-  // ]
-  // const roomRates = [
-  //   { label: 'Project Ready (per hr)', price: 'SGD 15.90' },
-  //   { label: 'Productive Session (4h)', price: 'SGD 55.00' },
-  //   { label: 'Day–Night Session (12h)', price: 'SGD 150.00' },
-  // ]
-const router = useRouter()
-  const packages = [
-    {
-      title: 'Student Semester Bundle',
-      img: '/pricing_img/package-1.png',
-      details: [
-        '20 Study-Hour Pass',
-        'Includes 5 Project-Room Credits',
-        'Valid 60 days from activation',
-        'SGD 129 (UP 180)'
-      ],
-    },
-  ]
+  // Filter student packages
+  const studentPackages = packages
+
+  // Check if user can purchase packages
+  const canPurchasePackage = () => {
+    if (!user) return false // Not logged in
+    if (!databaseUser) return false // No database user data
+    return databaseUser.memberType === 'STUDENT' // Only students can purchase
+  }
+
+  const isLoggedIn = !!user
+  const isStudent = databaseUser?.memberType === 'STUDENT'
+  const canPurchase = canPurchasePackage()
+
+  const handleBuyNow = (packageData: NewPackage) => {
+    if (!isLoggedIn) {
+      // Redirect to login if not logged in
+      router.push('/login?next=/costudy')
+      return
+    }
+    if (!isStudent) {
+      // Show alert if not a student
+      alert('Student packages are only available to verified students. Please verify your student status first.')
+      return
+    }
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=student`)
+  }
   // const reasons = [
   //   { num: '1', title: 'Scale Your Teaching', desc: 'More space lets you reach more students.' },
   //   { num: '2', title: 'Peer Learning',      desc: 'Facilitate group learning experiences.' },
@@ -238,27 +246,77 @@ const router = useRouter()
                
                            {/* Packages Panel */}
                            <Tab.Panel id="packages" className="grid gap-8 md:grid-cols-2">
-                             {packages.map((pkg) => (
-                               <div key={pkg.title} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
-                                 <div className="relative h-48">
-                                   <Image src={pkg.img} alt={pkg.title} fill className="object-cover" />
-                                 </div>
-                                 <div className="p-6">
-                                   <h4 className="text-xl font-semibold">{pkg.title}</h4>
-                                   <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
-                                     {pkg.details.map((d) => (
-                                       <li key={d}>{d}</li>
-                                     ))}
-                                   </ul>
-                                   <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded"
-                      onClick={() => router.push(`/buy-pass?package=${encodeURIComponent(pkg.title)}&type=costudy`)}
-                                   
-                                   >
-                                     Buy Now
-                                   </button>
-                                 </div>
+                        
+                            
+                             {packagesLoading ? (
+                               <div className="text-center py-12 col-span-2">
+                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                                 <p>Loading packages...</p>
                                </div>
-                             ))}
+                             ) : packagesError ? (
+                               <div className="text-center py-12 col-span-2">
+                                 <p className="text-red-500">Error loading packages: {packagesError}</p>
+                                 <button 
+                                   onClick={() => window.location.reload()} 
+                                   className="mt-2 px-4 py-2 bg-orange-500 text-white rounded"
+                                 >
+                                   Try Again
+                                 </button>
+                               </div>
+                             ) : studentPackages.length > 0 ? (
+                               studentPackages.map((pkg) => (
+                                 <div key={pkg.id} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
+                                   <div className="relative h-48">
+                                     <Image 
+                                       src={`/pricing_img/package-${pkg.packageType === 'HALF_DAY' ? '1' : '2'}.png`} 
+                                       alt={pkg.name} 
+                                       fill 
+                                       className="object-cover" 
+                                     />
+                                   </div>
+                                   <div className="p-6">
+                                     <h4 className="text-xl font-semibold">{pkg.name}</h4>
+                                     <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
+                                       <li>{pkg.description}</li>
+                                       {pkg.packageContents.halfDayPasses && (
+                                         <li>{pkg.packageContents.halfDayPasses} Half-Day Passes ({pkg.packageContents.halfDayHours} hrs/pass)</li>
+                                       )}
+                                       {pkg.packageContents.fullDayPasses && (
+                                         <li>{pkg.packageContents.fullDayPasses} Full-Day Passes ({pkg.packageContents.fullDayHours} hrs/pass)</li>
+                                       )}
+                                       {pkg.packageContents.complimentaryHours && (
+                                         <li>+{pkg.packageContents.complimentaryHours} Complimentary Hours</li>
+                                       )}
+                                       <li>Valid {pkg.validityDays} days from activation</li>
+                                       <li>SGD {pkg.price} {pkg.originalPrice && pkg.originalPrice > pkg.price && `(UP ${pkg.originalPrice})`} + SGD {pkg.outletFee} for all outlets</li>
+                                     </ul>
+                                     <button
+                                       onClick={() => handleBuyNow(pkg)}
+                                       disabled={isLoggedIn && !isStudent}
+                                       className={`mt-4 px-4 py-2 rounded transition-colors duration-200 ${
+                                         !isLoggedIn
+                                           ? 'bg-gray-800 text-white hover:bg-orange-500' // Not logged in - clickable, redirects to login
+                                           : isStudent
+                                           ? 'bg-gray-800 text-white hover:bg-orange-500' // Logged in + Student - clickable
+                                           : 'bg-gray-400 text-gray-200 cursor-not-allowed' // Logged in + Not Student - disabled
+                                       }`}
+                                     >
+                                       {!isLoggedIn 
+                                         ? 'Buy Now' 
+                                         : isStudent 
+                                         ? 'Buy Now' 
+                                         : 'Students Only'
+                                       }
+                                     </button>
+                                   </div>
+                                 </div>
+                               ))
+                             ) : (
+                               <div className="text-center py-12 col-span-2">
+                                 <p className="text-gray-500 text-lg">No student packages available at the moment.</p>
+                                 <p className="text-gray-400">Please check back later or contact us for custom arrangements.</p>
+                               </div>
+                             )}
                            </Tab.Panel>
                          </Tab.Panels>
                        </Tab.Group>

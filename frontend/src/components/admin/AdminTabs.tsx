@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PromoCodeManagement } from './PromoCodeManagement'
 import { BookingManagement } from './BookingManagement'
 import { UserManagement } from './UserManagement'
+import { AdminPackageManagement } from '@/components/packages/AdminPackageManagement'
 
 export default function AdminTabs({
   activeTab,
@@ -45,7 +46,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">
           Overview
           {pendingStudents.length > 0 && (
@@ -72,6 +73,7 @@ export default function AdminTabs({
         </TabsTrigger> */}
         <TabsTrigger value="bookings">Bookings</TabsTrigger>
         <TabsTrigger value="user-management">User Management</TabsTrigger>
+        <TabsTrigger value="packages">Packages</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
 
         {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
@@ -282,6 +284,10 @@ export default function AdminTabs({
       {/* User Management Tab */}
       <TabsContent value="user-management" className="space-y-4">
         <UserManagement />
+      </TabsContent>
+
+      <TabsContent value="packages" className="space-y-4">
+        <AdminPackageManagement />
       </TabsContent>
 
       {/* Settings Tab */}

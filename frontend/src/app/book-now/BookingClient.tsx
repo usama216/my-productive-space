@@ -37,6 +37,7 @@ import type { StudentValidationStatus } from '@/components/book-now-sections/Stu
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
 import { PromoCode } from '@/lib/promoCodeService'
+import { getUserPackages, UserPackage } from '@/lib/services/packageService'
 
 
 
@@ -225,6 +226,34 @@ export default function BookingClient() {
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
   const [finalTotal, setFinalTotal] = useState(0) // Will be set after total is calculated
+  
+  // User packages state
+  const [userPackages, setUserPackages] = useState<UserPackage[]>([])
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false)
+
+  // Load user packages
+  const loadUserPackages = useCallback(async () => {
+    if (!userId) return
+    
+    setIsLoadingPackages(true)
+    try {
+      const packages = await getUserPackages(userId)
+      // Filter for completed packages only
+      const completedPackages = packages.filter((pkg: UserPackage) => pkg.paymentStatus === 'COMPLETED')
+      setUserPackages(completedPackages)
+    } catch (error) {
+      console.error('Error loading user packages:', error)
+    } finally {
+      setIsLoadingPackages(false)
+    }
+  }, [userId])
+
+  // Load packages when user is available
+  useEffect(() => {
+    if (userId) {
+      loadUserPackages()
+    }
+  }, [userId, loadUserPackages])
 
   // Calculate booking duration when dates change
   useEffect(() => {
@@ -627,8 +656,52 @@ export default function BookingClient() {
   // Calculate discount if voucher is applied
   const discountInfo = null // Removed test voucher calculation
   const promoDiscountInfo = promoCodeInfo
-  const subtotal = promoDiscountInfo ? promoDiscountInfo.finalAmount : baseSubtotal
-  const discountAmount = promoDiscountInfo ? promoDiscountInfo.discountAmount : 0
+  
+  // Calculate package discount if package is selected
+  const packageDiscountInfo = selectedPackage ? (() => {
+    const pkg = userPackages?.find(p => p.id === selectedPackage)
+    if (!pkg || !bookingDuration) return null
+    
+    // Get actual package hours from packageContents
+    const getPackageHours = (pkg: any) => {
+      if (!pkg.packageContents) return 0
+      
+      if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
+        return pkg.packageContents.fullDayHours
+      }
+      if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
+        return pkg.packageContents.halfDayHours
+      }
+      if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
+        return pkg.packageContents.totalHours
+      }
+      
+      return pkg.packageContents.totalHours || 0
+    }
+    
+    const packageHours = getPackageHours(pkg)
+    const hoursToUse = Math.min(bookingDuration.durationHours, packageHours)
+    const hourlyRate = baseSubtotal / bookingDuration.durationHours
+    const packageDiscount = hoursToUse * hourlyRate
+    const remainingAmount = baseSubtotal - packageDiscount
+    
+    return {
+      discountAmount: packageDiscount,
+      finalAmount: remainingAmount
+    }
+  })() : null
+  
+  // Calculate final amounts - packages take precedence over promo codes
+  let subtotal = baseSubtotal
+  let discountAmount = 0
+  
+  if (packageDiscountInfo) {
+    subtotal = packageDiscountInfo.finalAmount
+    discountAmount = packageDiscountInfo.discountAmount
+  } else if (promoDiscountInfo) {
+    subtotal = promoDiscountInfo.finalAmount
+    discountAmount = promoDiscountInfo.discountAmount
+  }
 
   const total = subtotal
 
@@ -640,6 +713,8 @@ export default function BookingClient() {
     people,
     baseSubtotal,
     promoCodeInfo,
+    packageDiscountInfo,
+    selectedPackage,
     subtotal,
     discountAmount,
     total
@@ -1539,50 +1614,83 @@ export default function BookingClient() {
                         </div>
                       )}
 
-                      {selectedPackage && (
-                        <div className="flex justify-between text-blue-600">
-                          <span>Package Applied</span>
-                          <span>Pass Used</span>
-                        </div>
-                      )}
+                      {/* Package Discount Information */}
+                      {selectedPackage && (() => {
+                        // Find the selected package details
+                        const pkg = userPackages?.find(p => p.id === selectedPackage)
+                        if (!pkg || !bookingDuration) return null
+                        
+                        // Get actual package hours from packageContents
+                        const getPackageHours = (pkg: any) => {
+                          if (!pkg.packageContents) return 0
+                          
+                          if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
+                            return pkg.packageContents.fullDayHours
+                          }
+                          if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
+                            return pkg.packageContents.halfDayHours
+                          }
+                          if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
+                            return pkg.packageContents.totalHours
+                          }
+                          
+                          return pkg.packageContents.totalHours || 0
+                        }
+                        
+                        const packageHours = getPackageHours(pkg)
+                        const hoursToUse = Math.min(bookingDuration.durationHours, packageHours)
+                        const hourlyRate = baseSubtotal / bookingDuration.durationHours
+                        const packageDiscount = hoursToUse * hourlyRate
+                        const remainingAmount = baseSubtotal - packageDiscount
+                        
+                        return (
+                          <>
+                            <div className="flex justify-between text-green-600">
+                              <span>Package Applied</span>
+                              <span>{pkg.packageName}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600">
+                              <span>Hours Covered</span>
+                              <span>{hoursToUse}h free</span>
+                            </div>
+                            <div className="flex justify-between text-green-600">
+                              <span>Package Discount</span>
+                              <span>-${packageDiscount.toFixed(2)}</span>
+                            </div>
+                            {remainingAmount > 0 && (
+                              <div className="flex justify-between text-orange-600">
+                                <span>Remaining Amount</span>
+                                <span>${remainingAmount.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {remainingAmount === 0 && (
+                              <div className="flex justify-between text-green-600 font-medium">
+                                <span>Fully Covered!</span>
+                                <span>🎉</span>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
 
                       <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>${(() => {
-                          if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
-                            // Ensure the discounted amount is never more than the original
-                            const discountedAmount = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
-                            return discountedAmount.toFixed(2);
-                          }
-                          return subtotal.toFixed(2);
-                        })()}</span> 
+                        <span>${subtotal.toFixed(2)}</span> 
                       </div>
 
                       {selectedPaymentMethod === 'creditCard' && (
                         <div className="flex justify-between text-amber-600">
                           <span>Credit Card Fee (5%)</span>
-                          <span>${(() => {
-                            if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
-                              // Ensure the discounted amount is never more than the original
-                              const discountedSubtotal = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
-                              return (discountedSubtotal * 0.05).toFixed(2);
-                            }
-                            return (total * 0.05).toFixed(2);
-                          })()}</span>
+                          <span>${(subtotal * 0.05).toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total</span>
                         <span>${(() => {
-                          if (promoCodeInfo && promoCodeInfo.discountAmount > 0) {
-                            // Ensure the discounted amount is never more than the original
-                            const discountedSubtotal = Math.min(promoCodeInfo.finalAmount, baseSubtotal);
-                            if (selectedPaymentMethod === 'creditCard') {
-                              return (discountedSubtotal * 1.05).toFixed(2); // Add 5% credit card fee
-                            }
-                            return discountedSubtotal.toFixed(2);
+                          if (selectedPaymentMethod === 'creditCard') {
+                            return (subtotal * 1.05).toFixed(2); // Add 5% credit card fee
                           }
-                          return finalTotal > 0 ? finalTotal.toFixed(2) : total.toFixed(2);
+                          return subtotal.toFixed(2);
                         })()}</span>
                       </div>
 

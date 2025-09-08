@@ -7,8 +7,8 @@ import { ContactSection } from '@/components/landing-page-sections/ContactSectio
 import { Tab } from '@headlessui/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { usePackages } from '@/hooks/usePackages'
-import { Package } from '@/lib/api/packages'
+import { usePackages } from '@/hooks/useNewPackages'
+import { NewPackage } from '@/lib/services/packageService'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -31,15 +31,10 @@ const promos = [
 
 export default function PricingPage() {
   const router = useRouter()
-  const { packages, loading: packagesLoading, error: packagesError } = usePackages()
+  const { packages, loading: packagesLoading, error: packagesError } = usePackages('MEMBER')
 
-  // Filter packages by type for display
-  const coworkPackages = packages.filter(pkg => pkg.type === 'cowork')
-  const costudyPackages = packages.filter(pkg => pkg.type === 'costudy')
-  const colearnPackages = packages.filter(pkg => pkg.type === 'colearn')
-
-  const handleBuyNow = (packageData: Package) => {
-    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=${packageData.type}`)
+  const handleBuyNow = (packageData: NewPackage) => {
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=all`)
   }
 
   if (packagesLoading) {
@@ -62,7 +57,7 @@ export default function PricingPage() {
         <Navbar />
         <div className="min-h-screen flex items-center justify-center">
           <div className="max-w-md mx-auto">
-            <Alert>
+            <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error Loading Packages</AlertTitle>
               <AlertDescription>{packagesError}</AlertDescription>
@@ -78,6 +73,7 @@ export default function PricingPage() {
       </>
     )
   }
+
 
   return (
     <>
@@ -173,7 +169,7 @@ export default function PricingPage() {
                   <div key={pkg.id} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
                     <div className="relative h-48">
                       <Image 
-                        src={`/pricing_img/package-${pkg.name.includes('Half-Day') ? '1' : '2'}.png`} 
+                        src={`/pricing_img/package-${pkg.packageType === 'HALF_DAY' ? '1' : '2'}.png`} 
                         alt={pkg.name} 
                         fill 
                         className="object-cover" 
@@ -183,9 +179,17 @@ export default function PricingPage() {
                       <h4 className="text-xl font-semibold">{pkg.name}</h4>
                       <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
                         <li>{pkg.description}</li>
-                        {pkg.bonus && <li>{pkg.bonus}</li>}
-                        <li>Valid {pkg.validity} days from activation</li>
-                        <li>SGD {pkg.price} (UP {pkg.originalPrice}) + SGD {pkg.outletFee} for all outlets</li>
+                        {pkg.packageContents.halfDayPasses && (
+                          <li>{pkg.packageContents.halfDayPasses} Half-Day Passes ({pkg.packageContents.halfDayHours} hrs/pass)</li>
+                        )}
+                        {pkg.packageContents.fullDayPasses && (
+                          <li>{pkg.packageContents.fullDayPasses} Full-Day Passes ({pkg.packageContents.fullDayHours} hrs/pass)</li>
+                        )}
+                        {pkg.packageContents.complimentaryHours && (
+                          <li>+{pkg.packageContents.complimentaryHours} Complimentary Hours</li>
+                        )}
+                        <li>Valid {pkg.validityDays} days from activation</li>
+                        <li>SGD {pkg.price} {pkg.originalPrice && pkg.originalPrice > pkg.price && `(UP ${pkg.originalPrice})`} + SGD {pkg.outletFee} for all outlets</li>
                       </ul>
                       <button
                         onClick={() => handleBuyNow(pkg)}

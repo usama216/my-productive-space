@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
+import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle, Loader2, Clock, CheckCircle } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
-import { usePackages } from '@/hooks/usePackages'
-import { Package as PackageType, packagesApi } from '@/lib/api/packages'
+import { usePackages } from '@/hooks/useNewPackages'
+import { NewPackage } from '@/lib/services/packageService'
 
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import PaymentStep from '@/components/buy-pass/PaymentStep'
+import ConfirmationStep from '@/components/buy-pass/ConfirmationStep'
 
 export default function BuyNowPage() {
   const searchParams = useSearchParams()
@@ -26,11 +27,30 @@ export default function BuyNowPage() {
 
   // ALL HOOKS MUST BE CALLED FIRST - NO EARLY RETURNS
   const { user, loading: isLoadingAuth } = useAuth()
-  const { packages, loading: packagesLoading, error: packagesError, retryFetch } = usePackages()
+  
+  // Get the target role from URL params first
+  const typeParam = searchParams.get('type')
+  const typeMapping: { [key: string]: string } = {
+    'cowork': 'MEMBER',
+    'costudy': 'STUDENT', 
+    'colearn': 'TUTOR',
+    'student': 'STUDENT',
+    'tutor': 'TUTOR',
+    'member': 'MEMBER'
+  }
+  const targetRole = typeMapping[typeParam || ''] || 'MEMBER'
+  
+  // Debug logging
+  console.log('🎯 BuyPassClient Debug:', {
+    typeParam,
+    targetRole,
+    typeMapping
+  })
+  
+  const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
 
-
-  // State variables
-  const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null)
+  // State variables - MUST BE DECLARED BEFORE useEffect
+  const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
   const [packageType, setPackageType] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
   const [customerName, setCustomerName] = useState('')
@@ -43,12 +63,11 @@ export default function BuyNowPage() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [purchaseStep, setPurchaseStep] = useState(1)
-  const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [confirmationError, setConfirmationError] = useState<string | null>(null)
   const [confirmationData, setConfirmationData] = useState<any>(null)
   const [orderId, setOrderId] = useState<string>('')
   const [userPackageId, setUserPackageId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
+
 
   // ALL useEffect calls
   useEffect(() => {
@@ -79,7 +98,25 @@ export default function BuyNowPage() {
 
     if (packageParam && packages.length > 0) {
       const decodedPackageName = decodeURIComponent(packageParam)
-      const foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
+      
+      // Try exact match first
+      let foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
+      
+      // If no exact match, try case-insensitive match
+      if (!foundPackage) {
+        foundPackage = packages.find(pkg => 
+          pkg.name.toLowerCase() === decodedPackageName.toLowerCase()
+        )
+      }
+      
+      // If still no match, try partial match
+      if (!foundPackage) {
+        foundPackage = packages.find(pkg => 
+          pkg.name.toLowerCase().includes(decodedPackageName.toLowerCase()) ||
+          decodedPackageName.toLowerCase().includes(pkg.name.toLowerCase())
+        )
+      }
+      
       if (foundPackage) {
         setSelectedPackage(foundPackage)
       } else {
@@ -88,71 +125,26 @@ export default function BuyNowPage() {
     }
     
     if (typeParam) {
-      setPackageType(typeParam)
+      setPackageType(targetRole)
     }
   }, [searchParams, packages])
 
-  // Separate useEffect for step 3 handling to avoid dependency issues
+  // Handle step 3 - payment confirmation
   useEffect(() => {
     const stepParam = searchParams.get('step')
     const orderIdParam = searchParams.get('orderId')
     const userPackageIdParam = searchParams.get('userPackageId')
-    const referenceParam = searchParams.get('reference')
-    const statusParam = searchParams.get('status')
 
-    // Handle step 3 - payment confirmation
-    if (stepParam === '3' && orderIdParam && userPackageIdParam && referenceParam && statusParam === 'completed') {
+    if (stepParam === '3' && orderIdParam && userPackageIdParam) {
       console.log('Step 3 detected, setting up confirmation:', {
         stepParam,
         orderIdParam,
-        userPackageIdParam,
-        referenceParam,
-        statusParam
+        userPackageIdParam
       })
       
       setPurchaseStep(3)
       setOrderId(orderIdParam)
       setUserPackageId(userPackageIdParam)
-      
-      // Trigger confirmation immediately after state is set
-      const triggerConfirmation = () => {
-        console.log('Triggering confirmation with current state:', {
-          userPackageId: userPackageIdParam,
-          orderId: orderIdParam,
-          reference: referenceParam
-        })
-        
-        // Use the URL params directly instead of state
-        const confirmData = {
-          userPackageId: userPackageIdParam,
-          orderId: orderIdParam,
-          hitpayReference: referenceParam,
-          paymentStatus: 'completed'
-        }
-        
-        console.log('Calling confirm API with data:', confirmData)
-        
-        // Call the API directly
-        packagesApi.confirmPackagePurchase(confirmData)
-          .then(result => {
-            if (result.success) {
-              setConfirmationStatus('success')
-              setConfirmationData(result.data)
-              console.log('Package purchase confirmed successfully:', result.data)
-            } else {
-              throw new Error(result.message || 'Failed to confirm purchase')
-            }
-          })
-          .catch(error => {
-            console.error('Package confirmation error:', error)
-            setConfirmationStatus('error')
-            setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm purchase')
-            setConfirmationStatus('idle')
-          })
-      }
-      
-      // Trigger immediately
-      triggerConfirmation()
     }
   }, [searchParams])
 
@@ -182,13 +174,23 @@ export default function BuyNowPage() {
         }
       }
 
-      // Call the new package purchase endpoint
-      const result = await packagesApi.createPackagePurchase(purchaseData)
+       // Import the service dynamically
+       const { default: packageService } = await import('@/lib/services/packageService')
+       const result = await packageService.purchasePackage(purchaseData)
+      
+      console.log('Purchase result:', result)
       
       if (result.success) {
         // Store purchase data for payment step
+        console.log('Setting orderId:', result.data.orderId)
+        console.log('Setting userPackageId:', result.data.userPackageId)
+        
+        // Handle different possible field names for userPackageId
+        const userPackageId = result.data.userPackageId
+        console.log('Final userPackageId (using purchaseId):', userPackageId)
+        
         setOrderId(result.data.orderId)
-        setUserPackageId(result.data.userPackageId)
+        setUserPackageId(userPackageId)
         
         // Step 2: Navigate to payment page (same as booking flow)
         setPurchaseStep(2)
@@ -203,57 +205,6 @@ export default function BuyNowPage() {
     }
   }
 
-  const confirmPurchaseHandler = async () => {
-    try {
-      console.log('confirmPurchaseHandler called with state:', {
-        userPackageId,
-        orderId,
-        searchParams: Object.fromEntries(searchParams.entries())
-      })
-      
-      setConfirmationStatus('loading')
-      
-      // Get reference from URL params (HitPay webhook response)
-      const hitpayReference = searchParams.get('reference') || searchParams.get('reference_number') || orderId
-      
-      console.log('Extracted hitpayReference:', hitpayReference)
-      
-      if (!userPackageId || !hitpayReference) {
-        console.error('Missing required data:', { userPackageId, hitpayReference })
-        throw new Error('Missing purchase information')
-      }
-
-      console.log('Confirming package purchase:', {
-        userPackageId,
-        orderId,
-        hitpayReference,
-        paymentStatus: 'completed'
-      })
-
-      // Confirm the package purchase with the backend
-      const confirmData = {
-        userPackageId,
-        orderId,
-        hitpayReference,
-        paymentStatus: 'completed'
-      }
-
-      const result = await packagesApi.confirmPackagePurchase(confirmData)
-      
-      if (result.success) {
-        setConfirmationStatus('success')
-        setConfirmationData(result.data)
-        console.log('Package purchase confirmed successfully:', result.data)
-      } else {
-        throw new Error(result.message || 'Failed to confirm purchase')
-      }
-    } catch (error) {
-      console.error('Package confirmation error:', error)
-      setConfirmationStatus('error')
-      setConfirmationError(error instanceof Error ? error.message : 'Failed to confirm purchase')
-      setConfirmationStatus('idle') // Reset to idle so user can try again
-    }
-  }
 
   // NOW ALL HOOKS ARE CALLED - WE CAN DO CONDITIONAL RENDERING
   if (isLoadingAuth || packagesLoading) {
@@ -278,7 +229,7 @@ export default function BuyNowPage() {
             <AlertTitle>Error Loading Packages</AlertTitle>
             <AlertDescription>{packagesError}</AlertDescription>
           </Alert>
-          <Button onClick={retryFetch} className="mt-4">Try Again</Button>
+           <Button onClick={() => refetch(true)} className="mt-4">Try Again</Button>
         </div>
       </div>
     )
@@ -380,25 +331,42 @@ export default function BuyNowPage() {
                         <Select 
                           value={selectedPackage?.id || ''} 
                           onValueChange={(value) => {
+                            console.log('🎯 Select onValueChange:', value)
                             const packageData = packages.find(pkg => pkg.id === value)
+                            console.log('🎯 Found package data:', packageData)
                             setSelectedPackage(packageData || null)
                           }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Choose your package" />
                           </SelectTrigger>
-                          <SelectContent>
-                            {packages
-                              .filter((pkg) => !packageType || pkg.type === packageType)
-                              .map((pkg) => (
-                                <SelectItem key={pkg.id} value={pkg.id}>
-                                  <div className="flex flex-col">
-                                    <span>{pkg.name} - ${pkg.price}</span>
-                                    <span className="text-xs text-gray-500">{pkg.type}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
+                           <SelectContent>
+                             {(() => {
+                               const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
+                               console.log('🎯 Dropdown Debug:', {
+                                 allPackages: packages,
+                                 packageType,
+                                 filteredPackages,
+                                 filteredLength: filteredPackages.length,
+                                 filterLogic: packages.map(pkg => ({
+                                   name: pkg.name,
+                                   targetRole: pkg.targetRole,
+                                   matches: !packageType || pkg.targetRole === packageType
+                                 }))
+                               })
+                               
+                               if (filteredPackages.length === 0) {
+                                 console.log('⚠️ No packages match the filter!')
+                                 return <div className="p-2 text-sm text-gray-500">No packages available</div>
+                               }
+                               
+                               return filteredPackages.map((pkg) => (
+                                 <SelectItem key={pkg.id} value={pkg.id}>
+                                   {pkg.name}
+                                 </SelectItem>
+                               ))
+                             })()}
+                           </SelectContent>
                         </Select>
                       </div>
 
@@ -461,7 +429,11 @@ export default function BuyNowPage() {
                         <Label className="text-sm">I agree to the terms and conditions</Label>
                       </div>
 
-                      <Button type="submit" disabled={!isFormValid || isLoading} className="w-full">
+                      <Button 
+                        type="submit" 
+                        disabled={!isFormValid || isLoading} 
+                        className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      >
                         {isLoading ? 'Processing...' : 'Continue to Payment'}
                       </Button>
                     </form>
@@ -491,165 +463,165 @@ export default function BuyNowPage() {
                   )}
 
                   {purchaseStep === 3 && (
-                    <div className="text-center py-8">
-                      {confirmationStatus === 'idle' && (
-                        <div>
-                          <h3 className="text-2xl font-bold mb-4">Payment Successful!</h3>
-                          <p className="text-gray-600 mb-6">Your payment has been processed. Now confirming your package purchase...</p>
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-                            <h4 className="font-medium text-blue-800 mb-2">Purchase Details:</h4>
-                            <div className="text-sm text-blue-700 space-y-1">
-                              <p><strong>Order ID:</strong> {orderId}</p>
-                              <p><strong>Package ID:</strong> {userPackageId}</p>
-                              <p><strong>Status:</strong> Payment Completed</p>
-                              <p><strong>Reference:</strong> {searchParams.get('reference') || 'Not found'}</p>
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            <Button onClick={confirmPurchaseHandler} className="bg-green-600 hover:bg-green-700 w-full">
-                              Confirm Package Activation
-                            </Button>
-                            <Button 
-                              onClick={() => {
-                                console.log('Manual trigger clicked. Current state:', {
-                                  userPackageId,
-                                  orderId,
-                                  searchParams: Object.fromEntries(searchParams.entries())
-                                })
-                                confirmPurchaseHandler()
-                              }} 
-                              variant="outline" 
-                              className="w-full"
-                            >
-                              Debug: Check State & Retry
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      {confirmationStatus === 'loading' && (
-                        <div>
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-                          <h3 className="text-xl font-medium mb-2">Confirming Purchase</h3>
-                          <p className="text-gray-600">Please wait while we activate your package...</p>
-                        </div>
-                      )}
-                      {confirmationStatus === 'success' && (
-                        <div>
-                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                          <h3 className="text-2xl font-bold text-green-600 mb-4">Package Activated Successfully!</h3>
-                          <p className="text-gray-600 mb-4">Your package has been confirmed and activated.</p>
-                          
-                          {/* Package Details */}
-                          {confirmationData?.package && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-left">
-                              <h4 className="font-bold text-blue-800 text-lg mb-4">Package Details</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <h5 className="font-semibold text-blue-700 mb-2">{confirmationData.package.name}</h5>
-                                  <p className="text-blue-600 text-sm mb-2">{confirmationData.package.description}</p>
-                                  <p className="text-blue-600 text-sm mb-2">Bonus: {confirmationData.package.bonus}</p>
-                                  <p className="text-blue-600 text-sm">Validity: {confirmationData.package.validity} days</p>
-                                </div>
-                                <div>
-                                  <div className="space-y-2">
-                                    {confirmationData.package.passes.map((pass: any, index: number) => (
-                                      <div key={index} className="flex justify-between items-center bg-white rounded-lg px-3 py-2">
-                                        <span className="text-blue-700 text-sm font-medium">
-                                          {pass.count}x {pass.type} Pass
-                                        </span>
-                                        <span className="text-blue-600 text-sm">
-                                          {pass.hours} hrs each
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="mt-3 pt-3 border-t border-blue-200">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-blue-700 font-medium">Total Passes:</span>
-                                      <span className="text-blue-600 font-bold">
-                                        {confirmationData.package.passes.reduce((total: number, pass: any) => total + pass.count, 0)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Activation Details */}
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                            <h4 className="font-medium text-green-800 mb-2">Activation Details</h4>
-                            <div className="text-sm text-green-700 space-y-1">
-                              {confirmationData?.activatedAt && (
-                                <p><strong>Activated:</strong> {new Date(confirmationData.activatedAt).toLocaleDateString()}</p>
-                              )}
-                              {confirmationData?.expiresAt && (
-                                <p><strong>Expires:</strong> {new Date(confirmationData.expiresAt).toLocaleDateString()}</p>
-                              )}
-                              <p><strong>Status:</strong> Active</p>
-                            </div>
-                          </div>
-                          
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                            <p className="text-green-800 text-sm">
-                              <strong>What's next?</strong> You can now use your passes to book coworking spaces.
-                            </p>
-                          </div>
-                          
-                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <Button onClick={() => router.push('/dashboard')} className="bg-blue-600 hover:bg-blue-700">
-                              Go to Dashboard
-                            </Button>
-                            <Button onClick={() => router.push('/book-now')} variant="outline">
-                              Book Now
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      {confirmationStatus === 'error' && (
-                        <div>
-                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <AlertTriangle className="w-8 h-8 text-red-600" />
-                          </div>
-                          <h3 className="text-2xl font-bold text-red-600 mb-4">Confirmation Failed</h3>
-                          <p className="text-gray-600 mb-4">{confirmationError}</p>
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                            <p className="text-red-800 text-sm">
-                              <strong>Don't worry!</strong> Your payment was successful. Please contact support if this issue persists.
-                            </p>
-                          </div>
-                          <Button onClick={confirmPurchaseHandler} className="bg-orange-600 hover:bg-orange-700 mr-2">
-                            Try Again
-                          </Button>
-                          <Button onClick={() => router.push('/dashboard')} variant="outline">
-                            Go to Dashboard
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                    <ConfirmationStep
+                      userPackageId={userPackageId}
+                      orderId={orderId}
+                      onBack={() => setPurchaseStep(2)}
+                      onSuccess={(data) => {
+                        setConfirmationData(data)
+                      }}
+                    />
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Order Summary - Only show on steps 1 and 2 */}
-            {purchaseStep !== 3 && (
+          
               <div className="lg:col-span-1">
                 <Card className="sticky top-24">
                   <CardHeader>
                     <CardTitle>Order Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {selectedPackage && (
+                    {confirmationData ? (
                       <div className="space-y-4">
+                        {/* Confirmation Success Header */}
+                        <div className="text-center py-2">
+                          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          </div>
+                          <h4 className="font-bold text-green-600 text-sm">Package Activated!</h4>
+                        </div>
+
+                        {/* Confirmed Package Info */}
+                        <div>
+                          <h4 className="font-medium">{confirmationData.packageName}</h4>
+                          <div className="mt-2 flex items-center space-x-2">
+                            <Package className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">{confirmationData.packageType}</span>
+                          </div>
+                          <div className="mt-1 flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">{confirmationData.targetRole}</span>
+                          </div>
+                        </div>
+
+                        {/* Confirmed Package Contents */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Total Hours</span>
+                              <span className="font-medium">{confirmationData.packageContents?.totalHours || 0} hrs</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Half-Day Passes</span>
+                              <span className="font-medium">{confirmationData.packageContents?.halfDayPasses || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Full-Day Passes</span>
+                              <span className="font-medium">{confirmationData.packageContents?.fullDayPasses || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Complimentary Hours</span>
+                              <span className="font-medium">{confirmationData.packageContents?.complimentaryHours || 0} hrs</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Activation Details */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Activated</span>
+                            <span className="font-medium">{new Date(confirmationData.activatedAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Expires</span>
+                            <span className="font-medium">{new Date(confirmationData.expiresAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Status</span>
+                            <span className="font-medium text-green-600">{confirmationData.paymentStatus}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Payment Reference</span>
+                            <span className="text-xs text-gray-500">{confirmationData.hitpayReference}</span>
+                          </div>
+                        </div>
+
+                        {/* Cost Summary */}
+                        <div className="space-y-2 border-t pt-3">
+                          <div className="flex justify-between text-sm">
+                            <span>Package Price</span>
+                            <span>SGD ${confirmationData.totalAmount}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-lg">
+                            <span>Total Paid</span>
+                            <span>SGD ${confirmationData.totalAmount}</span>
+                          </div>
+                        </div>
+
+                        {/* Customer Info */}
+                        <div className="bg-blue-50 rounded-lg p-3">
+                          <h5 className="text-sm font-medium text-blue-900 mb-2">Customer</h5>
+                          <div className="text-xs text-blue-800 space-y-1">
+                            <div>{confirmationData.userInfo.name}</div>
+                            <div>{confirmationData.userInfo.email}</div>
+                            <div>{confirmationData.userInfo.memberType}</div>
+                          </div>
+                        </div>
+
+                        {/* Next Steps */}
+                        <div className="bg-green-50 rounded-lg p-3">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">Ready to Use</span>
+                          </div>
+                          <p className="text-xs text-green-700">
+                            Your package is now active and ready for booking.
+                          </p>
+                        </div>
+                      </div>
+                    ) : selectedPackage ? (
+                      <div className="space-y-4">
+                        {/* Package Selection Info */}
                         <div>
                           <h4 className="font-medium">{selectedPackage.name}</h4>
                           <p className="text-sm text-gray-600">{selectedPackage.description}</p>
+                          <div className="mt-2 flex items-center space-x-2">
+                            <Package className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">{selectedPackage.packageType}</span>
+                          </div>
+                          <div className="mt-1 flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">{selectedPackage.validityDays} days validity</span>
+                          </div>
                         </div>
+
+                        {/* Package Contents */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Total Hours</span>
+                              <span className="font-medium">{selectedPackage.packageContents?.totalHours || 0} hrs</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Half-Day Passes</span>
+                              <span className="font-medium">{selectedPackage.packageContents?.halfDayPasses || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Full-Day Passes</span>
+                              <span className="font-medium">{selectedPackage.packageContents?.fullDayPasses || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Complimentary Hours</span>
+                              <span className="font-medium">{selectedPackage.packageContents?.complimentaryHours || 0} hrs</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pricing Breakdown */}
                         <div className="space-y-2">
                           <div className="flex justify-between">
                             <span>Package Price</span>
@@ -663,6 +635,12 @@ export default function BuyNowPage() {
                             <span>Quantity</span>
                             <span>× {quantity}</span>
                           </div>
+                          {selectedPackage.originalPrice && selectedPackage.originalPrice > selectedPackage.price && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Discount</span>
+                              <span>-${(selectedPackage.originalPrice - selectedPackage.price) * quantity}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between">
                             <span>Subtotal</span>
                             <span>${subtotal}</span>
@@ -674,11 +652,16 @@ export default function BuyNowPage() {
                           </div>
                         </div>
                       </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-gray-500">Select a package to see details</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
               </div>
-            )}
+            
           </div>
         </div>
       </div>

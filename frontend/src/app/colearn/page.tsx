@@ -6,6 +6,8 @@ import { ContactSection } from '@/components/landing-page-sections/ContactSectio
 import { Tab } from '@headlessui/react'
 import { Carousel } from '@/components/Carousel'
 import { useRouter } from 'next/navigation'
+import { usePackages } from '@/hooks/useNewPackages'
+import { NewPackage } from '@/lib/services/packageService'
 const rateHeaders = ['1 hr', '> 1 hr']
 const rateRows = [
   { label: 'Student', values: ['3', '3'] },
@@ -71,6 +73,14 @@ const perks = [
 
 export default function CoTutorPage() {
   const router = useRouter()
+  const { packages, loading: packagesLoading, error: packagesError } = usePackages('TUTOR')
+
+  // Filter tutor packages
+  const tutorPackages = packages
+
+  const handleBuyNow = (packageData: NewPackage) => {
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=tutor`)
+  }
   return (
     <>
       <Navbar />
@@ -230,27 +240,63 @@ export default function CoTutorPage() {
                
                            {/* Packages Panel */}
                            <Tab.Panel id="packages" className="grid gap-8 md:grid-cols-2">
-                             {packages.map((pkg) => (
-                               <div key={pkg.title} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
-                                 <div className="relative h-48">
-                                   <Image src={pkg.img} alt={pkg.title} fill className="object-cover" />
-                                 </div>
-                                 <div className="p-6">
-                                   <h4 className="text-xl font-semibold">{pkg.title}</h4>
-                                   <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
-                                     {pkg.details.map((d) => (
-                                       <li key={d}>{d}</li>
-                                     ))}
-                                   </ul>
-                                   <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded"
-                      onClick={() => router.push(`/buy-pass?package=${encodeURIComponent(pkg.title)}&type=colearn`)}
-                                   
-                                   >
-                                     Buy Now
-                                   </button>
-                                 </div>
+                             {packagesLoading ? (
+                               <div className="text-center py-12 col-span-2">
+                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                                 <p>Loading packages...</p>
                                </div>
-                             ))}
+                             ) : packagesError ? (
+                               <div className="text-center py-12 col-span-2">
+                                 <p className="text-red-500">Error loading packages: {packagesError}</p>
+                                 <button 
+                                   onClick={() => window.location.reload()} 
+                                   className="mt-2 px-4 py-2 bg-orange-500 text-white rounded"
+                                 >
+                                   Try Again
+                                 </button>
+                               </div>
+                             ) : tutorPackages.length > 0 ? (
+                               tutorPackages.map((pkg) => (
+                                 <div key={pkg.id} className="bg-gray-50 rounded-lg overflow-hidden shadow-lg">
+                                   <div className="relative h-48">
+                                     <Image 
+                                       src={`/pricing_img/package-${pkg.packageType === 'HALF_DAY' ? '1' : '2'}.png`} 
+                                       alt={pkg.name} 
+                                       fill 
+                                       className="object-cover" 
+                                     />
+                                   </div>
+                                   <div className="p-6">
+                                     <h4 className="text-xl font-semibold">{pkg.name}</h4>
+                                     <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
+                                       <li>{pkg.description}</li>
+                                       {pkg.packageContents.halfDayPasses && (
+                                         <li>{pkg.packageContents.halfDayPasses} Half-Day Passes ({pkg.packageContents.halfDayHours} hrs/pass)</li>
+                                       )}
+                                       {pkg.packageContents.fullDayPasses && (
+                                         <li>{pkg.packageContents.fullDayPasses} Full-Day Passes ({pkg.packageContents.fullDayHours} hrs/pass)</li>
+                                       )}
+                                       {pkg.packageContents.complimentaryHours && (
+                                         <li>+{pkg.packageContents.complimentaryHours} Complimentary Hours</li>
+                                       )}
+                                       <li>Valid {pkg.validityDays} days from activation</li>
+                                       <li>SGD {pkg.price} {pkg.originalPrice && pkg.originalPrice > pkg.price && `(UP ${pkg.originalPrice})`} + SGD {pkg.outletFee} for all outlets</li>
+                                     </ul>
+                                     <button
+                                       onClick={() => handleBuyNow(pkg)}
+                                       className="mt-4 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500"
+                                     >
+                                       Buy Now
+                                     </button>
+                                   </div>
+                                 </div>
+                               ))
+                             ) : (
+                               <div className="text-center py-12 col-span-2">
+                                 <p className="text-gray-500 text-lg">No tutor packages available at the moment.</p>
+                                 <p className="text-gray-400">Please check back later or contact us for custom arrangements.</p>
+                               </div>
+                             )}
                            </Tab.Panel>
                          </Tab.Panels>
                        </Tab.Group>
