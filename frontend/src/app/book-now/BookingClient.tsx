@@ -288,6 +288,16 @@ export default function BookingClient() {
       setConfirmationStatus('loading')
       setConfirmationError(null)
       setConfirmationHeadingError(null)
+      
+      // Check if this is a zero-amount booking that was already auto-confirmed
+      const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
+      if (currentBooking.confirmedPayment && currentBooking.status === 'confirmed') {
+        console.log('💰 Booking already confirmed (zero-amount or regular)')
+        setConfirmedBookingData(currentBooking)
+        setConfirmationStatus('success')
+        return
+      }
+      
       // Check if payment was canceled or failed
       const paymentStatus = searchParams.get('status')
       if (isPaymentFailed(paymentStatus)) {
@@ -337,7 +347,6 @@ export default function BookingClient() {
       setConfirmedBookingData(result.booking)
 
       // Update local storage with confirmed booking
-      const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
       const updatedBooking = { ...currentBooking, confirmedPayment: true, status: 'confirmed' }
       localStorage.setItem('currentBooking', JSON.stringify(updatedBooking))
 
@@ -681,8 +690,13 @@ export default function BookingClient() {
     
     const packageHours = getPackageHours(pkg)
     const hoursToUse = Math.min(bookingDuration.durationHours, packageHours)
-    const hourlyRate = baseSubtotal / bookingDuration.durationHours
-    const packageDiscount = hoursToUse * hourlyRate
+    
+    // Calculate package discount for ONE person only
+    const pricePerHour = selectedLocation?.price || 0
+    const onePersonCost = pricePerHour * bookingDuration.durationHours
+    const packageDiscount = Math.min(hoursToUse * pricePerHour, onePersonCost)
+    
+    // Calculate remaining amount: (total cost) - (package discount for 1 person)
     const remainingAmount = baseSubtotal - packageDiscount
     
     return {
@@ -717,7 +731,13 @@ export default function BookingClient() {
     selectedPackage,
     subtotal,
     discountAmount,
-    total
+    total,
+    // Additional debug info for package discount
+    ...(selectedPackage && {
+      onePersonCost: selectedLocation ? selectedLocation.price * totalHours : 0,
+      packageDiscountForOnePerson: packageDiscountInfo?.discountAmount || 0,
+      otherPeopleCost: people > 1 ? (people - 1) * (selectedLocation?.price || 0) * totalHours : 0
+    })
   });
 
   // Update finalTotal when total changes
@@ -780,6 +800,9 @@ export default function BookingClient() {
       const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
         peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
 
+      // Check if total amount is $0.00 (after discounts)
+      const isZeroAmount = total <= 0
+
       const bookingPayload = {
         userId: user.id,
         location: locationData?.name || location,
@@ -797,9 +820,9 @@ export default function BookingClient() {
         totalAmount: total,
         memberType: memberType,
         bookedForEmails: [customerEmail],
-        confirmedPayment: false,
+        confirmedPayment: false, // Always create as unconfirmed first
         bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
-        paymentId: null,
+        paymentId: null, // Will be set after confirmation
         bookedAt: new Date().toISOString()
       }
 
@@ -808,7 +831,8 @@ export default function BookingClient() {
         ...bookingPayload,
         promoCodeInfo: promoCodeInfo,
         hasPromoCode: !!promoCodeInfo?.promoCode?.id,
-        discountAmount: promoCodeInfo?.discountAmount || 0
+        discountAmount: promoCodeInfo?.discountAmount || 0,
+        isZeroAmount: isZeroAmount
       });
 
       // Call the create booking API
@@ -832,13 +856,66 @@ export default function BookingClient() {
       console.log('Booking created successfully:', result)
 
       // Store the booking ID for payment and confirmation
-      setBookingId(result.booking?.id || result.id)
+      const createdBookingId = result.booking?.id || result.id
+      setBookingId(createdBookingId)
 
       // Store booking data for payment step
       localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
 
-      // Move to payment step
-      setBookingStep(2)
+      if (isZeroAmount) {
+        // For zero amount bookings, immediately call confirmBooking API
+        console.log('💰 Zero amount booking - calling confirmBooking API')
+        
+        try {
+          // Call the confirm booking API immediately
+          const confirmResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              bookingId: createdBookingId
+            })
+          })
+
+          if (!confirmResponse.ok) {
+            const errorData = await confirmResponse.json();
+            throw new Error(errorData.message || 'Failed to confirm zero-amount booking');
+          }
+
+          const confirmResult = await confirmResponse.json()
+          console.log('Zero-amount booking confirmed successfully:', confirmResult)
+
+          // Update local storage with confirmed booking
+          const updatedBooking = { ...result.booking, confirmedPayment: true, status: 'confirmed' }
+          localStorage.setItem('currentBooking', JSON.stringify(updatedBooking))
+          setConfirmedBookingData(updatedBooking)
+
+          // Show success message and go to confirmation step
+          toast({
+            title: "Booking Confirmed!",
+            description: "Your booking has been automatically confirmed as the total amount is $0.00",
+            variant: "default",
+          })
+          setBookingStep(3)
+          setConfirmationStatus('success')
+
+        } catch (confirmError) {
+          console.error('Error confirming zero-amount booking:', confirmError)
+          toast({
+            title: "Booking Created but Confirmation Failed",
+            description: "Your booking was created but confirmation failed. Please contact support.",
+            variant: "destructive",
+          })
+          // Still go to confirmation step to show the booking was created
+          setBookingStep(3)
+          setConfirmationStatus('error')
+          setConfirmationError('Failed to confirm booking automatically')
+        }
+      } else {
+        // Move to payment step for non-zero amounts
+        setBookingStep(2)
+      }
 
     } catch (error) {
       console.error('Error creating booking:', error)
@@ -1270,7 +1347,9 @@ export default function BookingClient() {
                             ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
                             : peopleBreakdown.coStudents > 0 && !studentsValidated
                               ? `Validate ${peopleBreakdown.coStudents} Student${peopleBreakdown.coStudents > 1 ? 's' : ''} to Continue`
-                              : (isLoading ? 'Processing...' : 'Continue to Payment')
+                              : total <= 0
+                                ? (isLoading ? 'Confirming Free Booking...' : 'Confirm Free Booking')
+                                : (isLoading ? 'Processing...' : 'Continue to Payment')
                         }
                       </Button>
 
@@ -1394,9 +1473,34 @@ export default function BookingClient() {
                             </svg>
                           </div>
                           <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
-                          <p className="text-gray-600 mb-6">
-                            Your booking has been confirmed. You will receive a confirmation email shortly.
-                          </p>
+                          {(() => {
+                            const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
+                            const isZeroAmount = currentBooking.totalAmount <= 0
+                            
+                            return (
+                              <>
+                                <p className="text-gray-600 mb-6">
+                                  {isZeroAmount 
+                                    ? "Your booking has been automatically confirmed as the total amount was $0.00. No payment was required."
+                                    : "Your booking has been confirmed. You will receive a confirmation email shortly."
+                                  }
+                                </p>
+                                {isZeroAmount && (
+                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                        <span className="text-green-600 text-sm">💰</span>
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium text-green-800">Zero Amount Booking</p>
+                                        <p className="text-xs text-green-600">Fully covered by package discount</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )
+                          })()}
                           <div className="bg-gray-50 p-4 rounded-lg text-left">
                             <p className="text-sm text-gray-600">
                               Booking Reference: {(() => {
@@ -1639,33 +1743,42 @@ export default function BookingClient() {
                         
                         const packageHours = getPackageHours(pkg)
                         const hoursToUse = Math.min(bookingDuration.durationHours, packageHours)
-                        const hourlyRate = baseSubtotal / bookingDuration.durationHours
-                        const packageDiscount = hoursToUse * hourlyRate
+                        
+                        // Calculate package discount for ONE person only (same logic as main calculation)
+                        const pricePerHour = selectedLocation?.price || 0
+                        const onePersonCost = pricePerHour * bookingDuration.durationHours
+                        const packageDiscount = Math.min(hoursToUse * pricePerHour, onePersonCost)
                         const remainingAmount = baseSubtotal - packageDiscount
                         
                         return (
                           <>
                             <div className="flex justify-between text-green-600">
-                              <span>Package Applied</span>
-                              <span>{pkg.packageName}</span>
+                              <span className='text-sm'>Package Applied</span>
+                              <span className='text-sm'>1 Person Only</span>
                             </div>
                             <div className="flex justify-between text-green-600">
-                              <span>Hours Covered</span>
-                              <span>{hoursToUse}h free</span>
+                              <span className='text-sm'>Hours Covered</span>
+                              <span className='text-sm'>{hoursToUse?.toFixed(2)}h free</span>
                             </div>
                             <div className="flex justify-between text-green-600">
-                              <span>Package Discount</span>
-                              <span>-${packageDiscount.toFixed(2)}</span>
+                              <span className='text-sm'>Package Discount</span>
+                              <span className='text-sm'>-${packageDiscount.toFixed(2)}</span>
                             </div>
-                            {remainingAmount > 0 && (
-                              <div className="flex justify-between text-orange-600">
-                                <span>Remaining Amount</span>
-                                <span>${remainingAmount.toFixed(2)}</span>
+                            {people > 1 && (
+                              <div className="flex justify-between text-gray-600">
+                                <span className='text-sm'>Other {people - 1} person{people - 1 > 1 ? 's' : ''}</span>
+                                <span className='text-sm'>${((people - 1) * pricePerHour * bookingDuration.durationHours).toFixed(2)}</span>
                               </div>
                             )}
-                            {remainingAmount === 0 && (
+                            {remainingAmount > 0 && (
+                              <div className="flex justify-between text-orange-600">
+                                <span className='text-sm'>Remaining Amount</span>
+                                <span className='text-sm'>${remainingAmount.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {remainingAmount === 0 && people === 1 && (
                               <div className="flex justify-between text-green-600 font-medium">
-                                <span>Fully Covered!</span>
+                                <span className='text-sm'>Fully Covered!</span>
                                 <span>🎉</span>
                               </div>
                             )}
@@ -1686,13 +1799,41 @@ export default function BookingClient() {
                       )}
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total</span>
-                        <span>${(() => {
-                          if (selectedPaymentMethod === 'creditCard') {
-                            return (subtotal * 1.05).toFixed(2); // Add 5% credit card fee
-                          }
-                          return subtotal.toFixed(2);
-                        })()}</span>
+                        <span className={total <= 0 ? "text-green-600" : ""}>
+                          {total <= 0 ? (
+                            <>
+                              <span className="line-through text-gray-400">${(() => {
+                                if (selectedPaymentMethod === 'creditCard') {
+                                  return (subtotal * 1.05).toFixed(2);
+                                }
+                                return subtotal.toFixed(2);
+                              })()}</span>
+                              <span className="ml-2">$0.00</span>
+                              <span className="ml-1 text-sm">🎉</span>
+                            </>
+                          ) : (
+                            `$${(() => {
+                              if (selectedPaymentMethod === 'creditCard') {
+                                return (subtotal * 1.05).toFixed(2);
+                              }
+                              return subtotal.toFixed(2);
+                            })()}`
+                          )}
+                        </span>
                       </div>
+                      
+                      {total <= 0 && (
+                        <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-green-800">
+                              🎉 Free Booking!
+                            </p>
+                            <p className="text-xs mt-1 text-green-600">
+                              Fully covered by package discount
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Show total savings if promo code applied */}
                       {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (

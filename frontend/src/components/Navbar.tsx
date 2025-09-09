@@ -75,7 +75,7 @@ export default function Navbar() {
     }
   }
 
-  console.log('first', user)
+
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-[#efefe7]/80 backdrop-blur z-50">

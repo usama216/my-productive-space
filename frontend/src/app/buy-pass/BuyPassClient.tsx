@@ -182,12 +182,28 @@ export default function BuyNowPage() {
       
       if (result.success) {
         // Store purchase data for payment step
-        console.log('Setting orderId:', result.data.orderId)
-        console.log('Setting userPackageId:', result.data.userPackageId)
+        console.log('✅ Purchase successful! Full result:', result)
+        console.log('📦 Result data:', result.data)
+        console.log('🆔 Setting orderId:', result.data.orderId)
+        console.log('📋 Setting userPackageId:', result.data.userPackageId)
         
         // Handle different possible field names for userPackageId
-        const userPackageId = result.data.userPackageId
-        console.log('Final userPackageId (using purchaseId):', userPackageId)
+        const userPackageId = result.data.userPackageId || 
+                              (result.data as any).purchaseId || 
+                              (result.data as any).id
+        console.log('✅ Final userPackageId (with fallbacks):', userPackageId)
+        console.log('🔍 All available fields in result.data:', Object.keys(result.data))
+        
+        // Validate that we have the required IDs
+        if (!result.data.orderId) {
+          throw new Error('Order ID not returned from purchase API')
+        }
+        
+        if (!userPackageId) {
+          console.error('❌ userPackageId is missing from API response!')
+          console.error('Available fields in result.data:', Object.keys(result.data))
+          throw new Error('User Package ID not returned from purchase API')
+        }
         
         setOrderId(result.data.orderId)
         setUserPackageId(userPackageId)
@@ -440,26 +456,34 @@ export default function BuyNowPage() {
                   )}
 
                   {purchaseStep === 2 && (
-                    <PaymentStep
-                      subtotal={subtotal}
-                      total={total}
-                      paymentMethod={paymentMethod}
-                      onPaymentMethodChange={setPaymentMethod}
-                      customer={{
-                        name: customerName,
-                        email: customerEmail,
-                        phone: customerPhone
-                      }}
-                      order={{
-                        packageName: selectedPackage?.name || '',
-                        quantity,
-                        notes: `Package: ${selectedPackage?.name}, Total: $${total.toFixed(2)}`
-                      }}
-                      onBack={() => setPurchaseStep(1)}
-                      user={user}
-                      userPackageId={userPackageId}
-                      orderId={orderId}
-                    />
+                    <>
+                      {console.log('🎯 Rendering PaymentStep with:', {
+                        userPackageId,
+                        orderId,
+                        userPackageIdType: typeof userPackageId,
+                        orderIdType: typeof orderId
+                      })}
+                      <PaymentStep
+                        subtotal={subtotal}
+                        total={total}
+                        paymentMethod={paymentMethod}
+                        onPaymentMethodChange={setPaymentMethod}
+                        customer={{
+                          name: customerName,
+                          email: customerEmail,
+                          phone: customerPhone
+                        }}
+                        order={{
+                          packageName: selectedPackage?.name || '',
+                          quantity,
+                          notes: `Package: ${selectedPackage?.name}, Total: $${total.toFixed(2)}`
+                        }}
+                        onBack={() => setPurchaseStep(1)}
+                        user={user}
+                        userPackageId={userPackageId}
+                        orderId={orderId}
+                      />
+                    </>
                   )}
 
                   {purchaseStep === 3 && (

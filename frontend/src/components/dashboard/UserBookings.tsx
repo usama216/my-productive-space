@@ -22,8 +22,8 @@ export function UserBookings() {
   const { toast } = useToast()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
-  const [userStats, setUserStats] = useState({ upcomingBookings: 0, pastBookings: 0 })
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
+  const [userStats, setUserStats] = useState({ upcomingBookings: 0, ongoingBookings: 0, pastBookings: 0 })
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'ongoing' | 'past'>('upcoming')
 
 
 
@@ -61,7 +61,11 @@ export function UserBookings() {
       // For demo purposes, using a mock userId - in real app, get from auth context
       const mockUserId = '123e4567-e89b-12d3-a456-426614174000'
       const stats = await getUserStats(mockUserId)
-      setUserStats(stats)
+      setUserStats({
+        upcomingBookings: stats.upcomingBookings || 0,
+        ongoingBookings: stats.ongoingBookings || 0,
+        pastBookings: stats.pastBookings || 0
+      })
     } catch (error) {
       console.error('Load User Stats Error:', error)
     }
@@ -74,19 +78,32 @@ export function UserBookings() {
 
   // Filter bookings by status
   const upcomingBookings = bookings.filter(booking =>
-    new Date(booking.startAt) > new Date() && !booking.isCompleted
+    booking.status === 'upcoming' || (new Date(booking.startAt) > new Date() && !booking.isCompleted && !booking.isOngoing)
+  )
+
+  const ongoingBookings = bookings.filter(booking =>
+    booking.status === 'ongoing' || booking.isOngoing || (() => {
+      const now = new Date()
+      const start = new Date(booking.startAt)
+      const end = new Date(booking.endAt)
+      return now >= start && now <= end && !booking.isCompleted
+    })()
   )
 
   const pastBookings = bookings.filter(booking =>
-    new Date(booking.endAt) < new Date() || booking.isCompleted
+    booking.status === 'completed' || booking.isCompleted || (new Date(booking.endAt) < new Date() && !booking.isOngoing)
   )
 
-  const currentBookings = bookings.filter(booking => {
-    const now = new Date()
-    const start = new Date(booking.startAt)
-    const end = new Date(booking.endAt)
-    return now >= start && now <= end
-  })
+  // Update stats when bookings change
+  useEffect(() => {
+    setUserStats({
+      upcomingBookings: upcomingBookings.length,
+      ongoingBookings: ongoingBookings.length,
+      pastBookings: pastBookings.length
+    })
+  }, [upcomingBookings.length, ongoingBookings.length, pastBookings.length])
+
+  const currentBookings = ongoingBookings
 
   // Check if booking can be edited (≥5 hours in advance)
   const canEditBooking = (booking: Booking): boolean => {
@@ -133,6 +150,8 @@ export function UserBookings() {
     switch (activeTab) {
       case 'upcoming':
         return upcomingBookings
+      case 'ongoing':
+        return ongoingBookings
       case 'past':
         return pastBookings
       default:
@@ -152,7 +171,7 @@ export function UserBookings() {
 
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
@@ -168,11 +187,11 @@ export function UserBookings() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current</CardTitle>
+            <CardTitle className="text-sm font-medium">Ongoing</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentBookings.length}</div>
+            <div className="text-2xl font-bold">{ongoingBookings.length}</div>
             <p className="text-xs text-muted-foreground">
               Active now
             </p>
@@ -199,10 +218,31 @@ export function UserBookings() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${bookings.reduce((sum, booking) => sum + (booking.totalAmount || 0), 0).toFixed(2)}
+              ${bookings
+                .filter(booking => booking.confirmedPayment) // Only include confirmed payments
+                .reduce((sum, booking) => sum + (booking.totalAmount || 0), 0)
+                .toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
-              All time
+              Confirmed payments only
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              ${bookings
+                .filter(booking => !booking.confirmedPayment) // Only include unconfirmed payments
+                .reduce((sum, booking) => sum + (booking.totalAmount || 0), 0)
+                .toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Awaiting payment
             </p>
           </CardContent>
         </Card>
@@ -222,6 +262,15 @@ export function UserBookings() {
           Upcoming ({upcomingBookings.length})
         </button>
         <button
+          onClick={() => setActiveTab('ongoing')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'ongoing'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+            }`}
+        >
+          Ongoing ({ongoingBookings.length})
+        </button>
+        <button
           onClick={() => setActiveTab('past')}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'past'
               ? 'bg-white text-gray-900 shadow-sm'
@@ -236,7 +285,8 @@ export function UserBookings() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {activeTab === 'upcoming' ? 'Upcoming Bookings' : 'Past Bookings'}
+            {activeTab === 'upcoming' ? 'Upcoming Bookings' : 
+             activeTab === 'ongoing' ? 'Ongoing Bookings' : 'Past Bookings'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -251,11 +301,14 @@ export function UserBookings() {
                 <Calendar className="h-12 w-12 mx-auto" />
               </div>
               <p className="text-gray-500 text-lg">
-                {activeTab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
+                {activeTab === 'upcoming' ? 'No upcoming bookings' : 
+                 activeTab === 'ongoing' ? 'No ongoing bookings' : 'No past bookings'}
               </p>
               <p className="text-gray-400 text-sm">
                 {activeTab === 'upcoming'
                   ? 'Book a study space to get started'
+                  : activeTab === 'ongoing'
+                  ? 'Your active bookings will appear here'
                   : 'Your completed bookings will appear here'
                 }
               </p>
@@ -363,6 +416,13 @@ export function UserBookings() {
                         <div className="text-sm text-gray-500">
                           <AlertTriangle className="h-4 w-4 inline mr-1" />
                           Cannot edit
+                        </div>
+                      )}
+
+                      {activeTab === 'ongoing' && (
+                        <div className="text-sm text-green-600 font-medium">
+                          <Clock className="h-4 w-4 inline mr-1" />
+                          In Progress
                         </div>
                       )}
 

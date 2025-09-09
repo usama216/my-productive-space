@@ -20,6 +20,58 @@ import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle
 import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode, calculateBookingDuration, validateMinimumHours, formatDurationDisplay, BookingDuration } from '@/lib/promoCodeService';
 import { getUserPackages, UserPackage as ApiUserPackage } from '@/lib/services/packageService';
 
+// Package validation logic based on requirements
+const validatePackageForBooking = (packageType: string, bookingHours: number) => {
+  const validationRules = {
+    'HALF_DAY': { minHours: 2, maxHours: 6 },
+    'FULL_DAY': { minHours: 6, maxHours: 12 },
+    'SEMESTER_BUNDLE': { minHours: 1, maxHours: 200 } // Flexible
+  };
+
+  const rule = validationRules[packageType as keyof typeof validationRules];
+  if (!rule) return { valid: false, reason: 'Invalid package type' };
+
+  if (bookingHours < rule.minHours) {
+    return { 
+      valid: false, 
+      reason: `Minimum ${rule.minHours} hours required for ${packageType} package` 
+    };
+  }
+
+  return { valid: true };
+};
+
+// Get applicable packages for booking
+const getApplicablePackages = (bookingHours: number, userPackages: ApiUserPackage[]) => {
+  return userPackages.filter(pkg => {
+    const validation = validatePackageForBooking(pkg.packageType, bookingHours);
+    return validation.valid && pkg.remainingPasses > 0 && !pkg.isExpired;
+  });
+};
+
+// Calculate excess charges for package usage
+const calculateExcessCharge = (packageType: string, packageHours: number, bookingHours: number, hourlyRate: number) => {
+  const excess = Math.max(0, bookingHours - packageHours);
+  return excess * hourlyRate;
+};
+
+// Get package hours based on type
+const getPackageHours = (pkg: ApiUserPackage) => {
+  if (!pkg.packageContents) return 0;
+  
+  if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
+    return pkg.packageContents.fullDayHours;
+  }
+  if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
+    return pkg.packageContents.halfDayHours;
+  }
+  if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
+    return pkg.packageContents.totalHours;
+  }
+  
+  return pkg.packageContents.totalHours || 0;
+};
+
 type DiscountInfo = 
   | { type: 'package'; id: string; discountAmount?: number; finalAmount?: number }
   | { type: 'promo'; id: string; discountAmount: number; finalAmount: number; promoCode: PromoCode }
@@ -74,15 +126,23 @@ export function EntitlementTabs({
       const packages = await getUserPackages(userId);
       // Filter only packages with COMPLETED payment status
       const completedPackages = packages.filter(pkg => pkg.paymentStatus === 'COMPLETED');
-      setUserPackages(completedPackages);
-      console.log('User packages loaded:', completedPackages);
+      
+      // Filter packages based on booking hours if available
+      let applicablePackages = completedPackages;
+      if (bookingDuration && bookingDuration.durationHours > 0) {
+        applicablePackages = getApplicablePackages(bookingDuration.durationHours, completedPackages);
+        console.log(`Filtered packages for ${bookingDuration.durationHours} hours:`, applicablePackages);
+      }
+      
+      setUserPackages(applicablePackages);
+      console.log('User packages loaded:', applicablePackages);
     } catch (error) {
       console.error('Error loading user packages:', error);
       setUserPackages([]);
     } finally {
       setIsLoadingPackages(false);
     }
-  }, [userId]);
+  }, [userId, bookingDuration]);
 
   // Load available promo codes from API
   const loadAvailablePromoCodes = useCallback(async () => {
@@ -357,17 +417,23 @@ export function EntitlementTabs({
                                         <span className="text-sm text-gray-500 ml-2">
                                           ({remaining} of {pkg.totalPasses} left)
                                         </span>
-                                        {discount && (
+                                        {/* {discount && (
                                           <div className="text-xs text-green-600 mt-1">
-                                            Save ${discount.discountAmount.toFixed(2)} • {discount.hoursToUse}h free
+                                            Save ${discount.discountAmount.toFixed(2)} • {discount.hoursToUse?.toFixed(2)}h free
                                           </div>
-                                        )}
-                                        <div className="text-xs text-gray-500 mt-1">
+                                        )} */}
+                                        {/* <div className="text-xs text-gray-500 mt-1">
                                           {packageHours}h available
-                                        </div>
+                                        </div> */}
                                         {!isValid && bookingHours > 0 && (
                                           <div className="text-xs text-red-600 mt-1">
-                                            {pkg.packageType === 'FULL_DAY' ? 'Min. 6 hours required' : 'Cannot use'}
+                                            {pkg.packageType === 'FULL_DAY' ? 'Min. 6 hours required' : 
+                                             pkg.packageType === 'HALF_DAY' ? 'Min. 2 hours required' : 'Cannot use'}
+                                          </div>
+                                        )}
+                                        {isValid && bookingHours > packageHours && (
+                                          <div className="text-xs text-orange-600 mt-1">
+                                            Excess charge: ${calculateExcessCharge(pkg.packageType, packageHours, bookingHours, 30).toFixed(2)}
                                           </div>
                                         )}
                                       </div>
@@ -408,6 +474,38 @@ export function EntitlementTabs({
                                     </div>
                                     <span>Type: {pkg.packageType}</span>
                                   </div>
+                                  
+                                  {(() => {
+                                    const bookingHours = bookingDuration?.durationHours || 0
+                                    const packageHours = getPackageHours(pkg)
+                                    const excessCharge = calculateExcessCharge(pkg.packageType, packageHours, bookingHours, 30)
+                                    
+                                    return (
+                                      <div className="space-y-2">
+                                        <div className="text-sm text-green-700">
+                                          <span className="font-medium">Package Hours:</span> {packageHours}h
+                                          {bookingHours > 0 && (
+                                            <span className="ml-2">
+                                              <span className="font-medium">Booking Hours:</span> {bookingHours}h
+                                            </span>
+                                          )}
+                                        </div>
+                                        
+                                        {excessCharge > 0 && (
+                                          <div className="text-sm text-orange-700 bg-orange-50 p-2 rounded">
+                                            <span className="font-medium">Excess Charge:</span> ${excessCharge.toFixed(2)} 
+                                            <span className="text-xs ml-1">({(bookingHours - packageHours).toFixed(1)}h × $30/hour)</span>
+                                          </div>
+                                        )}
+                                        
+                                        {bookingHours > 0 && bookingHours <= packageHours && (
+                                          <div className="text-sm text-green-700 bg-green-100 p-2 rounded">
+                                            <span className="font-medium">✅ Fully Covered</span> - No additional charges
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })()}
                                   <div className="flex justify-end pt-2 border-t border-green-200">
                                     <Button
                                       type="button"
@@ -430,9 +528,24 @@ export function EntitlementTabs({
                     <Card className="bg-white border-black">
                       <CardContent className="p-4 text-center">
                         <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-                        <p className="text-orange-800 font-medium">No Active Packages</p>
+                        <p className="text-orange-800 font-medium">
+                          {bookingDuration && bookingDuration.durationHours > 0 
+                            ? 'No Applicable Packages' 
+                            : 'No Active Packages'
+                          }
+                        </p>
                         <p className="text-sm text-orange-700 mt-1">
-                          Purchase a package to unlock member discounts
+                          {bookingDuration && bookingDuration.durationHours > 0 ? (
+                            <>
+                              No packages available for {bookingDuration.durationHours}h booking.
+                              <br />
+                              <span className="text-xs">
+                                Requirements: Half Day (2h+), Full Day (6h+)
+                              </span>
+                            </>
+                          ) : (
+                            'Purchase a package to unlock member discounts'
+                          )}
                         </p>
                         <Button
                           type="button"

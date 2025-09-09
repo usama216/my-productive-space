@@ -59,12 +59,25 @@ export default function PaymentStep({
     const handlePay = async () => {
     setLoading(true)
     try {
+      // Debug logging for payment step
+      console.log('💳 PaymentStep Debug Info:')
+      console.log('  - userPackageId:', userPackageId)
+      console.log('  - orderId:', orderId)
+      console.log('  - userPackageId type:', typeof userPackageId)
+      console.log('  - orderId type:', typeof orderId)
+      
+      // Validate required IDs before proceeding
+      if (!userPackageId || userPackageId === 'undefined') {
+        throw new Error('User Package ID is missing or invalid')
+      }
+      
+      if (!orderId || orderId === 'undefined') {
+        throw new Error('Order ID is missing or invalid')
+      }
+      
       // Construct redirect URL to step 3 for package confirmation
       const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&orderId=${orderId}&userPackageId=${userPackageId}`
-
-      // Call the new package payment API endpoint
-      console.log('PaymentStep - userPackageId:', userPackageId)
-      console.log('PaymentStep - orderId:', orderId)
+      console.log('🔗 Redirect URL:', redirectUrl)
       
       const paymentData = {
         userPackageId: userPackageId, // ID from the user_packages table
