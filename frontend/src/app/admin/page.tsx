@@ -253,6 +253,7 @@ export default function AdminDashboard() {
         headers: {
           'Content-Type': 'application/json',
         },
+          credentials: "include", 
         body: JSON.stringify({
           studentVerificationStatus: action === 'verify' ? 'VERIFIED' : 'REJECTED',
           ...(action === 'reject' && rejectionReason && { rejectionReason })
