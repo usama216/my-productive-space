@@ -248,7 +248,7 @@ export default function AdminDashboard() {
       }
 
       // Call your API
-      const response = await fetch(`http://localhost:8000/api/booking/admin/users/${user.id}/verify`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/booking/admin/users/${user.id}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

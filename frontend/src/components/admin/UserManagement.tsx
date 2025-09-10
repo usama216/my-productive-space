@@ -309,7 +309,7 @@ export function UserManagement() {
       setIsSubmitting(true)
       
       // Call your API with rejection reason if provided
-      const response = await fetch(`http://localhost:8000/api/booking/admin/users/${userId}/verify`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/booking/admin/users/${userId}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
