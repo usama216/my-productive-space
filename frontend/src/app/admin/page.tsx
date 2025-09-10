@@ -248,12 +248,11 @@ export default function AdminDashboard() {
       }
 
       // Call your API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/booking/admin/users/${user.id}/verify`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/admin/users/${user.id}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-          credentials: "include", 
         body: JSON.stringify({
           studentVerificationStatus: action === 'verify' ? 'VERIFIED' : 'REJECTED',
           ...(action === 'reject' && rejectionReason && { rejectionReason })
