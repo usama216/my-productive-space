@@ -102,6 +102,18 @@ export function BookingForm() {
     try {
       const response = await getBookedSeats(formData.location, formData.startAt, formData.endAt)
       setBookedSeats(response.bookedSeats || [])
+      console.log('Seat availability check:', {
+        location: formData.location,
+        timeRange: `${formData.startAt} to ${formData.endAt}`,
+        bookedSeats: response.bookedSeats,
+        overlappingBookings: response.overlappingBookings,
+        summary: response.summary
+      })
+      
+      // Log pending payment information
+      if (response.summary?.pending > 0) {
+        console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
+      }
     } catch (error) {
       console.error('Check Seat Availability Error:', error)
     }

@@ -631,6 +631,13 @@ export default function BookingClient() {
         const data = await response.json()
         setBookedSeats(data.bookedSeats || [])
         console.log('Booked seats fetched:', data.bookedSeats)
+        console.log('Overlapping bookings:', data.overlappingBookings)
+        console.log('Booking summary:', data.summary)
+        
+        // Log pending payment bookings for debugging
+        if (data.summary?.pending > 0) {
+          console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
+        }
       } else {
         console.error('Failed to fetch booked seats')
         setBookedSeats([])
