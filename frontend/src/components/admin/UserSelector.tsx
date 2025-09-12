@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { getAllUsers, User } from '@/lib/userService'
+import { getEffectiveMemberType, getMemberTypeDisplayName } from '@/lib/userProfileService'
 
 interface UserSelectorProps {
   selectedUserIds: string[]
@@ -94,18 +95,17 @@ export function UserSelector({
     if (fullName) {
       parts.push(user.email)
     }
-    if (user.memberType) {
-      parts.push(user.memberType)
-    }
-    if (user.studentVerificationStatus === 'VERIFIED') {
-      parts.push('Student')
+    const effectiveMemberType = getEffectiveMemberType(user.memberType, user.studentVerificationStatus)
+    if (effectiveMemberType) {
+      parts.push(effectiveMemberType)
     }
     return parts.join(' • ')
   }
 
   const getUserBadgeVariant = (user: User) => {
-    if (user.memberType === 'MEMBER') return 'default'
-    if (user.memberType === 'STUDENT') return 'secondary'
+    const effectiveMemberType = getEffectiveMemberType(user.memberType, user.studentVerificationStatus)
+    if (effectiveMemberType === 'MEMBER') return 'default'
+    if (effectiveMemberType === 'STUDENT') return 'secondary'
     return 'secondary'
   }
 

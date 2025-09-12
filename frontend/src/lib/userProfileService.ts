@@ -42,7 +42,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 // Update user profile - Comprehensive update for both Supabase Auth and custom User table
-export async function updateUserProfile(userId: string, profileData: Partial<UserProfile>): Promise<UserProfile | null> {
+export async function updateUserProfile(userId: string, profileData: Partial<UserProfile>, refreshCallback?: () => void): Promise<UserProfile | null> {
   try {
     // Step 1: Update Supabase Auth User metadata
     console.log('Updating Supabase Auth user metadata...')
@@ -81,6 +81,13 @@ export async function updateUserProfile(userId: string, profileData: Partial<Use
     
     if (response.ok && data.success) {
       console.log('Custom User table updated successfully')
+      
+      // Call refresh callback if provided (to refresh databaseUser state)
+      if (refreshCallback) {
+        console.log('Refreshing database user state...')
+        await refreshCallback()
+      }
+      
       return data.user;
     } else {
       throw new Error(data.error || 'Failed to update user profile in custom table');
@@ -149,9 +156,24 @@ export function formatUserName(user: UserProfile): string {
   return `${user.firstName} ${user.lastName}`.trim();
 }
 
+// Helper function to get effective member type based on verification status
+export function getEffectiveMemberType(memberType: string, studentVerificationStatus?: string): string {
+  // If user is STUDENT but not verified, treat as MEMBER
+  if (memberType === 'STUDENT' && studentVerificationStatus !== 'VERIFIED') {
+    return 'MEMBER';
+  }
+  // If user is STUDENT and verified, they are a STUDENT
+  if (memberType === 'STUDENT' && studentVerificationStatus === 'VERIFIED') {
+    return 'STUDENT';
+  }
+  return memberType;
+}
+
 // Helper function to get member type display name
-export function getMemberTypeDisplayName(memberType: string): string {
-  switch (memberType) {
+export function getMemberTypeDisplayName(memberType: string, studentVerificationStatus?: string): string {
+  const effectiveMemberType = getEffectiveMemberType(memberType, studentVerificationStatus);
+  
+  switch (effectiveMemberType) {
     case 'STUDENT':
       return 'Student';
     case 'MEMBER':

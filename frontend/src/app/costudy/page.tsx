@@ -1,7 +1,7 @@
 'use client'
 // app/costudy/page.tsx
 
-// import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { Tab } from '@headlessui/react'
@@ -12,6 +12,23 @@ import { useRouter } from 'next/navigation'
 import { usePackages } from '@/hooks/useNewPackages'
 import { NewPackage } from '@/lib/services/packageService'
 import { useAuth } from '@/hooks/useAuth'
+import { getEffectiveMemberType } from '@/lib/userProfileService'
+
+// Define the user type for API response
+interface ApiUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  memberType: 'STUDENT' | 'MEMBER' | 'TUTOR'
+  contactNumber: string
+  studentVerificationStatus: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED'
+  studentVerificationImageUrl?: string
+  studentVerificationDate?: string
+  studentRejectionReason?: string
+  createdAt: string
+  updatedAt: string
+}
 const rateHeaders = ['1 hr', '> 1 hr']
 const rateRows = [
   { label: 'Student', values: ['3', '3'] },
@@ -50,22 +67,75 @@ const promos = [
 
 export default function CoLearningPage() {
   const router = useRouter()
-  const { user, databaseUser } = useAuth()
+  const { user } = useAuth()
   const { packages, loading: packagesLoading, error: packagesError } = usePackages('STUDENT')
+  const [currentUser, setCurrentUser] = useState<ApiUser | null>(null)
+  const [userLoading, setUserLoading] = useState(true)
 
   // Filter student packages
   const studentPackages = packages
 
-  // Check if user can purchase packages
+  // Fetch fresh user data from API
+  const fetchCurrentUser = async () => {
+    if (!user?.id) {
+      setUserLoading(false)
+      return
+    }
+
+    try {
+      setUserLoading(true)
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api'
+      const response = await fetch(`${API_BASE_URL}/user/${user.id}`)
+      
+      if (response.ok) {
+        const userData = await response.json()
+        if (userData.success && userData.user) {
+          console.log('Fresh user data from API:', userData.user)
+          setCurrentUser(userData.user as ApiUser)
+        }
+      } else {
+        console.error('Failed to fetch user data:', response.status, response.statusText)
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error)
+    } finally {
+      setUserLoading(false)
+    }
+  }
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    fetchCurrentUser()
+  }, [user?.id])
+
+  // Check if user can purchase packages using fresh API data
   const canPurchasePackage = () => {
+    if (!currentUser) return false // No user data
     if (!user) return false // Not logged in
-    if (!databaseUser) return false // No database user data
-    return databaseUser.memberType === 'STUDENT' // Only students can purchase
+    
+    // Use effective member type - only verified students can purchase
+    const effectiveMemberType = getEffectiveMemberType(
+      currentUser.memberType || 'MEMBER', 
+      currentUser.studentVerificationStatus
+    )
+    return effectiveMemberType === 'STUDENT'
   }
 
   const isLoggedIn = !!user
-  const isStudent = databaseUser?.memberType === 'STUDENT'
+  const effectiveMemberType = currentUser 
+    ? getEffectiveMemberType(
+        currentUser.memberType || 'MEMBER',
+        currentUser.studentVerificationStatus
+      )
+    : 'MEMBER'
+
+  const isStudent = effectiveMemberType === 'STUDENT'
   const canPurchase = canPurchasePackage()
+
+  const handleRefreshUser = async () => {
+    console.log('Manually refreshing user data from API...')
+    await fetchCurrentUser()
+  }
 
   const handleBuyNow = (packageData: NewPackage) => {
     if (!isLoggedIn) {
@@ -119,6 +189,7 @@ export default function CoLearningPage() {
             <p className="mt-2 text-gray-600 text-sm">
               Must register as a student member to unlock these discounts.
             </p>
+        
           </div>
         </div>
       </div>

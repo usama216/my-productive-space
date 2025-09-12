@@ -118,6 +118,7 @@ export interface UserStatsResponse {
   userId: string
   upcomingBookings: number
   pastBookings: number
+  ongoingBookings:number
 }
 
 // API Base URL
@@ -300,7 +301,7 @@ export const getUserStats = async (userId: string): Promise<UserStatsResponse> =
     return data
   } catch (error) {
     console.error('Get User Stats Error:', error)
-    return { userId, upcomingBookings: 0, pastBookings: 0 }
+    return { userId, upcomingBookings: 0, pastBookings: 0, ongoingBookings:0 }
   }
 }
 

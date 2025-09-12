@@ -130,6 +130,44 @@ export function useAuth() {
   // Helper function to check if user is logged in
   const isLoggedIn = !!user && !!databaseUser
 
+  // Function to refresh database user data
+  const refreshDatabaseUser = async () => {
+    if (!user) return
+
+    try {
+      // Fetch fresh user data from the database using the same API base URL as userProfileService
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api'
+      const response = await fetch(`${API_BASE_URL}/user/${user.id}`)
+      if (response.ok) {
+        const userData = await response.json()
+        if (userData.success && userData.user) {
+          console.log('Refreshing database user with fresh data:', userData.user)
+          setDatabaseUser(userData.user)
+          saveToStorage(user, userData.user)
+        }
+      } else {
+        console.error('Failed to refresh database user:', response.status, response.statusText)
+      }
+    } catch (error) {
+      console.error('Error refreshing database user:', error)
+    }
+  }
+
+  // Function to refresh auth user data
+  const refreshAuthUser = async () => {
+    try {
+      const { data: { user: refreshedUser } } = await supabase.auth.getUser()
+      if (refreshedUser) {
+        console.log('Refreshing auth user with fresh data:', refreshedUser)
+        setUser(refreshedUser)
+        // Also refresh database user to keep them in sync
+        await refreshDatabaseUser()
+      }
+    } catch (error) {
+      console.error('Error refreshing auth user:', error)
+    }
+  }
+
   return { 
     user, 
     databaseUser,
@@ -138,6 +176,9 @@ export function useAuth() {
     userId: databaseUser?.id || user?.id, // Prefer database user ID, fallback to auth ID
     authUserId: user?.id, // Always available if authenticated
     // Login status check
-    isLoggedIn
+    isLoggedIn,
+    // Refresh functions
+    refreshDatabaseUser,
+    refreshAuthUser
   }
 }

@@ -425,7 +425,7 @@ export function AuthForm({ type }: Props) {
                 <SelectContent>
                   <SelectItem value="student">Student</SelectItem>
                   <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="tutor">Tutor</SelectItem>
+                  {/* <SelectItem value="tutor">Tutor</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>

@@ -10,6 +10,7 @@ import { PromoCodeManagement } from './PromoCodeManagement'
 import { BookingManagement } from './BookingManagement'
 import { UserManagement } from './UserManagement'
 import { AdminPackageManagement } from '@/components/packages/AdminPackageManagement'
+import { PackageUsageTracking } from './PackageUsageTracking'
 
 export default function AdminTabs({
   activeTab,
@@ -46,7 +47,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-5">
+      <TabsList className="grid w-full grid-cols-6">
         <TabsTrigger value="overview">
           Overview
           {pendingStudents.length > 0 && (
@@ -74,6 +75,7 @@ export default function AdminTabs({
         <TabsTrigger value="bookings">Bookings</TabsTrigger>
         <TabsTrigger value="user-management">User Management</TabsTrigger>
         <TabsTrigger value="packages">Packages</TabsTrigger>
+        <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
 
         {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
@@ -288,6 +290,10 @@ export default function AdminTabs({
 
       <TabsContent value="packages" className="space-y-4">
         <AdminPackageManagement />
+      </TabsContent>
+
+      <TabsContent value="package-usage" className="space-y-4">
+        <PackageUsageTracking />
       </TabsContent>
 
       {/* Settings Tab */}

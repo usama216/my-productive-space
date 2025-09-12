@@ -27,26 +27,26 @@ export default function BuyNowPage() {
 
   // ALL HOOKS MUST BE CALLED FIRST - NO EARLY RETURNS
   const { user, loading: isLoadingAuth } = useAuth()
-  
+
   // Get the target role from URL params first
   const typeParam = searchParams.get('type')
   const typeMapping: { [key: string]: string } = {
     'cowork': 'MEMBER',
-    'costudy': 'STUDENT', 
+    'costudy': 'STUDENT',
     'colearn': 'TUTOR',
     'student': 'STUDENT',
     'tutor': 'TUTOR',
     'member': 'MEMBER'
   }
   const targetRole = typeMapping[typeParam || ''] || 'MEMBER'
-  
+
   // Debug logging
   console.log('🎯 BuyPassClient Debug:', {
     typeParam,
     targetRole,
     typeMapping
   })
-  
+
   const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
 
   // State variables - MUST BE DECLARED BEFORE useEffect
@@ -98,32 +98,32 @@ export default function BuyNowPage() {
 
     if (packageParam && packages.length > 0) {
       const decodedPackageName = decodeURIComponent(packageParam)
-      
+
       // Try exact match first
       let foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
-      
+
       // If no exact match, try case-insensitive match
       if (!foundPackage) {
-        foundPackage = packages.find(pkg => 
+        foundPackage = packages.find(pkg =>
           pkg.name.toLowerCase() === decodedPackageName.toLowerCase()
         )
       }
-      
+
       // If still no match, try partial match
       if (!foundPackage) {
-        foundPackage = packages.find(pkg => 
+        foundPackage = packages.find(pkg =>
           pkg.name.toLowerCase().includes(decodedPackageName.toLowerCase()) ||
           decodedPackageName.toLowerCase().includes(pkg.name.toLowerCase())
         )
       }
-      
+
       if (foundPackage) {
         setSelectedPackage(foundPackage)
       } else {
         setError(`Package "${decodedPackageName}" not found`)
       }
     }
-    
+
     if (typeParam) {
       setPackageType(targetRole)
     }
@@ -141,7 +141,7 @@ export default function BuyNowPage() {
         orderIdParam,
         userPackageIdParam
       })
-      
+
       setPurchaseStep(3)
       setOrderId(orderIdParam)
       setUserPackageId(userPackageIdParam)
@@ -174,40 +174,40 @@ export default function BuyNowPage() {
         }
       }
 
-       // Import the service dynamically
-       const { default: packageService } = await import('@/lib/services/packageService')
-       const result = await packageService.purchasePackage(purchaseData)
-      
+      // Import the service dynamically
+      const { default: packageService } = await import('@/lib/services/packageService')
+      const result = await packageService.purchasePackage(purchaseData)
+
       console.log('Purchase result:', result)
-      
+
       if (result.success) {
         // Store purchase data for payment step
         console.log('✅ Purchase successful! Full result:', result)
         console.log('📦 Result data:', result.data)
         console.log('🆔 Setting orderId:', result.data.orderId)
         console.log('📋 Setting userPackageId:', result.data.userPackageId)
-        
+
         // Handle different possible field names for userPackageId
-        const userPackageId = result.data.userPackageId || 
-                              (result.data as any).purchaseId || 
-                              (result.data as any).id
+        const userPackageId = result.data.userPackageId ||
+          (result.data as any).purchaseId ||
+          (result.data as any).id
         console.log('✅ Final userPackageId (with fallbacks):', userPackageId)
         console.log('🔍 All available fields in result.data:', Object.keys(result.data))
-        
+
         // Validate that we have the required IDs
         if (!result.data.orderId) {
           throw new Error('Order ID not returned from purchase API')
         }
-        
+
         if (!userPackageId) {
           console.error('❌ userPackageId is missing from API response!')
           console.error('Available fields in result.data:', Object.keys(result.data))
           throw new Error('User Package ID not returned from purchase API')
         }
-        
+
         setOrderId(result.data.orderId)
         setUserPackageId(userPackageId)
-        
+
         // Step 2: Navigate to payment page (same as booking flow)
         setPurchaseStep(2)
       } else {
@@ -245,7 +245,7 @@ export default function BuyNowPage() {
             <AlertTitle>Error Loading Packages</AlertTitle>
             <AlertDescription>{packagesError}</AlertDescription>
           </Alert>
-           <Button onClick={() => refetch(true)} className="mt-4">Try Again</Button>
+          <Button onClick={() => refetch(true)} className="mt-4">Try Again</Button>
         </div>
       </div>
     )
@@ -344,8 +344,8 @@ export default function BuyNowPage() {
                       {/* Package Selection */}
                       <div>
                         <Label>Select Package</Label>
-                        <Select 
-                          value={selectedPackage?.id || ''} 
+                        <Select
+                          value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
                             console.log('🎯 Select onValueChange:', value)
                             const packageData = packages.find(pkg => pkg.id === value)
@@ -356,33 +356,33 @@ export default function BuyNowPage() {
                           <SelectTrigger>
                             <SelectValue placeholder="Choose your package" />
                           </SelectTrigger>
-                           <SelectContent>
-                             {(() => {
-                               const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
-                               console.log('🎯 Dropdown Debug:', {
-                                 allPackages: packages,
-                                 packageType,
-                                 filteredPackages,
-                                 filteredLength: filteredPackages.length,
-                                 filterLogic: packages.map(pkg => ({
-                                   name: pkg.name,
-                                   targetRole: pkg.targetRole,
-                                   matches: !packageType || pkg.targetRole === packageType
-                                 }))
-                               })
-                               
-                               if (filteredPackages.length === 0) {
-                                 console.log('⚠️ No packages match the filter!')
-                                 return <div className="p-2 text-sm text-gray-500">No packages available</div>
-                               }
-                               
-                               return filteredPackages.map((pkg) => (
-                                 <SelectItem key={pkg.id} value={pkg.id}>
-                                   {pkg.name}
-                                 </SelectItem>
-                               ))
-                             })()}
-                           </SelectContent>
+                          <SelectContent>
+                            {(() => {
+                              const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
+                              console.log('🎯 Dropdown Debug:', {
+                                allPackages: packages,
+                                packageType,
+                                filteredPackages,
+                                filteredLength: filteredPackages.length,
+                                filterLogic: packages.map(pkg => ({
+                                  name: pkg.name,
+                                  targetRole: pkg.targetRole,
+                                  matches: !packageType || pkg.targetRole === packageType
+                                }))
+                              })
+
+                              if (filteredPackages.length === 0) {
+                                console.log('⚠️ No packages match the filter!')
+                                return <div className="p-2 text-sm text-gray-500">No packages available</div>
+                              }
+
+                              return filteredPackages.map((pkg) => (
+                                <SelectItem key={pkg.id} value={pkg.id}>
+                                  {pkg.name}
+                                </SelectItem>
+                              ))
+                            })()}
+                          </SelectContent>
                         </Select>
                       </div>
 
@@ -432,9 +432,12 @@ export default function BuyNowPage() {
                           <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
                         </div>
                       </div>
+                      <p className='text-sm'>
+                        <span className='text-orange-400'> Disclaimer:</span> please check the order summary before proceeding with payment
 
+                      </p>
                       {/* Terms */}
-                      <div className="flex items-start space-x-3">
+                      <div className="flex items-start space-x-1">
                         <input
                           type="checkbox"
                           checked={agreedToTerms}
@@ -445,9 +448,9 @@ export default function BuyNowPage() {
                         <Label className="text-sm">I agree to the terms and conditions</Label>
                       </div>
 
-                      <Button 
-                        type="submit" 
-                        disabled={!isFormValid || isLoading} 
+                      <Button
+                        type="submit"
+                        disabled={!isFormValid || isLoading}
                         className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                       >
                         {isLoading ? 'Processing...' : 'Continue to Payment'}
@@ -500,192 +503,221 @@ export default function BuyNowPage() {
               </Card>
             </div>
 
-          
-              <div className="lg:col-span-1">
-                <Card className="sticky top-24">
-                  <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {confirmationData ? (
-                      <div className="space-y-4">
-                        {/* Confirmation Success Header */}
-                        <div className="text-center py-2">
-                          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
-                          </div>
-                          <h4 className="font-bold text-green-600 text-sm">Package Activated!</h4>
-                        </div>
 
-                        {/* Confirmed Package Info */}
-                        <div>
-                          <h4 className="font-medium">{confirmationData.packageName}</h4>
-                          <div className="mt-2 flex items-center space-x-2">
-                            <Package className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">{confirmationData.packageType}</span>
-                          </div>
-                          <div className="mt-1 flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">{confirmationData.targetRole}</span>
-                          </div>
+            <div className="lg:col-span-1">
+              <Card className="sticky top-24">
+                <CardHeader>
+                  <CardTitle>Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {confirmationData ? (
+                    <div className="space-y-4">
+                      {/* Confirmation Success Header */}
+                      <div className="text-center py-2">
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <CheckCircle className="w-6 h-6 text-green-600" />
                         </div>
+                        <h4 className="font-bold text-green-600 text-sm">Package Activated!</h4>
+                      </div>
 
-                        {/* Confirmed Package Contents */}
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Total Hours</span>
-                              <span className="font-medium">{confirmationData.packageContents?.totalHours || 0} hrs</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Half-Day Passes</span>
-                              <span className="font-medium">{confirmationData.packageContents?.halfDayPasses || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Full-Day Passes</span>
-                              <span className="font-medium">{confirmationData.packageContents?.fullDayPasses || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Complimentary Hours</span>
-                              <span className="font-medium">{confirmationData.packageContents?.complimentaryHours || 0} hrs</span>
-                            </div>
-                          </div>
+                      {/* Confirmed Package Info */}
+                      <div>
+                        <h4 className="font-medium">{confirmationData.packageName}</h4>
+                        <div className="mt-2 flex items-center space-x-2">
+                          <Package className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">{confirmationData.packageType}</span>
                         </div>
-
-                        {/* Activation Details */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Activated</span>
-                            <span className="font-medium">{new Date(confirmationData.activatedAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Expires</span>
-                            <span className="font-medium">{new Date(confirmationData.expiresAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Status</span>
-                            <span className="font-medium text-green-600">{confirmationData.paymentStatus}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Payment Reference</span>
-                            <span className="text-xs text-gray-500">{confirmationData.hitpayReference}</span>
-                          </div>
-                        </div>
-
-                        {/* Cost Summary */}
-                        <div className="space-y-2 border-t pt-3">
-                          <div className="flex justify-between text-sm">
-                            <span>Package Price</span>
-                            <span>SGD ${confirmationData.totalAmount}</span>
-                          </div>
-                          <div className="flex justify-between font-bold text-lg">
-                            <span>Total Paid</span>
-                            <span>SGD ${confirmationData.totalAmount}</span>
-                          </div>
-                        </div>
-
-                        {/* Customer Info */}
-                        <div className="bg-blue-50 rounded-lg p-3">
-                          <h5 className="text-sm font-medium text-blue-900 mb-2">Customer</h5>
-                          <div className="text-xs text-blue-800 space-y-1">
-                            <div>{confirmationData.userInfo.name}</div>
-                            <div>{confirmationData.userInfo.email}</div>
-                            <div>{confirmationData.userInfo.memberType}</div>
-                          </div>
-                        </div>
-
-                        {/* Next Steps */}
-                        <div className="bg-green-50 rounded-lg p-3">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-800">Ready to Use</span>
-                          </div>
-                          <p className="text-xs text-green-700">
-                            Your package is now active and ready for booking.
-                          </p>
+                        <div className="mt-1 flex items-center space-x-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">{confirmationData.targetRole}</span>
                         </div>
                       </div>
-                    ) : selectedPackage ? (
-                      <div className="space-y-4">
-                        {/* Package Selection Info */}
-                        <div>
-                          <h4 className="font-medium">{selectedPackage.name}</h4>
-                          <p className="text-sm text-gray-600">{selectedPackage.description}</p>
-                          <div className="mt-2 flex items-center space-x-2">
-                            <Package className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">{selectedPackage.packageType}</span>
-                          </div>
-                          <div className="mt-1 flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">{selectedPackage.validityDays} days validity</span>
-                          </div>
-                        </div>
 
-                        {/* Package Contents */}
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Total Hours</span>
-                              <span className="font-medium">{selectedPackage.packageContents?.totalHours || 0} hrs</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Half-Day Passes</span>
-                              <span className="font-medium">{selectedPackage.packageContents?.halfDayPasses || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Full-Day Passes</span>
-                              <span className="font-medium">{selectedPackage.packageContents?.fullDayPasses || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Complimentary Hours</span>
-                              <span className="font-medium">{selectedPackage.packageContents?.complimentaryHours || 0} hrs</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Pricing Breakdown */}
-                        <div className="space-y-2">
+                      {/* Confirmed Package Contents */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
+                        <div className="space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span>Package Price</span>
-                            <span>${selectedPackage.price}</span>
+                            <span className="text-gray-600">Total Hours</span>
+                            <span className="font-medium">{confirmationData.packageContents?.totalHours || 0} hrs</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Outlet Fee</span>
-                            <span>${selectedPackage.outletFee}</span>
+                            <span className="text-gray-600">Half-Day Passes</span>
+                            <span className="font-medium">{confirmationData.packageContents?.halfDayPasses || 0}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Quantity</span>
-                            <span>× {quantity}</span>
+                            <span className="text-gray-600">Full-Day Passes</span>
+                            <span className="font-medium">{confirmationData.packageContents?.fullDayPasses || 0}</span>
                           </div>
-                          {selectedPackage.originalPrice && selectedPackage.originalPrice > selectedPackage.price && (
-                            <div className="flex justify-between text-green-600">
-                              <span>Discount</span>
-                              <span>-${(selectedPackage.originalPrice - selectedPackage.price) * quantity}</span>
-                            </div>
-                          )}
                           <div className="flex justify-between">
-                            <span>Subtotal</span>
-                            <span>${subtotal}</span>
-                          </div>
-
-                          <div className="flex justify-between font-bold border-t pt-2">
-                            <span>Total</span>
-                            <span>${total.toFixed(2)}</span>
+                            <span className="text-gray-600">Complimentary Hours</span>
+                            <span className="font-medium">{confirmationData.packageContents?.complimentaryHours || 0} hrs</span>
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500">Select a package to see details</p>
+
+                      {/* Activation Details */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Activated</span>
+                          <span className="font-medium">{new Date(confirmationData.activatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Expires</span>
+                          <span className="font-medium">{new Date(confirmationData.expiresAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Status</span>
+                          <span className="font-medium text-green-600">{confirmationData.paymentStatus}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Payment Reference</span>
+                          <span className="text-xs text-gray-500">{confirmationData.hitpayReference}</span>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            
+
+                      {/* Cost Summary */}
+                      <div className="space-y-2 border-t pt-3">
+                        <div className="flex justify-between text-sm">
+                          <span>Package Price</span>
+                          <span>SGD ${confirmationData.totalAmount}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg">
+                          <span>Total Paid</span>
+                          <span>SGD ${confirmationData.totalAmount}</span>
+                        </div>
+                      </div>
+
+                      {/* Customer Info */}
+                      <div className="bg-blue-50 rounded-lg p-3">
+                        <h5 className="text-sm font-medium text-blue-900 mb-2">Customer</h5>
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <div>{confirmationData.userInfo.name}</div>
+                          <div>{confirmationData.userInfo.email}</div>
+                          <div>{confirmationData.userInfo.memberType}</div>
+                        </div>
+                      </div>
+
+                      {/* Next Steps */}
+                      <div className="bg-green-50 rounded-lg p-3">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800">Ready to Use</span>
+                        </div>
+                        <p className="text-xs text-green-700">
+                          Your package is now active and ready for booking.
+                        </p>
+                      </div>
+                    </div>
+                  ) : selectedPackage ? (
+                    <div className="space-y-4">
+                      {/* Package Selection Info */}
+                      <div>
+                        <h4 className="font-medium">{selectedPackage.name}</h4>
+                        <p className="text-sm text-gray-600">{selectedPackage.description}</p>
+                        <div className="mt-2 flex items-center space-x-2">
+                          <Package className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">{selectedPackage.packageType}</span>
+                        </div>
+                        <div className="mt-1 flex items-center space-x-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">{selectedPackage.validityDays} days validity</span>
+                        </div>
+                        <div className="mt-1 flex items-center space-x-2">
+                          <div className="text-xs text-gray-500">
+                            <span className="block">
+                              Package activated on:{" "}
+                              <span className="font-medium">
+                                {new Date().toLocaleDateString("en-GB", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </span>
+                            <span className="block">
+                              Package expires on:{" "}
+                              <span className="font-medium text-red-500">
+                                {new Date(
+                                  new Date().setDate(new Date().getDate() + selectedPackage.validityDays)
+                                ).toLocaleDateString("en-GB", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                         <div className="mt-1 flex items-center space-x-2">
+                          <span className="text-sm text-gray-600">Please note that pass will be activated upon payment</span>
+                        </div>
+                      </div>
+                      
+                      {/* Package Contents */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Hours</span>
+                            <span className="font-medium">{selectedPackage.packageContents?.totalHours || 0} hrs</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Half-Day Passes</span>
+                            <span className="font-medium">{selectedPackage.packageContents?.halfDayPasses || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Full-Day Passes</span>
+                            <span className="font-medium">{selectedPackage.packageContents?.fullDayPasses || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Complimentary Hours</span>
+                            <span className="font-medium">{selectedPackage.packageContents?.complimentaryHours || 0} hrs</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pricing Breakdown */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Package Price</span>
+                          <span>${selectedPackage.price}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Outlet Fee</span>
+                          <span>${selectedPackage.outletFee}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Quantity</span>
+                          <span>× {quantity}</span>
+                        </div>
+                        {selectedPackage.originalPrice && selectedPackage.originalPrice > selectedPackage.price && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Discount</span>
+                            <span>-${(selectedPackage.originalPrice - selectedPackage.price) * quantity}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span>Subtotal</span>
+                          <span>${subtotal}</span>
+                        </div>
+
+                        <div className="flex justify-between font-bold border-t pt-2">
+                          <span>Total</span>
+                          <span>${total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p className="text-gray-500">Select a package to see details</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
           </div>
         </div>
       </div>

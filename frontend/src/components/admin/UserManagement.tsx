@@ -46,6 +46,7 @@ import {
   getVerificationStatusColor,
   getVerificationStatusText
 } from '@/lib/userService'
+import { getEffectiveMemberType, getMemberTypeDisplayName } from '@/lib/userProfileService'
 
 export function UserManagement() {
   const { toast } = useToast()
@@ -553,8 +554,8 @@ export function UserManagement() {
                        </TableCell>
                                                <TableCell>
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className={getMemberTypeColor(user.memberType)}>
-                              {user.memberType}
+                            <Badge variant="secondary" className={getMemberTypeColor(getEffectiveMemberType(user.memberType, user.studentVerificationStatus))}>
+                              {getMemberTypeDisplayName(user.memberType, user.studentVerificationStatus)}
                             </Badge>
                             {user.studentVerificationImageUrl && user.memberType === 'STUDENT' && (
                               <Button

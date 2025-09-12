@@ -25,7 +25,8 @@ import {
   BarChart3,
   Star,
   FileText,
-  Eye
+  Eye,
+  Bell
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
 import Navbar from '@/components/Navbar'
@@ -71,7 +73,7 @@ interface Booking {
 
 export default function Dashboard() {
   const { toast } = useToast()
-  const { user: authUser, databaseUser } = useAuth()
+  const { user: authUser, databaseUser, refreshDatabaseUser, refreshAuthUser } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(false)
@@ -176,7 +178,7 @@ export default function Dashboard() {
         })
       }
 
-      const updatedProfile = await updateUserProfile(authUser.id, profileUpdateData)
+      const updatedProfile = await updateUserProfile(authUser.id, profileUpdateData, refreshAuthUser)
       if (updatedProfile) {
         setUserProfile(updatedProfile)
         setIsEditingProfile(false)
@@ -377,20 +379,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Student Verification Rejection Alert */}
-          {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' &&
-            (userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus) === 'REJECTED' && (
-              <Alert className="mb-6 border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">
-                  <div className="font-semibold mb-1">Student Verification Rejected</div>
-                  <div className="text-sm">
-                    {userProfile?.studentRejectionReason || databaseUser?.studentRejectionReason ||
-                      'Your student verification has been rejected. Please contact support for more information.'}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
 
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -428,10 +416,36 @@ export default function Dashboard() {
                 {/* Quick Stats */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <BarChart3 className="w-5 h-5 mr-2" />
-                      Quick Stats
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center">
+                        <BarChart3 className="w-5 h-5 mr-2" />
+                        Quick Stats
+                      </CardTitle>
+                      {/* Notification Bell for Student Verification Rejection */}
+                      {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' &&
+                        (userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus) === 'REJECTED' && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="relative">
+                                <Bell className="h-4 w-4" />
+                                <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80" align="end">
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <AlertCircle className="h-4 w-4 text-red-600" />
+                                  <h4 className="font-semibold text-red-800">Student Verification Rejected</h4>
+                                </div>
+                                <p className="text-sm text-red-700">
+                                  {userProfile?.studentRejectionReason || databaseUser?.studentRejectionReason ||
+                                    'Your student verification has been rejected. Please contact support for more information.'}
+                                </p>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 gap-4">
@@ -492,9 +506,15 @@ export default function Dashboard() {
                         <p className="text-gray-600">{userProfile?.email || authUser?.email || sampleUserData.email}</p>
                         <div className="flex items-center space-x-4 mt-2">
                           <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                            {userProfile ? getMemberTypeDisplayName(userProfile.memberType) : (databaseUser?.memberType || sampleUserData.memberType)}
+                            {userProfile 
+                              ? getMemberTypeDisplayName(userProfile.memberType, userProfile.studentVerificationStatus)
+                              : getMemberTypeDisplayName(
+                                  databaseUser?.memberType || sampleUserData.memberType,
+                                  databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus
+                                )
+                            }
                           </Badge>
-                          {/* Only show verification status for students */}
+                          {/* Show verification status for all students (verified, pending, rejected) */}
                           {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (() => {
                             const status =
                               userProfile?.studentVerificationStatus ||
@@ -595,7 +615,7 @@ export default function Dashboard() {
                           <SelectContent>
                             <SelectItem value="STUDENT">Student</SelectItem>
                             <SelectItem value="MEMBER">Member</SelectItem>
-                            <SelectItem value="TUTOR">Tutor</SelectItem>
+                            {/* <SelectItem value="TUTOR">Tutor</SelectItem> */}
                           </SelectContent>
                         </Select>
                       </div>

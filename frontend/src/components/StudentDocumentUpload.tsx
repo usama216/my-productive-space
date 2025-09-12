@@ -157,7 +157,7 @@ export function StudentDocumentUpload({
 
         toast({
           title: "Image uploaded successfully!",
-          description: "Your student verification image has been uploaded and will be reviewed by our admin team.",
+          description: "Your student verification image has been uploaded and will be reviewed by our admin team. Please check back in 2-3 days for student verification update",
         })
       } else {
         // Preview mode during signup - just prepare the data
