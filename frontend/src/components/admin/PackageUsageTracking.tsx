@@ -66,7 +66,8 @@ export const PackageUsageTracking: React.FC = () => {
   const fetchPackageUsage = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/packages/admin/usage`);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${API_BASE_URL}/packages/admin/usage`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch package usage data');

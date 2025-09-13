@@ -542,12 +542,12 @@ export default function BuyNowPage() {
                             <span className="font-medium">{confirmationData.packageContents?.totalHours || 0} hrs</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Half-Day Passes</span>
-                            <span className="font-medium">{confirmationData.packageContents?.halfDayPasses || 0}</span>
+                            <span className="text-gray-600">Passes Included</span>
+                            <span className="font-medium">{confirmationData.passCount || 0}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Full-Day Passes</span>
-                            <span className="font-medium">{confirmationData.packageContents?.fullDayPasses || 0}</span>
+                            <span className="text-gray-600">Package Type</span>
+                            <span className="font-medium">{confirmationData.packageType?.replace('_', ' ') || 'N/A'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Complimentary Hours</span>
@@ -663,12 +663,12 @@ export default function BuyNowPage() {
                             <span className="font-medium">{selectedPackage.packageContents?.totalHours || 0} hrs</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Half-Day Passes</span>
-                            <span className="font-medium">{selectedPackage.packageContents?.halfDayPasses || 0}</span>
+                            <span className="text-gray-600">Passes Included</span>
+                            <span className="font-medium">{selectedPackage.passCount || 0}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Full-Day Passes</span>
-                            <span className="font-medium">{selectedPackage.packageContents?.fullDayPasses || 0}</span>
+                            <span className="text-gray-600">Package Type</span>
+                            <span className="font-medium">{selectedPackage.packageType?.replace('_', ' ') || 'N/A'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Complimentary Hours</span>

@@ -270,15 +270,8 @@ export default function CoTutorPage() {
                                      <h4 className="text-xl font-semibold">{pkg.name}</h4>
                                      <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
                                        <li>{pkg.description}</li>
-                                       {pkg.packageContents.halfDayPasses && (
-                                         <li>{pkg.packageContents.halfDayPasses} Half-Day Passes ({pkg.packageContents.halfDayHours} hrs/pass)</li>
-                                       )}
-                                       {pkg.packageContents.fullDayPasses && (
-                                         <li>{pkg.packageContents.fullDayPasses} Full-Day Passes ({pkg.packageContents.fullDayHours} hrs/pass)</li>
-                                       )}
-                                       {pkg.packageContents.complimentaryHours && (
-                                         <li>+{pkg.packageContents.complimentaryHours} Complimentary Hours</li>
-                                       )}
+                                       <li>{pkg.passCount} Passes Included (1 pass per booking)</li>
+                                       <li>Package Type: {pkg.packageType.replace('_', ' ')}</li>
                                        <li>Valid {pkg.validityDays} days from activation</li>
                                        <li>SGD {pkg.price} {pkg.originalPrice && pkg.originalPrice > pkg.price && `(UP ${pkg.originalPrice})`} + SGD {pkg.outletFee} for all outlets</li>
                                      </ul>

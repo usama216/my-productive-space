@@ -55,21 +55,10 @@ const calculateExcessCharge = (packageType: string, packageHours: number, bookin
   return excess * hourlyRate;
 };
 
-// Get package hours based on type
+// Get package hours based on count-based system
 const getPackageHours = (pkg: ApiUserPackage) => {
-  if (!pkg.packageContents) return 0;
-  
-  if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
-    return pkg.packageContents.fullDayHours;
-  }
-  if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
-    return pkg.packageContents.halfDayHours;
-  }
-  if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
-    return pkg.packageContents.totalHours;
-  }
-  
-  return pkg.packageContents.totalHours || 0;
+  // For count-based system, each pass covers the entire booking regardless of duration
+  return 1;
 };
 
 type DiscountInfo = 
@@ -143,6 +132,7 @@ export function EntitlementTabs({
       setIsLoadingPackages(false);
     }
   }, [userId, bookingDuration]);
+
 
   // Load available promo codes from API
   const loadAvailablePromoCodes = useCallback(async () => {
@@ -295,48 +285,33 @@ export function EntitlementTabs({
     }
   }
 
-  // Get package hours from packageContents API data
+  // Get package hours from new count-based system
   const getPackageHours = (pkg: ApiUserPackage) => {
-    if (!pkg.packageContents) return 0
-    
-    if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
-      return pkg.packageContents.fullDayHours
-    }
-    if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
-      return pkg.packageContents.halfDayHours
-    }
-    if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
-      return pkg.packageContents.totalHours
-    }
-    
-    return pkg.packageContents.totalHours || 0
+    // For count-based system, each pass covers the entire booking regardless of duration
+    // We return 1 to indicate one pass can be used for any booking
+    return 1
   }
 
-  // Calculate package discount based on booking hours
+  // Calculate package discount based on count-based system
   const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number) => {
-    const packageHours = getPackageHours(pkg)
-    const hoursToUse = Math.min(bookingHours, packageHours)
-    const hourlyRate = bookingAmount / bookingHours
-    const discountAmount = hoursToUse * hourlyRate
-    const remainingAmount = bookingAmount - discountAmount
+    // For count-based system, one pass covers the entire booking
+    const canUse = pkg.remainingPasses > 0 && !pkg.isExpired
+    const discountAmount = canUse ? bookingAmount : 0
+    const remainingAmount = canUse ? 0 : bookingAmount
     
     return {
-      hoursToUse,
+      hoursToUse: canUse ? 1 : 0, // One pass used
       discountAmount,
       remainingAmount,
-      canUse: hoursToUse > 0
+      canUse
     }
   }
 
-  // Check if package is valid for current booking
+  // Check if package is valid for current booking (count-based system)
   const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
-    if (pkg.isExpired || pkg.remainingPasses <= 0) return false
-    
-    // Full-day package: minimum 6 hours required
-    if (pkg.packageType === 'FULL_DAY' && bookingHours < 6) return false
-    
-    // Half-day and semester bundle: any hours allowed
-    return true
+    // For count-based system, any package can be used for any booking duration
+    // as long as the user has remaining passes and the package isn't expired
+    return !pkg.isExpired && pkg.remainingPasses > 0
   }
 
   // Check if user has any valid packages
@@ -652,6 +627,7 @@ export function EntitlementTabs({
             </p>
           </div>
         </TabsContent>
+
 
         <TabsContent value="promo" className="mt-4 space-y-4">
           <div>

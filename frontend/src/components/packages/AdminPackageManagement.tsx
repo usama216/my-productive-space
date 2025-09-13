@@ -40,14 +40,7 @@ export const AdminPackageManagement: React.FC = () => {
     price: '',
     originalPrice: '',
     outletFee: '5.00',
-    packageContents: {
-      halfDayPasses: '',
-      fullDayPasses: '',
-      halfDayHours: '6',
-      fullDayHours: '12',
-      complimentaryHours: '',
-      totalHours: ''
-    },
+    passCount: '1',
     validityDays: '30'
   });
 

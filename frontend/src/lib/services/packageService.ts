@@ -13,14 +13,7 @@ export interface NewPackage {
   price: number;
   originalPrice?: number;
   outletFee: number;
-  packageContents: {
-    halfDayPasses?: number;
-    fullDayPasses?: number;
-    halfDayHours?: number;
-    fullDayHours?: number;
-    complimentaryHours?: number;
-    totalHours: number;
-  };
+  passCount: number;
   validityDays: number;
   isActive: boolean;
   discount?: number;
@@ -100,12 +93,8 @@ export interface UserPackage {
   targetRole: string;
   description: string;
   packageContents: {
-    halfDayPasses?: number;
-    fullDayPasses?: number;
-    halfDayHours?: number;
-    fullDayHours?: number;
-    complimentaryHours?: number;
-    totalHours?: number;
+    passCount: number;
+    validityDays: number;
   };
   quantity: number;
   totalAmount: number;

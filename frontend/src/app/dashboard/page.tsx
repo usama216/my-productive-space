@@ -780,6 +780,7 @@ export default function Dashboard() {
               <UserPackages userId={authUser?.id || ''} />
             </TabsContent>
 
+
             {/* Promo Codes Tab */}
             <TabsContent value="promocodes" className="space-y-6">
               <UserPromoCodes userId={authUser?.id || ''} />

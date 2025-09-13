@@ -53,31 +53,20 @@ export const PackageCard: React.FC<PackageCardProps> = ({ package: pkg, onPurcha
         <CardTitle className="text-xl mb-2">{pkg.name}</CardTitle>
         <p className="text-muted-foreground mb-4 text-sm">{pkg.description}</p>
         
-        {/* Package Contents */}
+        {/* Package Contents - Count-based system */}
         <div className="package-contents mb-4 space-y-3">
-          {pkg.packageContents.halfDayPasses && (
-            <div className="content-item text-sm flex items-center space-x-2 p-2 bg-blue-50 rounded-lg">
-              <span className="text-blue-600 font-bold">{pkg.packageContents.halfDayPasses}</span>
-              <span>Half-Day Passes</span>
-              <span className="text-muted-foreground">({pkg.packageContents.halfDayHours} hrs/pass)</span>
-            </div>
-          )}
-          {pkg.packageContents.fullDayPasses && (
-            <div className="content-item text-sm flex items-center space-x-2 p-2 bg-green-50 rounded-lg">
-              <span className="text-green-600 font-bold">{pkg.packageContents.fullDayPasses}</span>
-              <span>Full-Day Passes</span>
-              <span className="text-muted-foreground">({pkg.packageContents.fullDayHours} hrs/pass)</span>
-            </div>
-          )}
-          {pkg.packageContents.complimentaryHours && (
-            <div className="content-item text-sm flex items-center space-x-2 p-2 bg-purple-50 rounded-lg">
-              <span className="text-purple-600 font-bold">+{pkg.packageContents.complimentaryHours}</span>
-              <span>Complimentary Hours</span>
-            </div>
-          )}
+          <div className="content-item text-sm flex items-center space-x-2 p-2 bg-blue-50 rounded-lg">
+            <span className="text-blue-600 font-bold">{pkg.passCount}</span>
+            <span>Passes Included</span>
+            <span className="text-muted-foreground">(1 pass per booking)</span>
+          </div>
+          <div className="content-item text-sm flex items-center space-x-2 p-2 bg-green-50 rounded-lg">
+            <span className="text-green-600 font-bold">{pkg.validityDays}</span>
+            <span>Days Validity</span>
+          </div>
           <div className="content-item text-sm font-bold flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg border-2 border-orange-200">
-            <span>Total Hours:</span>
-            <span className="text-orange-600 text-lg">{pkg.packageContents.totalHours} hours</span>
+            <span>Package Type:</span>
+            <span className="text-orange-600 text-lg">{pkg.packageType.replace('_', ' ')}</span>
           </div>
         </div>
 

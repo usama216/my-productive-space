@@ -37,9 +37,12 @@ export function UserPackages({ userId }: UserPackagesProps) {
     
     try {
       console.log('Loading user packages for userId:', userId)
+      
+      // Load traditional packages
       const userPackages = await getUserPackages(userId)
       console.log('User packages loaded:', userPackages)
       setPackages(userPackages)
+      
     } catch (err) {
       console.error('Error loading user packages:', err)
       setError(err instanceof Error ? err.message : 'Failed to load packages')
@@ -228,6 +231,7 @@ export function UserPackages({ userId }: UserPackagesProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <h3 className="text-lg font-semibold mb-4">Your Packages</h3>
             {packages.map((pkg) => {
               const remainingDays = getRemainingDays(pkg.expiresAt)
               const isExpiringSoon = remainingDays <= 7 && remainingDays > 0
@@ -296,18 +300,14 @@ s for
                               <div className="font-medium">{pkg.packageContents.totalHours} hrs</div>
                             </div>
                           )}
-                          {pkg.packageContents?.halfDayPasses && pkg.packageContents.halfDayPasses > 0 && (
-                            <div>
-                              <div className="text-gray-600">Half-Day Passes</div>
-                              <div className="font-medium">{pkg.packageContents.halfDayPasses}</div>
-                            </div>
-                          )}
-                          {pkg.packageContents?.fullDayPasses && pkg.packageContents.fullDayPasses > 0 && (
-                            <div>
-                              <div className="text-gray-600">Full-Day Passes</div>
-                              <div className="font-medium">{pkg.packageContents.fullDayPasses}</div>
-                            </div>
-                          )}
+                          <div>
+                            <div className="text-gray-600">Passes Included</div>
+                            <div className="font-medium">{pkg.passCount}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Package Type</div>
+                            <div className="font-medium">{pkg.packageType.replace('_', ' ')}</div>
+                          </div>
                           {pkg.packageContents?.complimentaryHours && pkg.packageContents.complimentaryHours > 0 && (
                             <div>
                               <div className="text-gray-600">Complimentary Hours</div>
