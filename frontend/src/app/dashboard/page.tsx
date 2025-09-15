@@ -514,21 +514,24 @@ export default function Dashboard() {
                                 )
                             }
                           </Badge>
-                          {/* Show verification status for all students (verified, pending, rejected) */}
+                          {/* Show verification status for students (verified, pending) - hide rejected status */}
                           {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (() => {
                             const status =
                               userProfile?.studentVerificationStatus ||
                               databaseUser?.studentVerificationStatus ||
                               sampleUserData.studentVerificationStatus;
 
+                            // Don't show badge for rejected status - user can see this in notifications
+                            if (status === 'REJECTED') {
+                              return null;
+                            }
+
                             const statusText =
                               status === 'VERIFIED'
                                 ? 'Verified'
                                 : status === 'PENDING'
                                   ? 'Pending'
-                                  : status === 'REJECTED'
-                                    ? 'Rejected'
-                                    : 'Not Verified';
+                                  : 'Not Verified';
 
                             const badgeClass =
                               userProfile
