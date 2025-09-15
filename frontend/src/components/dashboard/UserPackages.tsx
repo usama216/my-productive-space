@@ -308,12 +308,7 @@ s for
                             <div className="text-gray-600">Package Type</div>
                             <div className="font-medium">{pkg.packageType.replace('_', ' ')}</div>
                           </div>
-                          {pkg.packageContents?.complimentaryHours && pkg.packageContents.complimentaryHours > 0 && (
-                            <div>
-                              <div className="text-gray-600">Complimentary Hours</div>
-                              <div className="font-medium">{pkg.packageContents.complimentaryHours} hrs</div>
-                            </div>
-                          )}
+                         
                         </div>
                       </div>
                     )}

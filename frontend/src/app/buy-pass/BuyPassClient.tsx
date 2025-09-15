@@ -59,7 +59,7 @@ export default function BuyNowPage() {
   const [companyName, setCompanyName] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
   const [postalCode, setPostalCode] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paynow'>('card')
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paynow'>('paynow')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [purchaseStep, setPurchaseStep] = useState(1)
@@ -151,7 +151,15 @@ export default function BuyNowPage() {
   // Helper functions
   const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user
   const subtotal = selectedPackage ? (selectedPackage.price + selectedPackage.outletFee) * quantity : 0
-  const total = subtotal
+  const cardFee = paymentMethod === 'card' ? subtotal * 0.05 : 0
+  const total = subtotal + cardFee // Show correct total in order summary
+  
+  console.log('Payment calculation:', {
+    paymentMethod,
+    subtotal,
+    cardFee,
+    total
+  })
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -164,6 +172,8 @@ export default function BuyNowPage() {
         userId: user.id,
         packageId: selectedPackage.id, // UUID from API response
         quantity,
+        totalAmount: subtotal, // Send base amount (without card fee)
+        paymentMethod: paymentMethod, // Include payment method
         customerInfo: {
           name: customerName,
           email: customerEmail,
@@ -173,6 +183,14 @@ export default function BuyNowPage() {
           postalCode
         }
       }
+      
+      console.log('Creating package purchase with data:', {
+        ...purchaseData,
+        paymentMethod,
+        subtotal,
+        cardFee,
+        total
+      })
 
       // Import the service dynamically
       const { default: packageService } = await import('@/lib/services/packageService')
@@ -468,7 +486,7 @@ export default function BuyNowPage() {
                       })}
                       <PaymentStep
                         subtotal={subtotal}
-                        total={total}
+                        total={subtotal}
                         paymentMethod={paymentMethod}
                         onPaymentMethodChange={setPaymentMethod}
                         customer={{
@@ -533,28 +551,7 @@ export default function BuyNowPage() {
                         </div>
                       </div>
 
-                      {/* Confirmed Package Contents */}
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Total Hours</span>
-                            <span className="font-medium">{confirmationData.packageContents?.totalHours || 0} hrs</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Passes Included</span>
-                            <span className="font-medium">{confirmationData.passCount || 0}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Package Type</span>
-                            <span className="font-medium">{confirmationData.packageType?.replace('_', ' ') || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Complimentary Hours</span>
-                            <span className="font-medium">{confirmationData.packageContents?.complimentaryHours || 0} hrs</span>
-                          </div>
-                        </div>
-                      </div>
+              
 
                       {/* Activation Details */}
                       <div className="space-y-2">
@@ -578,14 +575,31 @@ export default function BuyNowPage() {
 
                       {/* Cost Summary */}
                       <div className="space-y-2 border-t pt-3">
-                        <div className="flex justify-between text-sm">
-                          <span>Package Price</span>
-                          <span>SGD ${confirmationData.totalAmount}</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-lg">
-                          <span>Total Paid</span>
-                          <span>SGD ${confirmationData.totalAmount}</span>
-                        </div>
+                        {(() => {
+                          const isCardPayment = confirmationData.paymentMethod === 'card'
+                          const baseAmount = confirmationData.totalAmount
+                          const cardFee = isCardPayment ? baseAmount * 0.05 : 0
+                          const finalTotal = baseAmount + cardFee
+                          
+                          return (
+                            <>
+                              <div className="flex justify-between text-sm">
+                                <span>Package Amount</span>
+                                <span>SGD ${baseAmount.toFixed(2)}</span>
+                              </div>
+                              {isCardPayment && (
+                                <div className="flex justify-between text-sm text-orange-600">
+                                  <span>Credit Card Fee (5%)</span>
+                                  <span>SGD ${cardFee.toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between font-bold text-lg">
+                                <span>Total Paid</span>
+                                <span>SGD ${finalTotal.toFixed(2)}</span>
+                              </div>
+                            </>
+                          )
+                        })()}
                       </div>
 
                       {/* Customer Info */}
@@ -654,28 +668,7 @@ export default function BuyNowPage() {
                         </div>
                       </div>
                       
-                      {/* Package Contents */}
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <h5 className="text-sm font-medium text-gray-900 mb-2">Package Contents</h5>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Total Hours</span>
-                            <span className="font-medium">{selectedPackage.packageContents?.totalHours || 0} hrs</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Passes Included</span>
-                            <span className="font-medium">{selectedPackage.passCount || 0}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Package Type</span>
-                            <span className="font-medium">{selectedPackage.packageType?.replace('_', ' ') || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Complimentary Hours</span>
-                            <span className="font-medium">{selectedPackage.packageContents?.complimentaryHours || 0} hrs</span>
-                          </div>
-                        </div>
-                      </div>
+                 
 
                       {/* Pricing Breakdown */}
                       <div className="space-y-2">
@@ -699,8 +692,15 @@ export default function BuyNowPage() {
                         )}
                         <div className="flex justify-between">
                           <span>Subtotal</span>
-                          <span>${subtotal}</span>
+                          <span>${subtotal.toFixed(2)}</span>
                         </div>
+
+                        {cardFee > 0 && (
+                          <div className="flex justify-between text-orange-600">
+                            <span>Credit Card Fee (5%)</span>
+                            <span>${cardFee.toFixed(2)}</span>
+                          </div>
+                        )}
 
                         <div className="flex justify-between font-bold border-t pt-2">
                           <span>Total</span>

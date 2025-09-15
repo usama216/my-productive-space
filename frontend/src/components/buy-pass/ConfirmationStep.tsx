@@ -18,6 +18,7 @@ type ConfirmationData = {
   packageType: string
   targetRole: string
   totalAmount: number
+  paymentMethod: string // Add payment method
   activatedAt: string
   expiresAt: string
   userInfo: {
@@ -54,6 +55,20 @@ export default function ConfirmationStep({
   // Auto-trigger confirmation when component mounts
   useEffect(() => {
     if (userPackageId && orderId && status === 'idle') {
+      // Check payment status first
+      const paymentStatus = searchParams.get('status')
+      if (paymentStatus === 'canceled' || paymentStatus === 'cancelled') {
+        setStatus('error')
+        setError('Payment was canceled. Your package purchase was not completed.')
+        return
+      }
+      
+      if (paymentStatus === 'declined' || paymentStatus === 'rejected' || paymentStatus === 'expired') {
+        setStatus('error')
+        setError('Payment was declined. Your package purchase was not completed.')
+        return
+      }
+      
       handleConfirm()
     }
   }, [userPackageId, orderId])
@@ -85,6 +100,8 @@ export default function ConfirmationStep({
       })
       
       if (result.success) {
+        console.log('Package confirmation response:', result.data)
+        console.log('Payment method from response:', result.data.paymentMethod)
         setConfirmationData(result.data)
         setStatus('success')
         onSuccess(result.data)
@@ -104,6 +121,33 @@ export default function ConfirmationStep({
     setError('')
     setConfirmationData(null)
     handleConfirm()
+  }
+
+  // Calculate amount breakdown based on payment method
+  const calculateAmountBreakdown = (confirmationData: ConfirmationData) => {
+    if (!confirmationData) return { subtotal: 0, cardFee: 0, total: 0 }
+    
+    const total = confirmationData.totalAmount
+    const paymentMethod = confirmationData.paymentMethod
+    
+    // Handle old payments where paymentMethod might be null
+    if (!paymentMethod) {
+      // For old payments, show total amount as is (no breakdown)
+      return { subtotal: total, cardFee: 0, total, showBreakdown: false }
+    }
+    
+    const isCardPayment = paymentMethod === 'card'
+    
+    if (isCardPayment) {
+      // If card payment, totalAmount is the base amount, add 5% card fee
+      const subtotal = total // Base amount (stored in database)
+      const cardFee = total * 0.05 // 5% card fee
+      const finalTotal = subtotal + cardFee // Total with card fee
+      return { subtotal, cardFee, total: finalTotal, showBreakdown: true }
+    } else {
+      // If not card payment, show total amount as is (no breakdown)
+      return { subtotal: total, cardFee: 0, total, showBreakdown: false }
+    }
   }
 
   return (
@@ -163,9 +207,51 @@ export default function ConfirmationStep({
                     <span className="text-gray-900">{confirmationData.targetRole}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-medium">Total Amount</span>
-                    <span className="text-gray-900 font-bold">SGD ${confirmationData.totalAmount}</span>
+                    <span className="font-medium">Payment Method</span>
+                    <span className="text-gray-900 capitalize">
+                      {confirmationData.paymentMethod || 'PayNow'}
+                    </span>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Payment Details Card */}
+            <Card>
+              <CardContent className="pt-6">
+                <h4 className="font-medium mb-4">Payment Details</h4>
+                <div className="space-y-3">
+                  {(() => {
+                    const { subtotal, cardFee, total, showBreakdown } = calculateAmountBreakdown(confirmationData)
+                    
+                    if (showBreakdown) {
+                      // Show breakdown for card payments
+                      return (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span>Package Amount</span>
+                            <span>SGD ${subtotal.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-orange-600">
+                            <span>Credit Card Fee (5%)</span>
+                            <span>SGD ${cardFee.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center font-bold border-t pt-3">
+                            <span>Total Paid</span>
+                            <span>SGD ${total.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )
+                    } else {
+                      // Show simple total for non-card payments
+                      return (
+                        <div className="flex justify-between items-center font-bold">
+                          <span>Total Paid</span>
+                          <span>SGD ${total.toFixed(2)}</span>
+                        </div>
+                      )
+                    }
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -199,8 +285,15 @@ export default function ConfirmationStep({
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-8 h-8 text-red-600" />
           </div>
-          <h3 className="text-xl font-bold text-red-600 mb-4">Confirmation Failed</h3>
-          <p className="text-gray-600 mb-4">We encountered an issue while confirming your package purchase.</p>
+          <h3 className="text-xl font-bold text-red-600 mb-4">
+            {error.includes('canceled') || error.includes('cancelled') ? 'Payment Canceled' : 'Confirmation Failed'}
+          </h3>
+          <p className="text-gray-600 mb-4">
+            {error.includes('canceled') || error.includes('cancelled') 
+              ? 'Your payment was canceled and no charges were made to your account.'
+              : 'We encountered an issue while confirming your package purchase.'
+            }
+          </p>
           
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
             <div className="flex items-start space-x-2">
@@ -234,7 +327,7 @@ export default function ConfirmationStep({
           Back
         </Button>
         
-        {status === 'error' && (
+        {status === 'error' && !error.includes('canceled') && !error.includes('cancelled') && (
           <Button
             onClick={handleRetry}
             disabled={status === 'loading'}
@@ -245,10 +338,19 @@ export default function ConfirmationStep({
           </Button>
         )}
         
+        {status === 'error' && (error.includes('canceled') || error.includes('cancelled')) && (
+          <Button
+            onClick={() => window.location.href = '/buy-pass'}
+            className="flex-1 bg-blue-600 hover:bg-blue-700"
+          >
+            Try Again
+          </Button>
+        )}
+        
         {status === 'success' && (
           <Button
             onClick={() => window.location.href = '/dashboard'}
-            className="flex-1 bg-green-600 hover:bg-green-700"
+            className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
           >
             Go to Dashboard
           </Button>
