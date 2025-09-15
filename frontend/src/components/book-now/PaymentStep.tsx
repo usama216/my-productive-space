@@ -21,6 +21,9 @@ type Props = {
   onBack: () => void
   onComplete: () => void
   onPaymentMethodChange: (method: PaymentMethod, newTotal: number) => void
+  // New props for booking creation
+  onCreateBooking?: () => Promise<string | null> // Function to create booking and return booking ID
+  onBookingCreated?: (bookingId: string) => void // Callback when booking is created
 }
 
 export default function PaymentStep({
@@ -34,6 +37,8 @@ export default function PaymentStep({
   onBack,
   onComplete,
   onPaymentMethodChange,
+  onCreateBooking,
+  onBookingCreated,
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
@@ -57,8 +62,31 @@ export default function PaymentStep({
   const handlePay = async () => {
     setLoading(true)
     try {
+      let currentBookingId = bookingId
+
+      // Create booking if it doesn't exist yet
+      if (!currentBookingId && onCreateBooking) {
+        console.log('Creating booking before payment...')
+        const newBookingId = await onCreateBooking()
+        
+        if (!newBookingId) {
+          throw new Error('Failed to create booking')
+        }
+
+        currentBookingId = newBookingId
+
+        // Notify parent component about the created booking
+        if (onBookingCreated) {
+          onBookingCreated(newBookingId)
+        }
+      }
+
+      if (!currentBookingId) {
+        throw new Error('No booking ID available for payment')
+      }
+
       // Include booking ID in the redirect URL for confirmation
-      const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&bookingId=${bookingId}`
+      const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}`
 
       const body = {
         amount: finalTotal.toFixed(2),
@@ -66,13 +94,13 @@ export default function PaymentStep({
         email: customer.email,
         name: customer.name,
         purpose: 'Test Order Payment for My Productive Space',
-        reference_number: `${bookingId || 'DEMO'}`,
+        reference_number: `${currentBookingId}`,
         redirect_url: redirectUrl,
         // webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
         webhook: `https://productive-space-backend.vercel.app/hitpay/webhook`,
 
         payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)], // Array of strings
-        bookingId: bookingId || null, // Add bookingId field
+        bookingId: currentBookingId, // Use the created booking ID
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
@@ -87,6 +115,7 @@ export default function PaymentStep({
         setLoading(false)
       }
     } catch (err) {
+      console.error('Payment error:', err)
       setLoading(false)
     }
   }

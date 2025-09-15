@@ -781,6 +781,19 @@ export default function BookingClient() {
       return
     }
 
+    // Check if it's a zero amount booking - handle immediately
+    if (total <= 0) {
+      await handleZeroAmountBooking()
+      return
+    }
+
+    // For non-zero amounts, just move to payment step
+    // Booking will be created when user clicks "Pay"
+    setBookingStep(2)
+  }
+
+  // Handle zero amount bookings (free bookings)
+  const handleZeroAmountBooking = async () => {
     setIsLoading(true)
 
     try {
@@ -789,8 +802,105 @@ export default function BookingClient() {
       const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
         peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
 
-      // Check if total amount is $0.00 (after discounts)
-      const isZeroAmount = total <= 0
+      const bookingPayload = {
+        userId: user!.id,
+        location: locationData?.name || location,
+        startAt: startDate?.toISOString(),
+        endAt: endDate?.toISOString(),
+        specialRequests: specialRequests || null,
+        seatNumbers: selectedSeats,
+        pax: people,
+        students: peopleBreakdown.coStudents,
+        members: peopleBreakdown.coWorkers,
+        tutors: peopleBreakdown.coTutors,
+        totalCost: baseSubtotal,
+        promoCodeId: promoCodeInfo?.promoCode?.id || null,
+        discountAmount: promoCodeInfo?.discountAmount || 0,
+        totalAmount: total,
+        memberType: memberType,
+        bookedForEmails: [customerEmail],
+        confirmedPayment: false,
+        bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
+        paymentId: null,
+        bookedAt: new Date().toISOString(),
+        packageId: selectedPackage || null,
+        packageUsed: !!selectedPackage
+      }
+
+      // Create booking
+      const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create booking');
+      }
+
+      const result = await response.json();
+      const createdBookingId = result.booking?.id || result.id;
+      setBookingId(createdBookingId);
+
+      // Confirm the free booking
+      const confirmResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId: createdBookingId
+        })
+      });
+
+      if (!confirmResponse.ok) {
+        const errorData = await confirmResponse.json();
+        throw new Error(errorData.message || 'Failed to confirm zero-amount booking');
+      }
+
+      const confirmResult = await confirmResponse.json();
+      
+      // Update local storage with confirmed booking
+      const updatedBooking = { ...result.booking, confirmedPayment: true, status: 'confirmed' }
+      localStorage.setItem('currentBooking', JSON.stringify(updatedBooking))
+      setConfirmedBookingData(updatedBooking)
+
+      // Show success message and go to confirmation step
+      toast({
+        title: "Booking Confirmed!",
+        description: "Your booking has been automatically confirmed as the total amount is $0.00",
+        variant: "default",
+      })
+      setBookingStep(3)
+      setConfirmationStatus('success')
+
+    } catch (error) {
+      console.error('Error creating free booking:', error)
+      toast({
+        title: "Booking failed",
+        description: error instanceof Error ? error.message : "An error occurred while creating your booking. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Create booking for payment (called from PaymentStep)
+  const createBookingForPayment = async (): Promise<string | null> => {
+    if (!user) {
+      throw new Error('User not authenticated')
+    }
+
+    try {
+      // Prepare booking payload
+      const locationData = locations.find(loc => loc.id === location)
+      const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
+        peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
 
       const bookingPayload = {
         userId: user.id,
@@ -809,28 +919,16 @@ export default function BookingClient() {
         totalAmount: total,
         memberType: memberType,
         bookedForEmails: [customerEmail],
-        confirmedPayment: false, // Always create as unconfirmed first
+        confirmedPayment: false,
         bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
-        paymentId: null, // Will be set after confirmation
+        paymentId: null,
         bookedAt: new Date().toISOString(),
-        // Add package information for count tracking
         packageId: selectedPackage || null,
         packageUsed: !!selectedPackage
       }
 
-      // Log the payload for debugging
-      console.log('Creating booking with payload:', {
-        ...bookingPayload,
-        promoCodeInfo: promoCodeInfo,
-        hasPromoCode: !!promoCodeInfo?.promoCode?.id,
-        discountAmount: promoCodeInfo?.discountAmount || 0,
-        isZeroAmount: isZeroAmount
-      });
-
-      // Call the create booking API
+      // Create booking
       const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
-
-      // Call the create booking API
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -840,87 +938,23 @@ export default function BookingClient() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create booking')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create booking');
       }
 
-      const result = await response.json()
-      console.log('Booking created successfully:', result)
-
-      // Store the booking ID for payment and confirmation
-      const createdBookingId = result.booking?.id || result.id
-      setBookingId(createdBookingId)
-
+      const result = await response.json();
+      const createdBookingId = result.booking?.id || result.id;
+      
       // Store booking data for payment step
       localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
-
-      if (isZeroAmount) {
-        // For zero amount bookings, immediately call confirmBooking API
-        console.log('💰 Zero amount booking - calling confirmBooking API')
-        
-        try {
-          // Call the confirm booking API immediately
-          const confirmResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              bookingId: createdBookingId
-            })
-          })
-
-          if (!confirmResponse.ok) {
-            const errorData = await confirmResponse.json();
-            throw new Error(errorData.message || 'Failed to confirm zero-amount booking');
-          }
-
-          const confirmResult = await confirmResponse.json()
-          console.log('Zero-amount booking confirmed successfully:', confirmResult)
-
-          // Update local storage with confirmed booking
-          const updatedBooking = { ...result.booking, confirmedPayment: true, status: 'confirmed' }
-          localStorage.setItem('currentBooking', JSON.stringify(updatedBooking))
-          setConfirmedBookingData(updatedBooking)
-
-          // Show success message and go to confirmation step
-          toast({
-            title: "Booking Confirmed!",
-            description: "Your booking has been automatically confirmed as the total amount is $0.00",
-            variant: "default",
-          })
-          setBookingStep(3)
-          setConfirmationStatus('success')
-
-        } catch (confirmError) {
-          console.error('Error confirming zero-amount booking:', confirmError)
-          toast({
-            title: "Booking Created but Confirmation Failed",
-            description: "Your booking was created but confirmation failed. Please contact support.",
-            variant: "destructive",
-          })
-          // Still go to confirmation step to show the booking was created
-          setBookingStep(3)
-          setConfirmationStatus('error')
-          setConfirmationError('Failed to confirm booking automatically')
-        }
-      } else {
-        // Move to payment step for non-zero amounts
-        setBookingStep(2)
-      }
+      
+      return createdBookingId;
 
     } catch (error) {
-      console.error('Error creating booking:', error)
-      toast({
-        title: "Booking creation failed",
-        description: `Failed to create booking: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+      console.error('Error creating booking for payment:', error)
+      throw error
     }
   }
-
 
   // Get constraints for the DatePicker components
   const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
@@ -1318,7 +1352,7 @@ export default function BookingClient() {
                           userId={userId}
                           bookingAmount={baseSubtotal}
                           bookingDuration={bookingDuration}
-                          userRole={user?.memberType as 'STUDENT' | 'MEMBER' | 'TUTOR' || 'MEMBER'}
+                          userRole={peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'}
                           locationPrice={selectedLocation?.price || 0}
                         />
                       )}
@@ -1379,6 +1413,8 @@ export default function BookingClient() {
                             onBack={() => setBookingStep(1)}
                             onComplete={() => setBookingStep(3)}
                             onPaymentMethodChange={handlePaymentMethodChange}
+                            onCreateBooking={createBookingForPayment}
+                            onBookingCreated={(bookingId) => setBookingId(bookingId)}
                           />
                         </p>
                         {/* <Button
