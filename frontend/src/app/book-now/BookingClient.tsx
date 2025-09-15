@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { isSameDay, endOfDay, parseISO, addMonths, addDays, setHours, setMinutes } from 'date-fns'
-import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle, Ticket } from 'lucide-react'
+import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle, Ticket, Package } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -222,6 +222,7 @@ export default function BookingClient() {
   const [bookingId, setBookingId] = useState<string | null>(null) // Store the created booking ID
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  
   const [confirmationHeadingError, setConfirmationHeadingError] = useState<string | null>(null)
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
@@ -678,36 +679,37 @@ export default function BookingClient() {
     const pkg = userPackages?.find(p => p.id === selectedPackage)
     if (!pkg || !bookingDuration) return null
     
-    // Get actual package hours from packageContents
-    const getPackageHours = (pkg: any) => {
-      if (!pkg.packageContents) return 0
-      
-      if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
-        return pkg.packageContents.fullDayHours
-      }
-      if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
-        return pkg.packageContents.halfDayHours
-      }
-      if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
-        return pkg.packageContents.totalHours
-      }
-      
-      return pkg.packageContents.totalHours || 0
-    }
+    // Use the same hour-based logic as EntitlementTabs
+    const PACKAGE_HOUR_LIMITS = {
+      'HALF_DAY': 4,
+      'FULL_DAY': 8,
+      'SEMESTER_BUNDLE': 4
+    } as const;
     
-    const packageHours = getPackageHours(pkg)
-    const hoursToUse = Math.min(bookingDuration.durationHours, packageHours)
+    const packageType = pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS;
+    const discountHours = PACKAGE_HOUR_LIMITS[packageType] || 0;
+    const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
+    const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
     
-    // Calculate package discount for ONE person only
-    const pricePerHour = selectedLocation?.price || 0
-    const onePersonCost = pricePerHour * bookingDuration.durationHours
-    const packageDiscount = Math.min(hoursToUse * pricePerHour, onePersonCost)
+    // Use the actual location price
+    const pricePerHour = selectedLocation?.price || 0;
+    const discountAmount = appliedHours * pricePerHour;
+    const remainingAmount = remainingHours * pricePerHour;
     
-    // Calculate remaining amount: (total cost) - (package discount for 1 person)
-    const remainingAmount = baseSubtotal - packageDiscount
+    console.log('BookingClient package discount calculation:', {
+      packageName: pkg.packageName,
+      packageType,
+      discountHours,
+      bookingHours: bookingDuration.durationHours,
+      appliedHours,
+      remainingHours,
+      pricePerHour,
+      discountAmount,
+      remainingAmount
+    });
     
     return {
-      discountAmount: packageDiscount,
+      discountAmount: discountAmount,
       finalAmount: remainingAmount
     }
   })() : null
@@ -757,6 +759,7 @@ export default function BookingClient() {
     setSelectedPaymentMethod(method)
     setFinalTotal(newTotal)
   }
+
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -830,7 +833,10 @@ export default function BookingClient() {
         confirmedPayment: false, // Always create as unconfirmed first
         bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
         paymentId: null, // Will be set after confirmation
-        bookedAt: new Date().toISOString()
+        bookedAt: new Date().toISOString(),
+        // Add package information for count tracking
+        packageId: selectedPackage || null,
+        packageUsed: !!selectedPackage
       }
 
       // Log the payload for debugging
@@ -1333,6 +1339,8 @@ export default function BookingClient() {
                           userId={userId}
                           bookingAmount={baseSubtotal}
                           bookingDuration={bookingDuration}
+                          userRole={user?.memberType as 'STUDENT' | 'MEMBER' | 'TUTOR' || 'MEMBER'}
+                          locationPrice={selectedLocation?.price || 0}
                         />
                       )}
                       {/* ──────────────────────────────────────────────── */}
@@ -1731,31 +1739,22 @@ export default function BookingClient() {
                         const pkg = userPackages?.find(p => p.id === selectedPackage)
                         if (!pkg || !bookingDuration) return null
                         
-                        // Get actual package hours from packageContents
-                        const getPackageHours = (pkg: any) => {
-                          if (!pkg.packageContents) return 0
-                          
-                          if (pkg.packageType === 'FULL_DAY' && pkg.packageContents.fullDayHours) {
-                            return pkg.packageContents.fullDayHours
-                          }
-                          if (pkg.packageType === 'HALF_DAY' && pkg.packageContents.halfDayHours) {
-                            return pkg.packageContents.halfDayHours
-                          }
-                          if (pkg.packageType === 'SEMESTER_BUNDLE' && pkg.packageContents.totalHours) {
-                            return pkg.packageContents.totalHours
-                          }
-                          
-                          return pkg.packageContents.totalHours || 0
-                        }
+                        // Use the same hour-based logic as the main calculation
+                        const PACKAGE_HOUR_LIMITS = {
+                          'HALF_DAY': 4,
+                          'FULL_DAY': 8,
+                          'SEMESTER_BUNDLE': 4
+                        } as const;
                         
-                        const packageHours = getPackageHours(pkg)
-                        const hoursToUse = Math.min(bookingDuration.durationHours, packageHours)
+                        const packageType = pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS;
+                        const discountHours = PACKAGE_HOUR_LIMITS[packageType] || 0;
+                        const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
+                        const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
                         
-                        // Calculate package discount for ONE person only (same logic as main calculation)
-                        const pricePerHour = selectedLocation?.price || 0
-                        const onePersonCost = pricePerHour * bookingDuration.durationHours
-                        const packageDiscount = Math.min(hoursToUse * pricePerHour, onePersonCost)
-                        const remainingAmount = baseSubtotal - packageDiscount
+                        // Use the actual location price
+                        const pricePerHour = selectedLocation?.price || 0;
+                        const packageDiscount = appliedHours * pricePerHour;
+                        const remainingAmount = remainingHours * pricePerHour;
                         
                         return (
                           <>
@@ -1765,7 +1764,7 @@ export default function BookingClient() {
                             </div>
                             <div className="flex justify-between text-green-600">
                               <span className='text-sm'>Hours Covered</span>
-                              <span className='text-sm'>{hoursToUse?.toFixed(2)}h free</span>
+                              <span className='text-sm'>{appliedHours?.toFixed(2)}h free</span>
                             </div>
                             <div className="flex justify-between text-green-600">
                               <span className='text-sm'>Package Discount</span>

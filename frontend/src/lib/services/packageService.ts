@@ -401,8 +401,35 @@ class PackageService {
       console.log('✅ User Packages API Response:', data);
       
       // Handle the new API response structure: data.purchases instead of data.packages
-      const packages = data.purchases || data.packages || [];
-      console.log(`📦 Found ${packages.length} user packages`);
+      const rawPackages = data.purchases || data.packages || [];
+      console.log(`📦 Found ${rawPackages.length} user packages`);
+      
+      // Map the packages to include the required fields
+      const packages = rawPackages.map((pkg: any) => ({
+        id: pkg.id,
+        orderId: pkg.orderId,
+        packageId: pkg.packageId,
+        packageName: pkg.Package?.name || pkg.packageName,
+        packageType: pkg.Package?.packageType || pkg.packageType,
+        targetRole: pkg.Package?.targetRole || pkg.targetRole,
+        description: pkg.Package?.description || pkg.description,
+        passCount: pkg.Package?.passCount || pkg.passCount,
+        validityDays: pkg.Package?.validityDays || pkg.validityDays,
+        quantity: pkg.quantity,
+        totalAmount: pkg.totalAmount,
+        paymentStatus: pkg.paymentStatus,
+        paymentMethod: pkg.paymentMethod,
+        activatedAt: pkg.activatedAt,
+        expiresAt: pkg.expiresAt,
+        isExpired: pkg.isExpired || (pkg.expiresAt ? new Date() > new Date(pkg.expiresAt) : false),
+        totalPasses: pkg.totalPasses || pkg.Package?.passCount || 0,
+        usedPasses: pkg.usedPasses || 0,
+        remainingPasses: pkg.remainingPasses || pkg.Package?.passCount || 0,
+        expiredPasses: pkg.expiredPasses || 0,
+        createdAt: pkg.createdAt
+      }));
+      
+      console.log(`📦 Mapped ${packages.length} packages with remainingPasses:`, packages.map(p => ({ name: p.packageName, remaining: p.remainingPasses })));
       
       return { success: true, packages };
     } catch (error) {

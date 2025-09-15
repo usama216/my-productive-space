@@ -10,7 +10,7 @@ import { PromoCodeManagement } from './PromoCodeManagement'
 import { BookingManagement } from './BookingManagement'
 import { UserManagement } from './UserManagement'
 import PackageManagement from './PackageManagement'
-import { PackageUsageTracking } from './PackageUsageTracking'
+import PackageUsageTable from './PackageUsageTable'
 
 export default function AdminTabs({
   activeTab,
@@ -293,7 +293,7 @@ export default function AdminTabs({
       </TabsContent>
 
       <TabsContent value="package-usage" className="space-y-4">
-        <PackageUsageTracking />
+        <PackageUsageTable />
       </TabsContent>
 
 

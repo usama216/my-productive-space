@@ -313,6 +313,45 @@ s for
                       </div>
                     )}
 
+                    {/* Usage Statistics - Show remaining passes */}
+                    {isCompleted && !isExpired && (
+                      <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                        <h5 className="font-medium text-blue-900 mb-3">Usage Statistics</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="text-blue-600 font-medium text-lg">{pkg.remainingPasses || 0}</div>
+                            <div className="text-blue-600 text-xs">Remaining</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-green-600 font-medium text-lg">{pkg.usedPasses || 0}</div>
+                            <div className="text-green-600 text-xs">Used</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-gray-600 font-medium text-lg">{pkg.totalPasses || 0}</div>
+                            <div className="text-gray-600 text-xs">Total</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-purple-600 font-medium text-lg">
+                              {pkg.totalPasses > 0 ? Math.round(((pkg.usedPasses || 0) / pkg.totalPasses) * 100) : 0}%
+                            </div>
+                            <div className="text-purple-600 text-xs">Used</div>
+                          </div>
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                              style={{ 
+                                width: `${pkg.totalPasses > 0 ? ((pkg.usedPasses || 0) / pkg.totalPasses) * 100 : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Payment Information */}
                     <div className="p-4 mb-4">
                       <h5 className="font-medium text-orange-900 mb-2">Payment Information</h5>

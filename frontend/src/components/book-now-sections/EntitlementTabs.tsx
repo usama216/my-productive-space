@@ -20,45 +20,78 @@ import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle
 import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode, calculateBookingDuration, validateMinimumHours, formatDurationDisplay, BookingDuration } from '@/lib/promoCodeService';
 import { getUserPackages, UserPackage as ApiUserPackage } from '@/lib/services/packageService';
 
-// Package validation logic based on requirements
+// Package hour limits per day based on requirements
+const PACKAGE_HOUR_LIMITS = {
+  'HALF_DAY': 4,
+  'FULL_DAY': 8,
+  'SEMESTER_BUNDLE': 4
+} as const;
+
+// Hourly rates by role
+const HOURLY_RATES = {
+  'STUDENT': 5.00,
+  'MEMBER': 6.00,
+  'TUTOR': 4.00
+} as const;
+
+// Package validation logic - packages are always valid regardless of booking hours
 const validatePackageForBooking = (packageType: string, bookingHours: number) => {
-  const validationRules = {
-    'HALF_DAY': { minHours: 2, maxHours: 6 },
-    'FULL_DAY': { minHours: 6, maxHours: 12 },
-    'SEMESTER_BUNDLE': { minHours: 1, maxHours: 200 } // Flexible
-  };
-
-  const rule = validationRules[packageType as keyof typeof validationRules];
-  if (!rule) return { valid: false, reason: 'Invalid package type' };
-
-  if (bookingHours < rule.minHours) {
-    return {
-      valid: false,
-      reason: `Minimum ${rule.minHours} hours required for ${packageType} package`
-    };
-  }
-
+  // All packages are valid for any booking duration
+  // No hour-based restrictions - users can use packages for any duration
   return { valid: true };
 };
 
 // Get applicable packages for booking
 const getApplicablePackages = (bookingHours: number, userPackages: ApiUserPackage[]) => {
+  // All packages are applicable regardless of booking hours
+  // No hour-based restrictions - users can use packages for any duration
   return userPackages.filter(pkg => {
-    const validation = validatePackageForBooking(pkg.packageType, bookingHours);
-    return validation.valid && pkg.remainingPasses > 0 && !pkg.isExpired;
+    const remainingPasses = pkg.remainingPasses || pkg.passCount || 0;
+    return remainingPasses > 0 && !pkg.isExpired;
   });
 };
 
-// Calculate excess charges for package usage
-const calculateExcessCharge = (packageType: string, packageHours: number, bookingHours: number, hourlyRate: number) => {
-  const excess = Math.max(0, bookingHours - packageHours);
-  return excess * hourlyRate;
-};
-
-// Get package hours based on count-based system
-const getPackageHours = (pkg: ApiUserPackage) => {
-  // For count-based system, each pass covers the entire booking regardless of duration
-  return 1;
+// Calculate package discount based on hour limits
+const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, userRole: string = 'MEMBER', locationPrice: number = 0) => {
+  const packageType = pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS;
+  const discountHours = PACKAGE_HOUR_LIMITS[packageType] || 0;
+  const appliedHours = Math.min(bookingHours, discountHours);
+  const remainingHours = Math.max(0, bookingHours - appliedHours);
+  
+  // Use the actual location price instead of hardcoded rates
+  const hourlyRate = locationPrice || HOURLY_RATES[userRole as keyof typeof HOURLY_RATES] || 6.00;
+  const discountAmount = appliedHours * hourlyRate;
+  const remainingAmount = remainingHours * hourlyRate;
+  
+  const canUse = (pkg.remainingPasses || pkg.passCount || 0) > 0 && !pkg.isExpired;
+  
+  console.log('Package discount calculation:', {
+    packageName: pkg.packageName,
+    packageType,
+    discountHours,
+    bookingHours,
+    appliedHours,
+    remainingHours,
+    userRole,
+    hourlyRate,
+    locationPrice,
+    discountAmount,
+    remainingAmount,
+    canUse,
+    remainingPasses: pkg.remainingPasses,
+    passCount: pkg.passCount,
+    isExpired: pkg.isExpired
+  });
+  
+  return {
+    hoursToUse: appliedHours,
+    discountAmount,
+    remainingAmount,
+    canUse,
+    appliedHours,
+    remainingHours,
+    packageHours: discountHours
+  };
 };
 
 type DiscountInfo =
@@ -76,6 +109,8 @@ type Props = {
   userId?: string
   bookingAmount?: number
   bookingDuration?: BookingDuration
+  userRole?: 'STUDENT' | 'MEMBER' | 'TUTOR'
+  locationPrice?: number
 }
 
 export function EntitlementTabs({
@@ -87,7 +122,9 @@ export function EntitlementTabs({
   promoValid,
   userId,
   bookingAmount = 0,
-  bookingDuration
+  bookingDuration,
+  userRole = 'MEMBER',
+  locationPrice = 0
 }: Props) {
   const [localPromo, setLocalPromo] = useState(promoCode || '')
   const [promoFeedback, setPromoFeedback] = useState<{ isValid: boolean; message: string } | null>(null)
@@ -116,12 +153,9 @@ export function EntitlementTabs({
       // Filter only packages with COMPLETED payment status
       const completedPackages = packages.filter(pkg => pkg.paymentStatus === 'COMPLETED');
 
-      // Filter packages based on booking hours if available
-      let applicablePackages = completedPackages;
-      if (bookingDuration && bookingDuration.durationHours > 0) {
-        applicablePackages = getApplicablePackages(bookingDuration.durationHours, completedPackages);
-        console.log(`Filtered packages for ${bookingDuration.durationHours} hours:`, applicablePackages);
-      }
+      // All completed packages are applicable regardless of booking hours
+      const applicablePackages = completedPackages;
+      console.log(`All applicable packages:`, applicablePackages);
 
       setUserPackages(applicablePackages);
       console.log('User packages loaded:', applicablePackages);
@@ -285,39 +319,18 @@ export function EntitlementTabs({
     }
   }
 
-  // Get package hours from new count-based system
-  const getPackageHours = (pkg: ApiUserPackage) => {
-    // For count-based system, each pass covers the entire booking regardless of duration
-    // We return 1 to indicate one pass can be used for any booking
-    return 1
-  }
-
-  // Calculate package discount based on count-based system
-  const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number) => {
-    // For count-based system, one pass covers the entire booking
-    const canUse = pkg.remainingPasses > 0 && !pkg.isExpired
-    const discountAmount = canUse ? bookingAmount : 0
-    const remainingAmount = canUse ? 0 : bookingAmount
-
-    return {
-      hoursToUse: canUse ? 1 : 0, // One pass used
-      discountAmount,
-      remainingAmount,
-      canUse
-    }
-  }
-
-  // Check if package is valid for current booking (count-based system)
+  // Check if package is valid for current booking
   const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
-    // For count-based system, any package can be used for any booking duration
-    // as long as the user has remaining passes and the package isn't expired
-    return !pkg.isExpired && pkg.remainingPasses > 0
+    // Use remainingPasses from the API response, fallback to passCount if not available
+    const remainingPasses = pkg.remainingPasses || pkg.passCount || 0;
+    return !pkg.isExpired && remainingPasses > 0
   }
 
   // Check if user has any valid packages
-  const hasValidPackages = userPackages.some(pkg =>
-    !pkg.isExpired && pkg.remainingPasses > 0
-  )
+  const hasValidPackages = userPackages.some(pkg => {
+    const remainingPasses = pkg.remainingPasses || pkg.passCount || 0;
+    return !pkg.isExpired && remainingPasses > 0
+  })
 
   return (
     <div className="border-t pt-6">
@@ -356,19 +369,10 @@ export function EntitlementTabs({
                 <CardContent className="p-4 text-center">
                   <AlertCircle className="w-8 h-8 text-orange-500 mx-auto mb-2" />
                   <p className="text-orange-800 font-medium">
-                    {bookingDuration && bookingDuration.durationHours > 0
-                      ? "No Applicable Packages"
-                      : "No Active Packages"}
+                    No Active Packages
                   </p>
                   <p className="text-sm text-orange-700 mt-1">
-                    {bookingDuration && bookingDuration.durationHours > 0 ? (
-                      <>
-                        No packages available for {bookingDuration.durationHours.toFixed(2)}h booking.
-                      </>
-
-                    ) : (
-                      "Purchase a package to unlock member discounts"
-                    )}
+                    Purchase a package to unlock member discounts
                   </p>
 
                 </CardContent>
@@ -423,8 +427,19 @@ export function EntitlementTabs({
                           const bookingHours = bookingDuration?.durationHours || 0;
                           const discount =
                             pkg && bookingHours > 0
-                              ? calculatePackageDiscount(pkg, bookingHours)
+                              ? calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice)
                               : null;
+
+                          console.log('Package selected:', {
+                            packageId: val,
+                            packageName: pkg?.packageName,
+                            packageType: pkg?.packageType,
+                            bookingHours,
+                            userRole,
+                            discount,
+                            remainingPasses: pkg?.remainingPasses,
+                            passCount: pkg?.passCount
+                          });
 
                           onChange({
                             type: "package",
@@ -439,14 +454,14 @@ export function EntitlementTabs({
                         </SelectTrigger>
                         <SelectContent>
                           {userPackages.map((pkg) => {
-                            const remaining = pkg.remainingPasses;
+                            const remaining = pkg.remainingPasses || pkg.passCount || 0;
                             const bookingHours = bookingDuration?.durationHours || 0;
                             const isValid = isPackageValidForBooking(pkg, bookingHours);
                             const discount =
                               bookingHours > 0
-                                ? calculatePackageDiscount(pkg, bookingHours)
+                                ? calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice)
                                 : null;
-                            const packageHours = getPackageHours(pkg);
+                            const packageHours = PACKAGE_HOUR_LIMITS[pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS] || 0;
 
                             return (
                               <SelectItem
@@ -460,35 +475,14 @@ export function EntitlementTabs({
                                     <div>
                                       <span className="font-medium">{pkg.packageName}</span>
                                       <span className="text-sm text-gray-500 ml-2">
-                                        ({remaining} of {pkg.totalPasses} left)
+                                        ({remaining} of {pkg.totalPasses || pkg.passCount || 0} left)
                                       </span>
-                                      {/* {discount && (
-                            <div className="text-xs text-green-600 mt-1">
-                              Save ${discount.discountAmount.toFixed(2)} •{" "}
-                              {discount.hoursToUse?.toFixed(2)}h free
-                            </div>
-                          )} */}
-                                      {/* <div className="text-xs text-gray-500 mt-1">
-                            {packageHours}h available
-                          </div> */}
-                                      {!isValid && bookingHours > 0 && (
-                                        <div className="text-xs text-red-600 mt-1">
-                                          {pkg.packageType === "FULL_DAY"
-                                            ? "Min. 6 hours required"
-                                            : pkg.packageType === "HALF_DAY"
-                                              ? "Min. 2 hours required"
-                                              : "Cannot use"}
-                                        </div>
-                                      )}
-                                      {isValid && bookingHours > packageHours && (
-                                        <div className="text-xs text-orange-600 mt-1">
-                                          Excess charge: $
-                                          {calculateExcessCharge(
-                                            pkg.packageType,
-                                            packageHours,
-                                            bookingHours,
-                                            30
-                                          ).toFixed(2)}
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Package discount available
+                                      </div>
+                                      {discount && bookingHours > 0 && (
+                                        <div className="text-xs text-green-600 mt-1">
+                                          Save ${discount.discountAmount.toFixed(2)}
                                         </div>
                                       )}
                                     </div>
@@ -508,7 +502,7 @@ export function EntitlementTabs({
                           {(() => {
                             const pkg = userPackages.find((p) => p.id === selectedPackage);
                             if (!pkg) return null;
-                            const remaining = pkg.remainingPasses;
+                            const remaining = pkg.remainingPasses || pkg.passCount || 0;
 
                             return (
                               <div className="space-y-3">
@@ -542,44 +536,43 @@ export function EntitlementTabs({
 
                                 {(() => {
                                   const bookingHours = bookingDuration?.durationHours || 0;
-                                  const packageHours = getPackageHours(pkg);
-                                  const excessCharge = calculateExcessCharge(
-                                    pkg.packageType,
-                                    packageHours,
-                                    bookingHours,
-                                    30
-                                  );
+                                  const packageHours = PACKAGE_HOUR_LIMITS[pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS] || 0;
+                                  const discount = calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice);
 
                                   return (
-                                    <div className="space-y-2">
-                                      <div className="text-sm text-green-700">
-                                        <span className="font-medium">Package Hours:</span>{" "}
-                                        {packageHours}h
-                                        {bookingHours > 0 && (
-                                          <span className="ml-2">
-                                            <span className="font-medium">
-                                              Booking Hours:
-                                            </span>{" "}
-                                            {bookingHours}h
-                                          </span>
-                                        )}
-                                      </div>
+                                <div className="space-y-2">
+                                  <div className="text-sm text-green-700">
+                                    <span className="font-medium">Package Type:</span>{" "}
+                                    {pkg.packageName}
+                                    {bookingHours > 0 && (
+                                      <span className="ml-2">
+                                        <span className="font-medium">
+                                          Booking Hours:
+                                        </span>{" "}
+                                        {bookingHours}h
+                                      </span>
+                                    )}
+                                  </div>
 
-                                      {excessCharge > 0 && (
-                                        <div className="text-sm text-orange-700 bg-orange-50 p-2 rounded">
-                                          <span className="font-medium">Excess Charge:</span>{" "}
-                                          ${excessCharge.toFixed(2)}
-                                          <span className="text-xs ml-1">
-                                            ({(bookingHours - packageHours).toFixed(1)}h ×
-                                            $30/hour)
-                                          </span>
-                                        </div>
-                                      )}
+                                      {discount && (
+                                        <div className="space-y-2">
+                                          <div className="text-sm text-green-700 bg-green-100 p-2 rounded">
+                                            <span className="font-medium">Discount Applied:</span>{" "}
+                                            ${discount.discountAmount.toFixed(2)} saved
+                                            {discount.remainingAmount > 0 && (
+                                              <span className="ml-2">
+                                                <span className="font-medium">Final Amount:</span>{" "}
+                                                ${discount.remainingAmount.toFixed(2)}
+                                              </span>
+                                            )}
+                                          </div>
 
-                                      {bookingHours > 0 && bookingHours <= packageHours && (
-                                        <div className="text-sm text-green-700 bg-green-100 p-2 rounded">
-                                          <span className="font-medium">✅ Fully Covered</span>{" "}
-                                          - No additional charges
+                                          {discount.remainingAmount === 0 && (
+                                            <div className="text-sm text-green-700 bg-green-100 p-2 rounded">
+                                              <span className="font-medium">✅ Fully Covered</span>{" "}
+                                              - No additional charges
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>
