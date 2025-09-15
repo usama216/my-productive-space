@@ -456,7 +456,7 @@ export function UserManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {users.filter(u => u.studentVerificationStatus === 'PENDING').length}
+                {users.filter(u => u.studentVerificationStatus === 'PENDING' && u.studentVerificationImageUrl).length}
               </div>
             </CardContent>
           </Card>
@@ -601,7 +601,7 @@ export function UserManagement() {
                              <Edit className="h-4 w-4" />
                            </Button> */}
                            
-                           {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && (
+                           {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && user.studentVerificationImageUrl && (
                              <>
                                <Button
                                  variant="outline"

@@ -50,7 +50,7 @@ import { UserPackages } from '@/components/dashboard/UserPackages'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { getUserProfile, updateUserProfile, UserProfile, formatUserName, getMemberTypeDisplayName, getVerificationStatusDisplayName, getVerificationStatusColor } from '@/lib/userProfileService'
+import { getUserProfile, updateUserProfile, UserProfile, formatUserName, getMemberTypeDisplayName, getVerificationStatusDisplayName, getVerificationStatusColor, getEffectiveMemberType } from '@/lib/userProfileService'
 import { StudentDocumentUpload } from '@/components/StudentDocumentUpload'
 import { StudentDocumentData } from '@/lib/studentDocumentService'
 
@@ -606,7 +606,10 @@ export default function Dashboard() {
                         <Label htmlFor="memberType">Member Type</Label>
                         <Select
                           disabled={!isEditingProfile}
-                          value={isEditingProfile ? editFormData.memberType : (userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType)}
+                          value={isEditingProfile ? editFormData.memberType : getEffectiveMemberType(
+                            userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType,
+                            userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus
+                          )}
                           onValueChange={handleMemberTypeChange}
                         >
                           <SelectTrigger className="mt-1">

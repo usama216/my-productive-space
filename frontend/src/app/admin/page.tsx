@@ -170,9 +170,10 @@ export default function AdminDashboard() {
       })
       
       if (response.success && response.users) {
-        // Filter for pending verification status
+        // Filter for pending verification status (exclude NA which means cancelled)
         const pending = response.users.filter(user => 
-          user.studentVerificationStatus === 'PENDING'
+          user.studentVerificationStatus === 'PENDING' && 
+          user.studentVerificationImageUrl // Also ensure they have uploaded a document
         )
         setPendingStudents(pending)
       } else {
