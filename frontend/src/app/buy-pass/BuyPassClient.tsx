@@ -80,12 +80,21 @@ export default function BuyNowPage() {
     if (user) {
       const metadata = user.user_metadata as any
       if (metadata) {
-        setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
-        setCustomerEmail(user.email || '')
-        setCustomerPhone(metadata.contactNumber || '')
+        // Only set name if it's currently empty
+        if (!customerName) {
+          setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
+        }
+        // Only set email if it's currently empty
+        if (!customerEmail) {
+          setCustomerEmail(user.email || '')
+        }
+        // Only set phone if it's currently empty
+        if (!customerPhone) {
+          setCustomerPhone(metadata.contactNumber || '')
+        }
       }
     }
-  }, [user])
+  }, [user, customerName, customerEmail, customerPhone])
 
   useEffect(() => {
     const packageParam = searchParams.get('package')

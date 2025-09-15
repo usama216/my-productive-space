@@ -389,17 +389,27 @@ export default function BookingClient() {
     }
   }, [user, isLoadingAuth, router])
 
-  // Pre-fill user information when user changes
+  // Pre-fill user information when user changes (only if fields are empty)
   useEffect(() => {
     if (user) {
       const metadata = user.user_metadata as any
+      console.log('user phone', user)
       if (metadata) {
-        setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
-        setCustomerEmail(user.email || '')
-        setCustomerPhone(metadata.contactNumber || '')
+        // Only set name if it's currently empty
+        if (!customerName) {
+          setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
+        }
+        // Only set email if it's currently empty
+        if (!customerEmail) {
+          setCustomerEmail(user.email || '')
+        }
+        // Only set phone if it's currently empty
+        if (!customerPhone) {
+          setCustomerPhone(metadata.contactNumber || '')
+        }
       }
     }
-  }, [user])
+  }, [user, customerName, customerEmail, customerPhone])
 
   // Prefill form with data from landing page
   useEffect(() => {
@@ -696,18 +706,6 @@ export default function BookingClient() {
     const discountAmount = appliedHours * pricePerHour;
     const remainingAmount = remainingHours * pricePerHour;
     
-    console.log('BookingClient package discount calculation:', {
-      packageName: pkg.packageName,
-      packageType,
-      discountHours,
-      bookingHours: bookingDuration.durationHours,
-      appliedHours,
-      remainingHours,
-      pricePerHour,
-      discountAmount,
-      remainingAmount
-    });
-    
     return {
       discountAmount: discountAmount,
       finalAmount: remainingAmount
@@ -728,26 +726,7 @@ export default function BookingClient() {
 
   const total = subtotal
 
-  // Debug logging for pricing calculations
-  console.log('Pricing calculations:', {
-    location: selectedLocation?.name,
-    pricePerHour: selectedLocation?.price,
-    totalHours,
-    people,
-    baseSubtotal,
-    promoCodeInfo,
-    packageDiscountInfo,
-    selectedPackage,
-    subtotal,
-    discountAmount,
-    total,
-    // Additional debug info for package discount
-    ...(selectedPackage && {
-      onePersonCost: selectedLocation ? selectedLocation.price * totalHours : 0,
-      packageDiscountForOnePerson: packageDiscountInfo?.discountAmount || 0,
-      otherPeopleCost: people > 1 ? (people - 1) * (selectedLocation?.price || 0) * totalHours : 0
-    })
-  });
+
 
   // Update finalTotal when total changes
   useEffect(() => {
