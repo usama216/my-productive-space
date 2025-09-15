@@ -288,7 +288,6 @@ export function UserPackages({ userId }: UserPackagesProps) {
                         </div>
                       </div>
                     </div>
-s for
                     {/* Package Contents */}
                     {pkg.packageContents && (
                       <div className="bg-gray-50 rounded-lg p-4 mb-4">

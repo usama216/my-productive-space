@@ -143,58 +143,7 @@ export default function PackageUsageTable() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Overview */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Packages</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.totalPackages}</p>
-                </div>
-                <Package className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Purchases</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.totalPurchases}</p>
-                </div>
-                <Users className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Passes</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.totalPasses}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Usage Rate</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.averageUsage.toFixed(1)}%</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+   
 
       {/* Package Usage Table */}
       <Card>
