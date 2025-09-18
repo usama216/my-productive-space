@@ -1,4 +1,3 @@
-// src/app/auth/confirm/ConfirmClient.tsx
 "use client"
 
 import { useEffect, useState } from 'react'
@@ -34,7 +33,6 @@ export default function ConfirmPage() {
 
         setConfirmed(true)
         
-        // Redirect to home with success message after 3 seconds
         setTimeout(() => {
           router.push('/?toastType=emailConfirmed')
         }, 3000)

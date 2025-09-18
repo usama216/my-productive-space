@@ -1,4 +1,3 @@
-// src/app/forgot-password/page.tsx - Step 1: Request password reset
 "use client"
 
 import { useState, useRef } from 'react'

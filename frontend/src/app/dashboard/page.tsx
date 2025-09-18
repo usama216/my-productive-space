@@ -82,6 +82,7 @@ export default function Dashboard() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+  const [verificationHistory, setVerificationHistory] = useState<any[]>([])
   const [editFormData, setEditFormData] = useState({
     firstName: '',
     lastName: '',
@@ -133,11 +134,31 @@ export default function Dashboard() {
             mimeType: 'image/jpeg' // Default assumption
           })
         }
+
+        // Load verification history if user is a student
+        if (profile.memberType === 'STUDENT') {
+          await loadVerificationHistory(authUser.id)
+        }
       }
     } catch (error) {
       console.error('Error loading user profile:', error)
     } finally {
       setIsLoadingProfile(false)
+    }
+  }
+
+  // Load verification history
+  const loadVerificationHistory = async (userId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/verification-history/${userId}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setVerificationHistory(data.history || [])
+        console.log('📋 Verification history loaded:', data.history)
+      }
+    } catch (error) {
+      console.error('Error loading verification history:', error)
     }
   }
 
@@ -166,12 +187,10 @@ export default function Dashboard() {
       // Prepare profile data with student document info
       const profileUpdateData: Partial<UserProfile> = {
         ...editFormData,
-        // Include student document data if available
         ...(editFormData.memberType === 'STUDENT' && studentDocument && {
           studentVerificationImageUrl: studentDocument.url,
           studentVerificationStatus: 'PENDING' as const
         }),
-        // If changing away from student, clear student data
         ...(editFormData.memberType !== 'STUDENT' && originalMemberType === 'STUDENT' && {
           studentVerificationImageUrl: undefined,
           studentVerificationStatus: 'NA' as const
@@ -368,19 +387,11 @@ export default function Dashboard() {
                   Welcome back, {databaseUser?.name || 'User'}!
                 </p>
               </div>
-              {/* <div className="flex items-center space-x-4">
-                <Button onClick={() => router.push('/book-now')} className="bg-orange-500 hover:bg-orange-600">
-                  Book Now
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/buy-pass')}>
-                  Buy Passes
-                </Button>
-              </div> */}
+             
             </div>
           </div>
 
 
-          {/* Main Content */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -390,10 +401,9 @@ export default function Dashboard() {
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
             </TabsList>
 
-            {/* Overview Tab */}
+       
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Upcoming Bookings Preview */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
@@ -413,7 +423,7 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
 
-                {/* Quick Stats */}
+             
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -421,30 +431,102 @@ export default function Dashboard() {
                         <BarChart3 className="w-5 h-5 mr-2" />
                         Quick Stats
                       </CardTitle>
-                      {/* Notification Bell for Student Verification Rejection */}
-                      {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' &&
-                        (userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus) === 'REJECTED' && (
+                      {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' && (() => {
+                        // ONLY show notification if there's verification history
+                        if (verificationHistory.length === 0) return null;
+                        
+                        // Debug logging
+                        console.log('🔔 Notification Debug:', {
+                          historyLength: verificationHistory.length,
+                          verificationHistory
+                        });
+                        
+                        const formatDate = (dateString) => {
+                          const date = new Date(dateString);
+                          return `${date.getMonth() + 1}/${date.getDate()}`;
+                        };
+                        
+                        const getStatusIcon = (status) => {
+                          switch (status) {
+                            case 'REJECTED':
+                              return <AlertCircle className="h-4 w-4 text-red-600" />;
+                            case 'VERIFIED':
+                              return <CheckCircle className="h-4 w-4 text-green-600" />;
+                            case 'PENDING':
+                              return <Clock className="h-4 w-4 text-orange-600" />;
+                            default:
+                              return <AlertCircle className="h-4 w-4 text-gray-600" />;
+                          }
+                        };
+                        
+                        const getStatusColor = (status) => {
+                          switch (status) {
+                            case 'REJECTED':
+                              return 'text-red-800';
+                            case 'VERIFIED':
+                              return 'text-green-800';
+                            case 'PENDING':
+                              return 'text-orange-800';
+                            default:
+                              return 'text-gray-800';
+                          }
+                        };
+                        
+                        const getStatusText = (status) => {
+                          switch (status) {
+                            case 'REJECTED':
+                              return 'rejected';
+                            case 'VERIFIED':
+                              return 'approved';
+                            case 'PENDING':
+                              return 'pending';
+                            default:
+                              return 'changed';
+                          }
+                        };
+                        
+                        // Show notification if there are any status changes in history
+                        const hasStatusChanges = verificationHistory.some(h => h.newStatus === 'REJECTED' || h.newStatus === 'VERIFIED');
+                        
+                        if (!hasStatusChanges) return null;
+                        
+                        return (
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="outline" size="sm" className="relative">
                                 <Bell className="h-4 w-4" />
-                                <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+                                <span className="absolute -top-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></span>
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80" align="end">
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div className="flex items-center space-x-2">
-                                  <AlertCircle className="h-4 w-4 text-red-600" />
-                                  <h4 className="font-semibold text-red-800">Student Verification Rejected</h4>
+                                  <Bell className="h-4 w-4 text-orange-600" />
+                                  <h4 className="font-semibold text-orange-600">Verification History</h4>
                                 </div>
-                                <p className="text-sm text-red-700">
-                                  {userProfile?.studentRejectionReason || databaseUser?.studentRejectionReason ||
-                                    'Your student verification has been rejected. Please contact support for more information.'}
-                                </p>
+                                
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                  {verificationHistory.map((history, index) => (
+                                    <div key={history.id} className="border-l-2 border-gray-200 pl-3 py-2">
+                                      <div className="flex items-center space-x-2">
+                                        {getStatusIcon(history.newStatus)}
+                                        <span className={`text-sm font-medium ${getStatusColor(history.newStatus)}`}>
+                                          Student status {getStatusText(history.newStatus)}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {formatDate(history.changedAt)} - {history.reason}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                
+                             
                               </div>
                             </PopoverContent>
                           </Popover>
-                        )}
+                        );
+                      })()}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -514,14 +596,12 @@ export default function Dashboard() {
                                 )
                             }
                           </Badge>
-                          {/* Show verification status for students (verified, pending) - hide rejected status */}
                           {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (() => {
                             const status =
                               userProfile?.studentVerificationStatus ||
                               databaseUser?.studentVerificationStatus ||
                               sampleUserData.studentVerificationStatus;
 
-                            // Don't show badge for rejected status - user can see this in notifications
                             if (status === 'REJECTED') {
                               return null;
                             }
@@ -544,7 +624,10 @@ export default function Dashboard() {
 
                             return (
                               <Badge variant="outline" className={badgeClass}>
-                                {`Student Verification Status - ${statusText}`}
+                                {status === 'PENDING' 
+                                  ? 'Status verification Pending - Please check back in a few days.'
+                                  : `Student Verification Status - ${statusText}`
+                                }
                               </Badge>
                             );
                           })()}
@@ -564,7 +647,6 @@ export default function Dashboard() {
                       </Button>
                     </div>
 
-                    {/* Detailed Information */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t">
                       <div>
                         <Label htmlFor="firstName">First Name</Label>
@@ -625,7 +707,6 @@ export default function Dashboard() {
                           </SelectContent>
                         </Select>
                       </div>
-                      {/* Only show student verification dropdown for students */}
                       {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (
                         <div>
                           <Label htmlFor="verificationStatus">Student Verification</Label>
@@ -741,39 +822,7 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* Account Statistics */}
-                    {/* <div className="pt-6 border-t">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Account Statistics</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                          <div className="flex items-center">
-                            <Calendar className="w-8 h-8 text-blue-600 mr-3" />
-                      <div>
-                              <p className="text-sm text-blue-600 font-medium">Total Bookings</p>
-                              <p className="text-2xl font-bold text-blue-700">0</p>
-                      </div>
-                      </div>
-                      </div>
-                        <div className="bg-green-50 p-4 rounded-lg">
-                          <div className="flex items-center">
-                            <Clock className="w-8 h-8 text-green-600 mr-3" />
-                      <div>
-                              <p className="text-sm text-green-600 font-medium">Hours Used</p>
-                              <p className="text-2xl font-bold text-green-700">0</p>
-                      </div>
-                    </div>
-                    </div>
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <div className="flex items-center">
-                            <Gift className="w-8 h-8 text-purple-600 mr-3" />
-                                <div>
-                              <p className="text-sm text-purple-600 font-medium">Promo Codes Used</p>
-                              <p className="text-2xl font-bold text-purple-700">0</p>
-                                </div>
-                              </div>
-                              </div>
-                            </div>
-                            </div> */}
+                   
                   </CardContent>
                 </Card>
 

@@ -1,4 +1,3 @@
-// // src/app/reset-password/ResetPasswordClient.tsx- Step 2: User sets new password (Updated with notifications)
 "use client"
 
 import { useState, useEffect } from 'react'

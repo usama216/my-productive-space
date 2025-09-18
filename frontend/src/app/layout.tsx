@@ -40,7 +40,6 @@ export default function RootLayout({
           <WhatsappLive />
         </div>
         
-        {/* Toast components for authentication notifications */}
         <Toaster />
         <HomeToast />
       </body>

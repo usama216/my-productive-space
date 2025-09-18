@@ -8,7 +8,7 @@ export default function CancellationReviewModal({
   setSelectedCancellation,
   handleCancellationAction,
   isLoading
-}) {
+}:any) {
   return (
     <Dialog open={!!selectedCancellation} onOpenChange={() => setSelectedCancellation(null)}>
       <DialogContent className="max-w-2xl">

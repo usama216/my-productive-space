@@ -1,4 +1,3 @@
-// src/app/book-now/BookingClient.tsx
 'use client'
 
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
@@ -40,10 +39,6 @@ import { PromoCode } from '@/lib/promoCodeService'
 import { getUserPackages, UserPackage } from '@/lib/services/packageService'
 
 
-
-
-
-// Location data with pricing
 const locations = [
   { id: 'kovan', name: 'Kovan', price: 30, address: '456 Kovan Road, Singapore 560456' }
 ]
@@ -52,7 +47,6 @@ export default function BookingClient() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
-  // Auth state
   const { user, userId, isLoggedIn, loading: isLoadingAuth } = useAuth()
 
   const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo'>('package')
@@ -84,9 +78,7 @@ export default function BookingClient() {
 
 
 
-  // A quick demo layout matching your SVG coords:
   const DEMO_LAYOUT: SeatMeta[] = [
-    // ← Left column (near T1–T4)
     { id: 'S1', x: 120, y: 80, shape: 'circle', size: 20 },
     { id: 'S2', x: 120, y: 160, shape: 'circle', size: 20 },
     { id: 'S3', x: 120, y: 260, shape: 'circle', size: 20 },
@@ -196,50 +188,43 @@ export default function BookingClient() {
 
 
 
-  // Booking form state
   const [location, setLocation] = useState<string>('kovan')
   const [people, setPeople] = useState<number>(1)
 
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
   
-  // Booking duration for minimum hours validation
   const [bookingDuration, setBookingDuration] = useState<{
     startAt: string;
     endAt: string;
     durationHours: number;
   } | undefined>(undefined)
 
-  // Additional booking details
   const [customerName, setCustomerName] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
 
-  // UI state
   const [isLoading, setIsLoading] = useState(false)
-  const [bookingStep, setBookingStep] = useState(1) // 1: Details, 2: Payment, 3: Confirmation
-  const [bookingId, setBookingId] = useState<string | null>(null) // Store the created booking ID
+  const [bookingStep, setBookingStep] = useState(1) 
+  const [bookingId, setBookingId] = useState<string | null>(null) 
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
   
   const [confirmationHeadingError, setConfirmationHeadingError] = useState<string | null>(null)
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
-  const [finalTotal, setFinalTotal] = useState(0) // Will be set after total is calculated
+  const [finalTotal, setFinalTotal] = useState(0) 
   
-  // User packages state
   const [userPackages, setUserPackages] = useState<UserPackage[]>([])
   const [isLoadingPackages, setIsLoadingPackages] = useState(false)
 
-  // Load user packages
   const loadUserPackages = useCallback(async () => {
     if (!userId) return
     
     setIsLoadingPackages(true)
     try {
       const packages = await getUserPackages(userId)
-      // Filter for completed packages only
       const completedPackages = packages.filter((pkg: UserPackage) => pkg.paymentStatus === 'COMPLETED')
       setUserPackages(completedPackages)
     } catch (error) {
@@ -249,14 +234,12 @@ export default function BookingClient() {
     }
   }, [userId])
 
-  // Load packages when user is available
   useEffect(() => {
     if (userId) {
       loadUserPackages()
     }
   }, [userId, loadUserPackages])
 
-  // Calculate booking duration when dates change
   useEffect(() => {
     if (startDate && endDate) {
       const startAt = startDate.toISOString();
@@ -274,41 +257,33 @@ export default function BookingClient() {
     }
   }, [startDate, endDate])
 
-  // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
 
-  // Helper function to check if payment failed
   const isPaymentFailed = useCallback((status: string | null) => {
     return status === 'canceled' || status === 'cancelled' || status === 'failed' ||
       status === 'declined' || status === 'rejected' || status === 'expired'
   }, [])
 
-  // Function to confirm booking
   const confirmBooking = useCallback(async () => {
     try {
       setConfirmationStatus('loading')
       setConfirmationError(null)
       setConfirmationHeadingError(null)
       
-      // Check if this is a zero-amount booking that was already auto-confirmed
       const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
       if (currentBooking.confirmedPayment && currentBooking.status === 'confirmed') {
-        console.log('💰 Booking already confirmed (zero-amount or regular)')
         setConfirmedBookingData(currentBooking)
         setConfirmationStatus('success')
         return
       }
       
-      // Check if payment was canceled or failed
       const paymentStatus = searchParams.get('status')
       if (isPaymentFailed(paymentStatus)) {
-        console.log('Payment status indicates failure:', paymentStatus)
         setConfirmationStatus('error')
         setConfirmationError('Payment was not completed. Your booking has not been confirmed.')
         return
       }
 
-      // Get booking ID from URL params or state
       const urlBookingId = searchParams.get('bookingId')
       const currentBookingId = urlBookingId || bookingId
 
@@ -316,7 +291,6 @@ export default function BookingClient() {
         throw new Error('No booking ID found for confirmation')
       }
 
-      // Call the confirm booking API
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
         method: 'POST',
         headers: {
@@ -326,11 +300,6 @@ export default function BookingClient() {
           bookingId: currentBookingId
         })
       })
-
-      // if (!response.ok) {
-      //   const errorData = await response.json()
-      //   throw new Error(errorData.error || 'Failed to confirm booking')
-      // }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -389,21 +358,16 @@ export default function BookingClient() {
     }
   }, [user, isLoadingAuth, router])
 
-  // Pre-fill user information when user changes (only if fields are empty)
   useEffect(() => {
     if (user) {
       const metadata = user.user_metadata as any
-      console.log('user phone', user)
       if (metadata) {
-        // Only set name if it's currently empty
         if (!customerName) {
           setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
         }
-        // Only set email if it's currently empty
         if (!customerEmail) {
           setCustomerEmail(user.email || '')
         }
-        // Only set phone if it's currently empty
         if (!customerPhone) {
           setCustomerPhone(metadata.contactNumber || '')
         }
@@ -411,17 +375,11 @@ export default function BookingClient() {
     }
   }, [user, customerName, customerEmail, customerPhone])
 
-  // Prefill form with data from landing page
   useEffect(() => {
-    // 1) pull raw strings
     const locStr = searchParams.get('location')
     const peopleParam = searchParams.get('people')
     const startStr = searchParams.get('start')
     const endStr = searchParams.get('end')
-
-    // 2) parse your breakdown
-    // Get breakdown parameters
-    // parse breakdown from URL
     const cW = parseInt(searchParams.get('coWorkers') ?? '1', 10)
     const cT = parseInt(searchParams.get('coTutors') ?? '0', 10)
     const cS = parseInt(searchParams.get('coStudents') ?? '0', 10)
@@ -596,7 +554,6 @@ export default function BookingClient() {
       }
     }
 
-    // If it's a next-day booking, validate time constraints
     if (daysDifference === 1) {
       const startHour = startDate.getHours()
       const endHour = endDate.getHours()
@@ -641,11 +598,7 @@ export default function BookingClient() {
       if (response.ok) {
         const data = await response.json()
         setBookedSeats(data.bookedSeats || [])
-        console.log('Booked seats fetched:', data.bookedSeats)
-        console.log('Overlapping bookings:', data.overlappingBookings)
-        console.log('Booking summary:', data.summary)
-        
-        // Log pending payment bookings for debugging
+       
         if (data.summary?.pending > 0) {
           console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
         }
@@ -689,15 +642,8 @@ export default function BookingClient() {
     const pkg = userPackages?.find(p => p.id === selectedPackage)
     if (!pkg || !bookingDuration) return null
     
-    // Use the same hour-based logic as EntitlementTabs
-    const PACKAGE_HOUR_LIMITS = {
-      'HALF_DAY': 4,
-      'FULL_DAY': 8,
-      'SEMESTER_BUNDLE': 4
-    } as const;
-    
-    const packageType = pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS;
-    const discountHours = PACKAGE_HOUR_LIMITS[packageType] || 0;
+    // Use dynamic hoursAllowed from package configuration instead of hardcoded values
+    const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
     const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
     const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
     
@@ -879,7 +825,6 @@ export default function BookingClient() {
       setConfirmationStatus('success')
 
     } catch (error) {
-      console.error('Error creating free booking:', error)
       toast({
         title: "Booking failed",
         description: error instanceof Error ? error.message : "An error occurred while creating your booking. Please try again.",
@@ -990,7 +935,6 @@ export default function BookingClient() {
 
       <div className="pt-20 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Guest Warning Alert */}
           {!user && (
             <Alert className="mb-6 border-orange-200 bg-orange-50">
               <AlertCircle className="h-4 w-4 text-orange-600" />
@@ -1008,7 +952,6 @@ export default function BookingClient() {
               </AlertDescription>
             </Alert>
           )}
-          {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-serif text-gray-900 mb-4">Complete Your Booking</h1>
             <p className="text-lg text-gray-600">Secure your co-working space in just a few steps</p>
@@ -1307,7 +1250,6 @@ export default function BookingClient() {
                           onModeChange={(newMode) => {
                             console.log('Mode changed to:', newMode);
                             setEntitlementMode(newMode);
-                            // Clear any existing discounts when switching modes
                             setSelectedPackage('');
                             setPromoCode('');
                             setPromoValid(false);
@@ -1361,13 +1303,7 @@ export default function BookingClient() {
                       <Button
                         type="submit"
                         className="w-full bg-orange-500 hover:bg-orange-600"
-                        // disabled={
-                        //   !isFormValid ||
-                        //   // (entitlementMode === 'package' && !selectedPackage) ||
-                        //   (entitlementMode === 'promo' && !promoValid) ||
-                        //   isLoading ||
-                        //   !user
-                        // }
+                       
                       >
                         {!user
                           ? 'Sign In Required'
@@ -1417,12 +1353,7 @@ export default function BookingClient() {
                             onBookingCreated={(bookingId) => setBookingId(bookingId)}
                           />
                         </p>
-                        {/* <Button
-                          onClick={() => setBookingStep(3)}
-                          className="w-full bg-orange-500 hover:bg-orange-600"
-                        >
-                          Complete Booking (Demo)
-                        </Button> */}
+                   
                       </div>
                     </div>
 
@@ -1721,7 +1652,6 @@ export default function BookingClient() {
 
                     </div>
                   ) : totalHours > 0 && user ? (
-                    // Show form pricing when not yet confirmed
                     <div className="border-t pt-4 space-y-2">
                       <div className="flex justify-between">
                         <span>Rate (${selectedLocation?.price}/hour)</span>
@@ -1754,15 +1684,8 @@ export default function BookingClient() {
                         const pkg = userPackages?.find(p => p.id === selectedPackage)
                         if (!pkg || !bookingDuration) return null
                         
-                        // Use the same hour-based logic as the main calculation
-                        const PACKAGE_HOUR_LIMITS = {
-                          'HALF_DAY': 4,
-                          'FULL_DAY': 8,
-                          'SEMESTER_BUNDLE': 4
-                        } as const;
-                        
-                        const packageType = pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS;
-                        const discountHours = PACKAGE_HOUR_LIMITS[packageType] || 0;
+                        // Use dynamic hoursAllowed from package configuration instead of hardcoded values
+                        const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
                         const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
                         const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
                         

@@ -124,12 +124,7 @@ export default function CoworkPage() {
               ))}
             </Carousel>
           </div>
-          <div className="text-center mt-10">
-            {/* BOOK BUTTON */}
-            <button className="px-6 py-3 bg-orange-500 text-white rounded ml-auto transition-colors duration-200 hover:bg-orange-800">
-              Book Now →
-            </button>
-          </div>
+         
         </section>
 
         {/* Tabs */}

@@ -1,5 +1,3 @@
-// src/app/auth/confirm/page.tsx - Email confirmation handler
-// src/app/auth/confirm/page.tsx - Email confirmation handler (Fixed with Suspense)
 import { Suspense } from 'react'
 import ConfirmClient from './ConfirmClient'
 

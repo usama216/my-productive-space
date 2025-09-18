@@ -1,9 +1,9 @@
 // src/app/buy-pass/BuyPassClient.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ChevronDown, CreditCard, Shield, Package, User, Mail, Phone, MapPin, AlertCircle, AlertTriangle, Loader2, Clock, CheckCircle } from 'lucide-react'
+import { Package, AlertCircle, AlertTriangle, Loader2, Clock, CheckCircle } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { usePackages } from '@/hooks/useNewPackages'
@@ -40,16 +40,8 @@ export default function BuyNowPage() {
   }
   const targetRole = typeMapping[typeParam || ''] || 'MEMBER'
 
-  // Debug logging
-  console.log('🎯 BuyPassClient Debug:', {
-    typeParam,
-    targetRole,
-    typeMapping
-  })
-
   const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
 
-  // State variables - MUST BE DECLARED BEFORE useEffect
   const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
   const [packageType, setPackageType] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
@@ -69,7 +61,6 @@ export default function BuyNowPage() {
   const [error, setError] = useState<string | null>(null)
 
 
-  // ALL useEffect calls
   useEffect(() => {
     if (!isLoadingAuth && !user) {
       router.push(`/login?next=/buy-pass${window.location.search}`)
@@ -161,7 +152,7 @@ export default function BuyNowPage() {
   const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user
   const subtotal = selectedPackage ? (selectedPackage.price + selectedPackage.outletFee) * quantity : 0
   const cardFee = paymentMethod === 'card' ? subtotal * 0.05 : 0
-  const total = subtotal + cardFee // Show correct total in order summary
+  const total = subtotal + cardFee
   
   console.log('Payment calculation:', {
     paymentMethod,
@@ -176,7 +167,6 @@ export default function BuyNowPage() {
 
     setIsLoading(true)
     try {
-      // Step 1: Create package purchase record (data only, no payment yet)
       const purchaseData = {
         userId: user.id,
         packageId: selectedPackage.id, // UUID from API response
@@ -192,50 +182,29 @@ export default function BuyNowPage() {
           postalCode
         }
       }
-      
-      console.log('Creating package purchase with data:', {
-        ...purchaseData,
-        paymentMethod,
-        subtotal,
-        cardFee,
-        total
-      })
 
-      // Import the service dynamically
       const { default: packageService } = await import('@/lib/services/packageService')
       const result = await packageService.purchasePackage(purchaseData)
 
-      console.log('Purchase result:', result)
-
+  
       if (result.success) {
-        // Store purchase data for payment step
-        console.log('✅ Purchase successful! Full result:', result)
-        console.log('📦 Result data:', result.data)
-        console.log('🆔 Setting orderId:', result.data.orderId)
-        console.log('📋 Setting userPackageId:', result.data.userPackageId)
-
-        // Handle different possible field names for userPackageId
+        
         const userPackageId = result.data.userPackageId ||
           (result.data as any).purchaseId ||
           (result.data as any).id
-        console.log('✅ Final userPackageId (with fallbacks):', userPackageId)
-        console.log('🔍 All available fields in result.data:', Object.keys(result.data))
-
-        // Validate that we have the required IDs
+   
         if (!result.data.orderId) {
           throw new Error('Order ID not returned from purchase API')
         }
 
         if (!userPackageId) {
-          console.error('❌ userPackageId is missing from API response!')
-          console.error('Available fields in result.data:', Object.keys(result.data))
+          
           throw new Error('User Package ID not returned from purchase API')
         }
 
         setOrderId(result.data.orderId)
         setUserPackageId(userPackageId)
 
-        // Step 2: Navigate to payment page (same as booking flow)
         setPurchaseStep(2)
       } else {
         throw new Error(result.message || 'Failed to create package purchase')
@@ -249,7 +218,6 @@ export default function BuyNowPage() {
   }
 
 
-  // NOW ALL HOOKS ARE CALLED - WE CAN DO CONDITIONAL RENDERING
   if (isLoadingAuth || packagesLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -316,7 +284,6 @@ export default function BuyNowPage() {
       <Navbar />
       <div className="pt-28 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Guest Warning */}
           {!user && (
             <Alert className="mb-6 border-orange-200 bg-orange-50">
               <AlertCircle className="h-4 w-4 text-orange-600" />
@@ -330,7 +297,6 @@ export default function BuyNowPage() {
             </Alert>
           )}
 
-          {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-serif text-gray-900 mb-4">Purchase Your Pass</h1>
             <p className="text-lg text-gray-600">Unlock unlimited productivity with our flexible packages</p>
@@ -342,7 +308,6 @@ export default function BuyNowPage() {
             )}
           </div>
 
-          {/* Progress Steps */}
           <div className="flex justify-center mb-8">
             <div className="flex space-x-8">
               {[1, 2, 3].map((step) => (
@@ -386,20 +351,9 @@ export default function BuyNowPage() {
                           <SelectContent>
                             {(() => {
                               const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
-                              console.log('🎯 Dropdown Debug:', {
-                                allPackages: packages,
-                                packageType,
-                                filteredPackages,
-                                filteredLength: filteredPackages.length,
-                                filterLogic: packages.map(pkg => ({
-                                  name: pkg.name,
-                                  targetRole: pkg.targetRole,
-                                  matches: !packageType || pkg.targetRole === packageType
-                                }))
-                              })
+                            
 
                               if (filteredPackages.length === 0) {
-                                console.log('⚠️ No packages match the filter!')
                                 return <div className="p-2 text-sm text-gray-500">No packages available</div>
                               }
 

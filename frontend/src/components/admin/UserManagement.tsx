@@ -463,30 +463,7 @@ export function UserManagement() {
         </div>
       )}
 
-      {/* Search Filter */}
-      {/* <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Search Users
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="search">Search by name or email</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="search"
-                placeholder="Search users..."
-                value={filters.search || ''}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card> */}
+    
 
       {/* Users Table */}
       <Card>
@@ -593,13 +570,7 @@ export function UserManagement() {
                        </TableCell>
                       <TableCell>
                                                  <div className="flex items-center gap-2">
-                           {/* <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => handleEdit(user)}
-                           >
-                             <Edit className="h-4 w-4" />
-                           </Button> */}
+                         
                            
                            {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && user.studentVerificationImageUrl && (
                              <>

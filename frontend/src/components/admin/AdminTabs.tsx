@@ -56,29 +56,13 @@ export default function AdminTabs({
             </span>
           )}
         </TabsTrigger>
-        {/* <TabsTrigger value="cancellations">
-          Cancellations
-          {cancellations.filter(c => c.status === 'pending').length > 0 && (
-            <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-1">
-              {cancellations.filter(c => c.status === 'pending').length}
-            </span>
-          )}
-        </TabsTrigger>
-        <TabsTrigger value="users">
-          Users
-          {users.filter(u => u.verificationStatus === 'pending').length > 0 && (
-            <span className="ml-2 bg-yellow-500 text-white text-xs rounded-full px-2 py-1">
-              {users.filter(u => u.verificationStatus === 'pending').length}
-            </span>
-          )}
-        </TabsTrigger> */}
+      
         <TabsTrigger value="bookings">Bookings</TabsTrigger>
         <TabsTrigger value="user-management">User Management</TabsTrigger>
         <TabsTrigger value="packages">Packages</TabsTrigger>
         <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
 
-        {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
       </TabsList>
 
       {/* Overview Tab */}

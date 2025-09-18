@@ -50,7 +50,6 @@ export default function PackageUsageTable() {
   const [sortBy, setSortBy] = useState('usagePercentage')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // Fetch package usage data
   const fetchPackageUsage = async () => {
     setIsLoading(true)
     try {
@@ -79,7 +78,6 @@ export default function PackageUsageTable() {
     fetchPackageUsage()
   }, [])
 
-  // Filter and sort packages
   const filteredPackages = packageUsages
     .filter(pkg => {
       const matchesSearch = pkg.packageName.toLowerCase().includes(searchTerm.toLowerCase()) ||

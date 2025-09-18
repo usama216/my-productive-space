@@ -12,7 +12,6 @@ export default function PasswordResetSuccessPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Auto-redirect to login page after 5 seconds
     const timer = setTimeout(() => {
       router.push('/login')
     }, 5000)

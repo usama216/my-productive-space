@@ -1,11 +1,9 @@
-// src/app/sign-up/page.tsx  
 import { AuthForm } from "@/components/AuthForm"
 
 function SignUpPage() {
   return (
     <div className="h-screen bg-gray-50 overflow-hidden m-0 p-0">
       <div className="grid grid-cols-1 lg:grid-cols-2 h-screen m-0 p-0">
-        {/* Left Column - Brand & Information (Hidden on mobile, Fixed on desktop) */}
         <div className="hidden lg:block bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-12 overflow-hidden">
           <div className="text-white text-left max-w-md h-full flex flex-col justify-center">
             <div className="mb-8">
@@ -55,7 +53,6 @@ function SignUpPage() {
           </div>
         </div>
 
-        {/* Right Column - Signup Form (Scrollable) */}
         <div className="bg-white h-screen overflow-y-auto">
           <div className="p-3 lg:p-4">
             <div className="w-full max-w-md mx-auto">

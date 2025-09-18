@@ -23,12 +23,12 @@ interface Package {
   targetRole: 'MEMBER' | 'TUTOR' | 'STUDENT';
   price: number;
   originalPrice?: number;
-  outletFee: number;
   passCount: number;
   validityDays: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  hoursAllowed?: number;
 }
 
 interface PackageFormData {
@@ -38,10 +38,10 @@ interface PackageFormData {
   targetRole: 'MEMBER' | 'TUTOR' | 'STUDENT';
   price: string;
   originalPrice: string;
-  outletFee: string;
   passCount: string;
   validityDays: string;
   isActive: boolean;
+  hoursAllowed: string;
 }
 
 const PackageManagement: React.FC = () => {
@@ -57,10 +57,10 @@ const PackageManagement: React.FC = () => {
     targetRole: 'MEMBER',
     price: '',
     originalPrice: '',
-    outletFee: '5.00',
     passCount: '1',
     validityDays: '30',
-    isActive: true
+    isActive: true,
+    hoursAllowed: '4'
   });
 
   // Fetch packages
@@ -104,9 +104,10 @@ const PackageManagement: React.FC = () => {
         ...formData,
         price: parseFloat(formData.price),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
-        outletFee: parseFloat(formData.outletFee),
+        outletFee: 0.00,
         passCount: parseInt(formData.passCount),
-        validityDays: parseInt(formData.validityDays)
+        validityDays: parseInt(formData.validityDays),
+        hoursAllowed: parseInt(formData.hoursAllowed)
       };
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
@@ -159,10 +160,10 @@ const PackageManagement: React.FC = () => {
       targetRole: pkg.targetRole,
       price: pkg.price.toString(),
       originalPrice: pkg.originalPrice?.toString() || '',
-      outletFee: pkg.outletFee.toString(),
       passCount: pkg.passCount.toString(),
       validityDays: pkg.validityDays.toString(),
-      isActive: pkg.isActive
+      isActive: pkg.isActive,
+      hoursAllowed: (pkg as any).hoursAllowed?.toString() || '4'
     });
     setIsEditDialogOpen(true);
   };
@@ -207,10 +208,10 @@ const PackageManagement: React.FC = () => {
       targetRole: 'MEMBER',
       price: '',
       originalPrice: '',
-      outletFee: '5.00',
       passCount: '1',
       validityDays: '30',
-      isActive: true
+      isActive: true,
+      hoursAllowed: '4'
     });
   };
 
@@ -287,6 +288,7 @@ const PackageManagement: React.FC = () => {
                     <TableHead>Target Role</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Pass Count</TableHead>
+                    <TableHead>Hours</TableHead>
                     <TableHead>Validity</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -333,6 +335,11 @@ const PackageManagement: React.FC = () => {
                       <TableCell>
                         <div className="font-medium">{pkg.passCount}</div>
                         <div className="text-xs text-gray-500">passes</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">
+                          {(pkg as any).hoursAllowed ? `${(pkg as any).hoursAllowed}h` : 'Not set'}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{pkg.validityDays} days</div>
@@ -388,9 +395,8 @@ const PackageManagement: React.FC = () => {
       </Card>
 
 
-      {/* Create Package Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Package</DialogTitle>
             <DialogDescription>
@@ -398,7 +404,7 @@ const PackageManagement: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Package Name *</Label>
                 <Input
@@ -440,7 +446,7 @@ const PackageManagement: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="targetRole">Target Role *</Label>
                 <Select
@@ -473,7 +479,7 @@ const PackageManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price">Price *</Label>
                 <Input
@@ -499,18 +505,6 @@ const PackageManagement: React.FC = () => {
                   placeholder="0.00"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="outletFee">Outlet Fee</Label>
-                <Input
-                  id="outletFee"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.outletFee}
-                  onChange={(e) => setFormData({ ...formData, outletFee: e.target.value })}
-                  placeholder="5.00"
-                />
-              </div>
             </div>
 
             <div className="space-y-2">
@@ -523,6 +517,21 @@ const PackageManagement: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, validityDays: e.target.value })}
                 placeholder="30"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="hoursAllowed">Hours Allowed</Label>
+              <Input
+                id="hoursAllowed"
+                type="number"
+                min="1"
+                max="24"
+                value={formData.hoursAllowed}
+                onChange={(e) => setFormData({ ...formData, hoursAllowed: e.target.value })}
+                placeholder="4"
+                required
+              />
+              <p className="text-xs text-gray-500">Number of hours this package allows</p>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -546,7 +555,7 @@ const PackageManagement: React.FC = () => {
 
       {/* Edit Package Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Package</DialogTitle>
             <DialogDescription>
@@ -554,7 +563,7 @@ const PackageManagement: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-name">Package Name *</Label>
                 <Input
@@ -596,7 +605,7 @@ const PackageManagement: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-targetRole">Target Role *</Label>
                 <Select
@@ -629,7 +638,7 @@ const PackageManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-price">Price *</Label>
                 <Input
@@ -655,18 +664,6 @@ const PackageManagement: React.FC = () => {
                   placeholder="0.00"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-outletFee">Outlet Fee</Label>
-                <Input
-                  id="edit-outletFee"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.outletFee}
-                  onChange={(e) => setFormData({ ...formData, outletFee: e.target.value })}
-                  placeholder="5.00"
-                />
-              </div>
             </div>
 
             <div className="space-y-2">
@@ -679,6 +676,21 @@ const PackageManagement: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, validityDays: e.target.value })}
                 placeholder="30"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-hoursAllowed">Hours Allowed</Label>
+              <Input
+                id="edit-hoursAllowed"
+                type="number"
+                min="1"
+                max="24"
+                value={formData.hoursAllowed}
+                onChange={(e) => setFormData({ ...formData, hoursAllowed: e.target.value })}
+                placeholder="4"
+                required
+              />
+              <p className="text-xs text-gray-500">Number of hours this package allows</p>
             </div>
 
             <div className="flex items-center space-x-2">

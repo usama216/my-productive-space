@@ -108,7 +108,7 @@ export default function CoLearningPage() {
     fetchCurrentUser()
   }, [user?.id])
 
-  // Check if user can purchase packages using fresh API data
+ 
   const canPurchasePackage = () => {
     if (!currentUser) return false // No user data
     if (!user) return false // Not logged in
@@ -150,17 +150,7 @@ export default function CoLearningPage() {
     }
     router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=student`)
   }
-  // const reasons = [
-  //   { num: '1', title: 'Scale Your Teaching', desc: 'More space lets you reach more students.' },
-  //   { num: '2', title: 'Peer Learning',      desc: 'Facilitate group learning experiences.' },
-  //   { num: '3', title: 'Multimedia Ready',    desc: '55″ TV & whiteboard for better demos.' },
-  //   { num: '4', title: 'Maximize Profits',    desc: 'Lower overhead, higher margins.' },
-  //   { num: '5', title: 'Save Travel Time',    desc: 'Central locations for you and your tutees.' },
-  //   { num: '6', title: 'No Startup Cost',     desc: 'Furnished classrooms—walk in and teach.' },
-  //   { num: '7', title: 'Build Your Brand',    desc: 'Join our community of educators.' },
-  //   { num: '8', title: 'Pay-per-Use',         desc: 'No minimums or hidden fees.' },
-  //   { num: '9', title: 'Guaranteed Space',    desc: 'Fixed bookings give you certainty.' },
-  // ]
+
   const reasons = [
     { src: '/mock_img/perk1.png', title: 'Focus Zone Vibes', subtitle: 'Noise-controlled areas for deep concentration' },
     { src: '/mock_img/perk2.png', title: 'Study Buddy Network', subtitle: 'Connect with motivated peers and study groups' },
@@ -198,24 +188,7 @@ export default function CoLearningPage() {
 
       {/* Tabs */}
       <main className="max-w-7xl mx-auto py-20 px-4 space-y-12">
-         {/* Reasons Grid */}
-        {/* <section className="space-y-6">
-          <h2 className="text-3xl font-bold text-center">Reasons to Teach at Spatial</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {reasons.map((r) => (
-              <div key={r.num} className="bg-gray-50 rounded-lg p-6 text-center">
-                <div className="text-4xl font-bold text-orange-600">{r.num}</div>
-                <h4 className="mt-2 font-semibold">{r.title}</h4>
-                <p className="mt-1 text-gray-700 text-sm">{r.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="text-center">
-            <button className="px-6 py-3 bg-orange-600 text-white rounded">
-              Book Now
-            </button>
-          </div>
-        </section> */}
+    
         <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">Reasons to Co-Study at Spatial</h2>
                 <div className="mt-4">
@@ -234,12 +207,7 @@ export default function CoLearningPage() {
                                 <div className="text-center">
                     
                   </div>
-                  <div className="text-center mt-10">
-            {/* BOOK BUTTON */}
-            <button className="px-6 py-3 bg-orange-500 text-white rounded ml-auto transition-colors duration-200 hover:bg-orange-800">
-              Book Now →
-            </button>
-          </div>
+                
                                 </section>
         {/* Tabs */}
                        <Tab.Group>

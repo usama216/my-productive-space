@@ -107,6 +107,7 @@ export interface UserPackage {
   usedPasses: number;
   remainingPasses: number;
   expiredPasses: number;
+  hoursAllowed?: number;
   createdAt: string;
 }
 
@@ -415,6 +416,7 @@ class PackageService {
         description: pkg.Package?.description || pkg.description,
         passCount: pkg.Package?.passCount || pkg.passCount,
         validityDays: pkg.Package?.validityDays || pkg.validityDays,
+        hoursAllowed: pkg.Package?.hoursAllowed || pkg.hoursAllowed || 4, // Default to 4 hours
         quantity: pkg.quantity,
         totalAmount: pkg.totalAmount,
         paymentStatus: pkg.paymentStatus,

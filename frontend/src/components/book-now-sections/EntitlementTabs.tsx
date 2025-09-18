@@ -20,7 +20,8 @@ import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle
 import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode, calculateBookingDuration, validateMinimumHours, formatDurationDisplay, BookingDuration } from '@/lib/promoCodeService';
 import { getUserPackages, UserPackage as ApiUserPackage } from '@/lib/services/packageService';
 
-// Package hour limits per day based on requirements
+// Package hour limits per day based on requirements - DEPRECATED
+// Now using dynamic hoursAllowed from package configuration
 const PACKAGE_HOUR_LIMITS = {
   'HALF_DAY': 4,
   'FULL_DAY': 8,
@@ -51,10 +52,10 @@ const getApplicablePackages = (bookingHours: number, userPackages: ApiUserPackag
   });
 };
 
-// Calculate package discount based on hour limits
+// Calculate package discount based on dynamic hoursAllowed from package configuration
 const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, userRole: string = 'MEMBER', locationPrice: number = 0) => {
-  const packageType = pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS;
-  const discountHours = PACKAGE_HOUR_LIMITS[packageType] || 0;
+  // Use dynamic hoursAllowed from package configuration instead of hardcoded values
+  const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
   const appliedHours = Math.min(bookingHours, discountHours);
   const remainingHours = Math.max(0, bookingHours - appliedHours);
   
@@ -67,7 +68,8 @@ const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, use
   
   console.log('Package discount calculation:', {
     packageName: pkg.packageName,
-    packageType,
+    packageType: pkg.packageType,
+    hoursAllowed: pkg.hoursAllowed,
     discountHours,
     bookingHours,
     appliedHours,

@@ -501,7 +501,6 @@ export function BookingManagement() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
-                    {/* <TableHead>Actions</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -563,70 +562,7 @@ export function BookingManagement() {
                           {booking.confirmedPayment ? 'Paid' : 'Unpaid'}
                         </Badge>
                       </TableCell>
-                      {/* <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(booking)}
-                            className="hover:bg-blue-50"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="hover:bg-red-50 text-red-600 border-red-200"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  <div className="space-y-4">
-                                    <p>Are you sure you want to cancel "{booking.bookingRef}"?</p>
-                                    <div className="space-y-2">
-                                      <Label htmlFor="cancelReason">Reason for cancellation</Label>
-                                      <Input
-                                        id="cancelReason"
-                                        placeholder="e.g., Room maintenance, User request..."
-                                        onChange={(e) => setEditFormData(prev => ({ ...prev, specialRequests: e.target.value }))}
-                                      />
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label htmlFor="refundAmount">Refund Amount</Label>
-                                      <Input
-                                        id="refundAmount"
-                                        type="number"
-                                        placeholder="0.00"
-                                        onChange={(e) => setEditFormData(prev => ({ ...prev, totalAmount: parseFloat(e.target.value) || 0 }))}
-                                      />
-                                    </div>
-                                  </div>
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleCancel(
-                                    booking, 
-                                    editFormData.specialRequests, 
-                                    editFormData.totalAmount
-                                  )}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Cancel Booking
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell> */}
+                      
                     </TableRow>
                   ))}
                 </TableBody>

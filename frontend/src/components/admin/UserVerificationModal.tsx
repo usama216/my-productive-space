@@ -149,27 +149,11 @@ export default function UserVerificationModal({
                   </Badge>
                 </div>
 
-                {/* <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-gray-700">User ID</span>
-                  </div>
-                  <p className="text-gray-900 font-medium ml-5 text-sm font-mono">{selectedUser.id}</p>
-                </div> */}
+              
               </div>
             </div>
 
-            {/* Student Document Alert */}
-            {/* {selectedUser.memberType === 'STUDENT' && (
-              <Alert>
-                <AlertDescription>
-                  Student verification requires manual review of uploaded documents. 
-                  {selectedUser.studentVerificationImageUrl && " Click the eye icon above to view the document."}
-                </AlertDescription>
-              </Alert>
-            )} */}
-
-            {/* Verification Status Selection */}
+     
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Verification Decision</h3>
               <RadioGroup 
