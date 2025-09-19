@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   Booking,
@@ -17,13 +21,20 @@ import {
   getStatusColor,
   calculateDuration
 } from '@/lib/bookingService'
+import { requestRefund } from '@/lib/refundService'
 
 export function UserBookings() {
   const { toast } = useToast()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [userStats, setUserStats] = useState({ upcomingBookings: 0, ongoingBookings: 0, pastBookings: 0 })
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'ongoing' | 'past'>('upcoming')
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'ongoing' | 'past' | 'cancelled'>('upcoming')
+  
+  // Refund dialog state
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [refundReason, setRefundReason] = useState('')
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false)
 
 
 
@@ -68,6 +79,56 @@ export function UserBookings() {
       })
     } catch (error) {
       console.error('Load User Stats Error:', error)
+    }
+  }
+
+  // Handle cancel booking (refund request)
+  const handleCancelBooking = (booking: Booking) => {
+    setSelectedBooking(booking)
+    setRefundReason('')
+    setIsRefundDialogOpen(true)
+  }
+
+  // Submit refund request
+  const handleSubmitRefund = async () => {
+    if (!selectedBooking || !refundReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a reason for the refund request.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSubmittingRefund(true)
+      
+      // For now, we'll use a placeholder userId. In a real app, this would come from auth context
+      const userId = "b90c181e-874d-46c2-b1c8-3a510bbdef48" // This should be dynamic
+      
+      await requestRefund(selectedBooking.id, refundReason, userId)
+      
+      toast({
+        title: "Refund Requested",
+        description: "Your refund request has been submitted and is pending admin approval.",
+      })
+      
+      setIsRefundDialogOpen(false)
+      setSelectedBooking(null)
+      setRefundReason('')
+      
+      // Reload bookings to reflect any status changes
+      loadBookings()
+      
+    } catch (error) {
+      console.error('Refund Request Error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to submit refund request. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmittingRefund(false)
     }
   }
 
@@ -154,6 +215,8 @@ export function UserBookings() {
         return ongoingBookings
       case 'past':
         return pastBookings
+      case 'cancelled':
+        return bookings.filter(b => b.status === 'refunded')
       default:
         return []
     }
@@ -260,6 +323,15 @@ export function UserBookings() {
         >
           Past ({pastBookings.length})
         </button>
+        <button
+          onClick={() => setActiveTab('cancelled')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'cancelled'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+            }`}
+        >
+          Cancelled ({bookings.filter(b => b.status === 'refunded').length})
+        </button>
       </div>
 
       {/* Bookings Table */}
@@ -283,13 +355,16 @@ export function UserBookings() {
               </div>
               <p className="text-gray-500 text-lg">
                 {activeTab === 'upcoming' ? 'No upcoming bookings' : 
-                 activeTab === 'ongoing' ? 'No ongoing bookings' : 'No past bookings'}
+                 activeTab === 'ongoing' ? 'No ongoing bookings' : 
+                 activeTab === 'cancelled' ? 'No cancelled bookings' : 'No past bookings'}
               </p>
               <p className="text-gray-400 text-sm">
                 {activeTab === 'upcoming'
                   ? 'Book a study space to get started'
                   : activeTab === 'ongoing'
                   ? 'Your active bookings will appear here'
+                  : activeTab === 'cancelled'
+                  ? 'Your refunded bookings will appear here'
                   : 'Your completed bookings will appear here'
                 }
               </p>
@@ -381,37 +456,82 @@ export function UserBookings() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {activeTab === 'upcoming' && canEditBooking(booking) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(booking)}
-                          className="hover:bg-blue-50"
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                      )}
+                      <div className="flex flex-col gap-2">
+                        {activeTab === 'upcoming' && canEditBooking(booking) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEdit(booking)}
+                            className="hover:bg-blue-50"
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                        )}
 
-                      {activeTab === 'upcoming' && !canEditBooking(booking) && (
-                        <div className="text-sm text-gray-500">
-                          <AlertTriangle className="h-4 w-4 inline mr-1" />
-                          Cannot edit
-                        </div>
-                      )}
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleCancelBooking(booking)}
+                            className="hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancel & Refund
+                          </Button>
+                        )}
 
-                      {activeTab === 'ongoing' && (
-                        <div className="text-sm text-green-600 font-medium">
-                          <Clock className="h-4 w-4 inline mr-1" />
-                          In Progress
-                        </div>
-                      )}
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus !== 'NONE' && (
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              className={`text-xs ${
+                                booking.refundstatus === 'APPROVED' 
+                                  ? 'bg-orange-100 text-orange-800 border-orange-200' 
+                                  : booking.refundstatus === 'REJECTED' 
+                                    ? 'bg-red-100 text-red-800 border-red-200' 
+                                    : 'bg-orange-50 text-orange-700 border-orange-200'
+                              }`}
+                            >
+                              {booking.refundstatus === 'REQUESTED' && 'Refund Requested'}
+                              {booking.refundstatus === 'APPROVED' && 'Refund Approved'}
+                              {booking.refundstatus === 'REJECTED' && 'Refund Rejected'}
+                            </Badge>
+                          </div>
+                        )}
 
-                      {activeTab === 'past' && (
-                        <div className="text-sm text-gray-500">
-                          Completed
-                        </div>
-                      )}
+                        {activeTab === 'cancelled' && booking.status === 'refunded' && (
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              className="bg-orange-100 text-orange-800 border-orange-200 text-xs"
+                            >
+                              Refunded (Record Only)
+                            </Badge>
+                            <span className="text-xs text-orange-600">
+                              Seats released for others
+                            </span>
+                          </div>
+                        )}
+
+                        {activeTab === 'upcoming' && !canEditBooking(booking) && !booking.confirmedPayment && (
+                          <div className="text-sm text-gray-500">
+                            <AlertTriangle className="h-4 w-4 inline mr-1" />
+                            Cannot edit
+                          </div>
+                        )}
+
+                        {activeTab === 'ongoing' && (
+                          <div className="text-sm text-green-600 font-medium">
+                            <Clock className="h-4 w-4 inline mr-1" />
+                            In Progress
+                          </div>
+                        )}
+
+                        {activeTab === 'past' && (
+                          <div className="text-sm text-gray-500">
+                            Completed
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -454,6 +574,72 @@ export function UserBookings() {
 
 
 
+      {/* Refund Request Dialog */}
+      <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Refund</DialogTitle>
+          </DialogHeader>
+          
+          {selectedBooking && (
+            <div className="space-y-4">
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Note:</strong> Refund requests are reviewed by our admin team. 
+                  Approved refunds will be added to your store credits, which expire in 30 days.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="space-y-2">
+                <Label>Booking Details</Label>
+                <div className="p-3 bg-gray-50 rounded-md text-sm">
+                  <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
+                  <div><strong>Location:</strong> {selectedBooking.location}</div>
+                  <div><strong>Date:</strong> {formatBookingDate(selectedBooking.startAt)}</div>
+                  <div><strong>Amount:</strong> ${selectedBooking.totalAmount}</div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="refundReason">Reason for Refund *</Label>
+                <Textarea
+                  id="refundReason"
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  placeholder="Please explain why you need a refund..."
+                  className="w-full"
+                  rows={4}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsRefundDialogOpen(false)}
+                  disabled={isSubmittingRefund}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmitRefund}
+                  disabled={isSubmittingRefund || !refundReason.trim()}
+                  variant="destructive"
+                >
+                  {isSubmittingRefund ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Refund Request'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

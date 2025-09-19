@@ -23,6 +23,11 @@ export interface Booking {
   confirmedPayment: boolean
   isUpcoming?: boolean
   isOngoing?: boolean
+  refundstatus?: 'NONE' | 'REQUESTED' | 'APPROVED' | 'REJECTED'
+  refundrequestedat?: string
+  refundapprovedat?: string
+  refundapprovedby?: string
+  refundreason?: string
   isCompleted?: boolean
   isToday?: boolean
   durationHours?: number
@@ -412,6 +417,8 @@ export const formatBookingDate = (dateString: string): string => {
 }
 
 export const getBookingStatus = (booking: Booking): string => {
+  if (booking.status === 'refunded') return 'refunded'
+  if (booking.status === 'cancelled') return 'cancelled'
   if (booking.isToday) return 'today'
   if (booking.isUpcoming) return 'upcoming'
   if (booking.isOngoing) return 'ongoing'
@@ -425,6 +432,8 @@ export const getStatusColor = (status: string): string => {
     case 'upcoming': return 'bg-green-100 text-green-800'
     case 'ongoing': return 'bg-yellow-100 text-yellow-800'
     case 'completed': return 'bg-gray-100 text-gray-800'
+    case 'refunded': return 'bg-orange-100 text-orange-800'
+    case 'cancelled': return 'bg-red-100 text-red-800'
     default: return 'bg-gray-100 text-gray-800'
   }
 }

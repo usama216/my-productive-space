@@ -11,6 +11,7 @@ import { BookingManagement } from './BookingManagement'
 import { UserManagement } from './UserManagement'
 import PackageManagement from './PackageManagement'
 import PackageUsageTable from './PackageUsageTable'
+import { RefundManagement } from './RefundManagement'
 
 export default function AdminTabs({
   activeTab,
@@ -47,7 +48,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-7">
+      <TabsList className="grid w-full grid-cols-8">
         <TabsTrigger value="overview">
           Overview
           {pendingStudents.length > 0 && (
@@ -62,6 +63,8 @@ export default function AdminTabs({
         <TabsTrigger value="packages">Packages</TabsTrigger>
         <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+        <TabsTrigger value="refunds">Refund Management</TabsTrigger>
+        <TabsTrigger value="refunds"></TabsTrigger>
 
       </TabsList>
 
@@ -260,6 +263,11 @@ export default function AdminTabs({
       {/* Promo Codes Tab */}
       <TabsContent value="promocodes" className="space-y-4">
         <PromoCodeManagement />
+      </TabsContent>
+
+      {/* Refund Management Tab */}
+      <TabsContent value="refunds" className="space-y-4">
+        <RefundManagement />
       </TabsContent>
 
       {/* Bookings Tab */}

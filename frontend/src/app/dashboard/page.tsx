@@ -47,6 +47,9 @@ import { PromoCodeHistory } from '@/components/dashboard/PromoCodeHistory'
 import { UserBookings } from '@/components/dashboard/UserBookings'
 import { UserPromoCodes } from '@/components/dashboard/UserPromoCodes'
 import { UserPackages } from '@/components/dashboard/UserPackages'
+import { UserCredits } from '@/components/dashboard/UserCredits'
+import { RefundRequests } from '@/components/dashboard/RefundRequests'
+import { RefundSystemTest } from '@/components/RefundSystemTest'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
@@ -393,12 +396,14 @@ export default function Dashboard() {
 
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="passes">Passes</TabsTrigger>
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+              <TabsTrigger value="credits">Store Credits</TabsTrigger>
+              <TabsTrigger value="refunds">Refund Requests</TabsTrigger>
             </TabsList>
 
        
@@ -839,6 +844,17 @@ export default function Dashboard() {
             {/* Promo Codes Tab */}
             <TabsContent value="promocodes" className="space-y-6">
               <UserPromoCodes userId={authUser?.id || ''} />
+            </TabsContent>
+
+            {/* Store Credits Tab */}
+            <TabsContent value="credits" className="space-y-6">
+              <UserCredits userId={authUser?.id || ''} />
+            </TabsContent>
+
+            {/* Refund Requests Tab */}
+            <TabsContent value="refunds" className="space-y-6">
+              <RefundRequests userId={authUser?.id || ''} />
+              <RefundSystemTest />
             </TabsContent>
 
             {/* My Bookings Tab */}
