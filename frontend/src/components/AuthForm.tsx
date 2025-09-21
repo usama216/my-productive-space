@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/hooks/use-toast'
 import { StudentDocumentUpload } from '@/components/StudentDocumentUpload'
 import { uploadStudentDocument } from '@/lib/studentDocumentService'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import 'react-international-phone/style.css'
 
@@ -45,6 +46,7 @@ export function AuthForm({ type }: Props) {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [phoneTouched, setPhoneTouched] = useState(false)
+  const [showOtpPopup, setShowOtpPopup] = useState(false)
   
   // Google reCAPTCHA
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
@@ -80,6 +82,21 @@ export function AuthForm({ type }: Props) {
   const resetCaptcha = () => {
     recaptchaRef.current?.reset()
     setCaptchaToken(null)
+  }
+
+  const resetSignupForm = () => {
+    setSignupData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      contactNumber: '',
+      memberType: 'member' as 'student' | 'member' | 'tutor',
+      acceptedTerms: false
+    })
+    setStudentDocument(null)
+    resetCaptcha()
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -220,6 +237,20 @@ export function AuthForm({ type }: Props) {
       }
       console.log('Supabase connection successful')
       
+      // Check if email already exists before attempting signup
+      console.log('Checking if email already exists...')
+      const { data: existingUser, error: checkError } = await supabase
+        .from('User')
+        .select('email')
+        .eq('email', signupData.email)
+        .single()
+      
+      if (existingUser && !checkError) {
+        throw new Error('An account with this email address already exists. Please use a different email or try logging in.')
+      }
+      
+      console.log('Email is available for registration')
+      
       // Step 1: Create user using Supabase Auth (this handles auth.users automatically)
       console.log('Starting signup process...')
       console.log('Email:', signupData.email)
@@ -318,16 +349,32 @@ export function AuthForm({ type }: Props) {
 
       resetCaptcha()
       
-      // Different redirect based on member type
-      if (signupData.memberType === 'student') {
-        router.push(`/?toastType=studentSignUp`)
-      } else {
-        router.push(`/?toastType=signUp`)
-      }
+      // Show OTP popup instead of navigating
+      setShowOtpPopup(true)
+      resetSignupForm()
     } catch (error: any) {
+      console.error('Signup error:', error)
+      
+      // Handle specific error cases
+      let errorMessage = "An error occurred during signup"
+      
+      if (error.code === '23505' || error.message?.includes('duplicate key value violates unique constraint')) {
+        errorMessage = "An account with this email address already exists. Please use a different email or try logging in."
+      } else if (error.message?.includes('User already registered')) {
+        errorMessage = "An account with this email address already exists. Please use a different email or try logging in."
+      } else if (error.message?.includes('Email already registered')) {
+        errorMessage = "An account with this email address already exists. Please use a different email or try logging in."
+      } else if (error.message?.includes('duplicate key value')) {
+        errorMessage = "An account with this email address already exists. Please use a different email or try logging in."
+      } else if (error.message?.includes('already exists')) {
+        errorMessage = "An account with this email address already exists. Please use a different email or try logging in."
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "An error occurred during signup",
+        title: "Signup Failed",
+        description: errorMessage,
         variant: "destructive",
       })
       resetCaptcha()
@@ -336,10 +383,9 @@ export function AuthForm({ type }: Props) {
     }
   }
 
-  if (!isLoginForm) {
-    // Single Step Signup Form - Vertical Layout
-    return (
-      <form onSubmit={handleSignup} className="space-y-2">
+  // Single Step Signup Form - Vertical Layout
+  const signupForm = (
+    <form onSubmit={handleSignup} className="space-y-2">
         <div className="space-y-2">
           {/* Personal Information */}
           <div className="grid grid-cols-2 gap-2">
@@ -537,103 +583,147 @@ export function AuthForm({ type }: Props) {
         </div>
       </form>
     )
-  }
 
-  // Login Form - Vertical Layout
+
+
   return (
-    <form onSubmit={handleLogin} className="space-y-2">
-      <div className="space-y-2">
-        <div className="flex flex-col space-y-1">
-          <Label htmlFor="login-email" className="text-xs font-medium text-gray-700">Email</Label>
-          <div className="relative">
-            <Mail className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
-            <Input
-              id="login-email"
-              type="email"
-              placeholder="Enter your email"
-              value={loginData.email}
-              onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-              className="pl-7 h-8 text-xs"
-              required
-              disabled={loading}
-            />
-          </div>
-        </div>
+    <>
+      {isLoginForm ? (
+        <form onSubmit={handleLogin} className="space-y-2">
+          <div className="space-y-2">
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="email" className="text-xs font-medium text-gray-700">Email Address *</Label>
+              <div className="relative">
+                <Mail className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={loginData.email}
+                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  className="h-8 text-xs pl-7"
+                  placeholder="Enter your email"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
 
-        <div className="flex flex-col space-y-1">
-          <Label htmlFor="login-password" className="text-xs font-medium text-gray-700">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
-            <Input
-              id="login-password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
-              value={loginData.password}
-              onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-              className="pl-7 pr-7 h-8 text-xs"
-              required
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2"
-              disabled={loading}
+            <div className="flex flex-col space-y-1">
+              <Label htmlFor="password" className="text-xs font-medium text-gray-700">Password *</Label>
+              <div className="relative">
+                <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={loginData.password}
+                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                  className="h-8 text-xs pl-7 pr-8"
+                  placeholder="Enter your password"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  disabled={loading}
+                >
+                  {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember"
+                  checked={loginData.rememberMe}
+                  onCheckedChange={(checked) => setLoginData({ ...loginData, rememberMe: checked as boolean })}
+                  disabled={loading}
+                />
+                <Label htmlFor="remember" className="text-xs text-gray-600">Remember me</Label>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-center">
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+                onChange={setCaptchaToken}
+                onExpired={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-8 text-xs font-medium bg-orange-600 hover:bg-orange-700 text-white"
+              disabled={loading || !captchaToken}
             >
-              {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-            </button>
+            {loading ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In'
+            )}
+          </Button>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="remember-me"
-            checked={loginData.rememberMe}
-            onCheckedChange={(checked) => setLoginData({ ...loginData, rememberMe: !!checked })}
-            disabled={loading}
-          />
-          <Label htmlFor="remember-me" className="text-xs text-gray-600">Remember me</Label>
-        </div>
-      </div>
+          <div className="text-center">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-orange-600 hover:underline font-medium"
+            >
+              Forgot your password?
+            </Link>
+          </div>
 
-      <div className="space-y-2">
-        <div className="flex justify-center">
-          <ReCAPTCHA
-            ref={recaptchaRef}
-            sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-            onChange={setCaptchaToken}
-            onExpired={() => setCaptchaToken(null)}
-            onError={() => setCaptchaToken(null)}
-          />
-        </div>
+          <p className="text-center text-xs text-gray-600">
+            Don't have an account yet?{' '}
+            <Link
+              href="/sign-up"
+              className={`text-orange-600 hover:underline font-medium ${loading ? "pointer-events-none opacity-50" : ""}`}
+            >
+              Sign Up
+            </Link>
+          </p>
+        </form>
+      ) : (
+        signupForm
+      )}
 
-        <Button
-          type="submit"
-          className="w-full bg-orange-500 hover:bg-orange-600 h-8 text-xs font-medium"
-          disabled={loading || !captchaToken}
-        >
-          {loading ? <Loader2 className="animate-spin w-3 h-3" /> : "Login"}
-        </Button>
-
-        <div className="text-center">
-          <Link
-            href="/forgot-password"
-            className="text-xs text-orange-600 hover:underline font-medium"
-          >
-            Forgot your password?
-          </Link>
-        </div>
-
-        <p className="text-center text-xs text-gray-600">
-          Don't have an account yet?{' '}
-          <Link
-            href="/sign-up"
-            className={`text-orange-600 hover:underline font-medium ${loading ? "pointer-events-none opacity-50" : ""}`}
-          >
-            Sign Up
-          </Link>
-        </p>
-      </div>
-    </form>
+      {/* OTP Popup Dialog */}
+      <Dialog open={showOtpPopup} onOpenChange={setShowOtpPopup}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-lg font-semibold text-gray-900">
+              Account Created Successfully!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              We've sent a one-time password to your email address. In case you don't find
+              this email in your primary inbox, please check your spam or bulk email
+              folders.
+            </p>
+            <div className="mt-6">
+              <Button
+                onClick={() => {
+                  setShowOtpPopup(false)
+                  router.push('/')
+                }}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                Got it!
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

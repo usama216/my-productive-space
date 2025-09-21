@@ -171,6 +171,9 @@ export default function PaymentStep({
         </CardContent>
       </Card>
 
+      {/* Booking Hold Notice */}
+    
+
       {/* Price Breakdown */}
       <Card>
         <CardContent className="space-y-2 pt-4">
@@ -209,7 +212,15 @@ export default function PaymentStep({
         <div><b>Email:</b> {customer.email}</div>
         <div><b>Phone:</b> {customer.phone}</div>
       </div>
-
+      <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+        <div className="flex items-start space-x-2">
+          <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-orange-800">
+          
+            <p>The booking will be held for 5 mins upon clicking of pay, please pay when you are ready</p>
+          </div>
+        </div>
+      </div>
       <div className="flex gap-3">
         <Button variant="outline" onClick={onBack} disabled={loading} className="flex-1">
           Back

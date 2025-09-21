@@ -40,8 +40,24 @@ import { getUserPackages, UserPackage } from '@/lib/services/packageService'
 
 
 const locations = [
-  { id: 'kovan', name: 'Kovan', price: 30, address: '456 Kovan Road, Singapore 560456' }
+  { id: 'kovan', name: 'Kovan', address: 'Blk 208 Hougang St 21 #01-201 S 530208' }
 ]
+
+// Pricing structure based on user type and duration
+const PRICING = {
+  student: {
+    '1hour': 4,    // $4/hr for 1 hour
+    'over1hour': 3 // $3/hr for >1 hour
+  },
+  member: {
+    '1hour': 5,    // $5/hr for 1 hour  
+    'over1hour': 4 // $4/hr for >1 hour
+  },
+  tutor: {
+    '1hour': 6,    // $6/hr for 1 hour
+    'over1hour': 5 // $5/hr for >1 hour
+  }
+}
 
 export default function BookingClient() {
   const { toast } = useToast()
@@ -631,7 +647,31 @@ export default function BookingClient() {
 
   const selectedLocation = locations.find(loc => loc.id === location)
   const totalHours = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60))) : 0
-  const baseSubtotal = selectedLocation ? selectedLocation.price * totalHours * people : 0
+  
+  // Calculate base subtotal using people-based pricing
+  const baseSubtotal = (() => {
+    if (!selectedLocation || totalHours === 0) return 0
+    
+    // Determine pricing tier based on duration
+    const pricingTier = totalHours === 1 ? '1hour' : 'over1hour'
+    
+    // Calculate cost based on people breakdown
+    let totalCost = 0
+    
+    // Students (coStudents)
+    const studentCost = PRICING.student[pricingTier] * totalHours * peopleBreakdown.coStudents
+    totalCost += studentCost
+    
+    // Members (coWorkers) 
+    const memberCost = PRICING.member[pricingTier] * totalHours * peopleBreakdown.coWorkers
+    totalCost += memberCost
+    
+    // Tutors (coTutors)
+    const tutorCost = PRICING.tutor[pricingTier] * totalHours * peopleBreakdown.coTutors
+    totalCost += tutorCost
+    
+    return totalCost
+  })()
 
   // Calculate discount if voucher is applied
   const discountInfo = null // Removed test voucher calculation
@@ -686,6 +726,51 @@ export default function BookingClient() {
   }
 
 
+  // Validate package usage before booking
+  const validatePackageUsage = async (packageId: string) => {
+    try {
+      // Get user's packages to check remaining passes
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/new-packages/user-packages?userId=${user?.id}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch user packages')
+      }
+      
+      const data = await response.json()
+      if (!data.success || !data.packages) {
+        throw new Error('No packages found')
+      }
+      
+      // Find the selected package
+      const selectedPkg = data.packages.find((pkg: any) => pkg.id === packageId)
+      if (!selectedPkg) {
+        return {
+          isValid: false,
+          message: 'Selected package not found'
+        }
+      }
+      
+      // Check if package has remaining passes
+      const remainingPasses = selectedPkg.remainingPasses || selectedPkg.passCount || 0
+      if (remainingPasses <= 0) {
+        return {
+          isValid: false,
+          message: `You have used all ${selectedPkg.passCount} passes from this package. Please select a different package or book without a package.`
+        }
+      }
+      
+      return {
+        isValid: true,
+        message: 'Package is valid for use'
+      }
+    } catch (error) {
+      console.error('Error validating package usage:', error)
+      return {
+        isValid: false,
+        message: 'Failed to validate package usage. Please try again.'
+      }
+    }
+  }
+
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -725,6 +810,19 @@ export default function BookingClient() {
         variant: "destructive",
       })
       return
+    }
+
+    // Validate package usage if package is selected
+    if (selectedPackage) {
+      const packageValidation = await validatePackageUsage(selectedPackage)
+      if (!packageValidation.isValid) {
+        toast({
+          title: "Package usage limit reached",
+          description: packageValidation.message,
+          variant: "destructive",
+        })
+        return
+      }
     }
 
     // Check if it's a zero amount booking - handle immediately
@@ -839,6 +937,14 @@ export default function BookingClient() {
   const createBookingForPayment = async (): Promise<string | null> => {
     if (!user) {
       throw new Error('User not authenticated')
+    }
+
+    // Validate package usage if package is selected
+    if (selectedPackage) {
+      const packageValidation = await validatePackageUsage(selectedPackage)
+      if (!packageValidation.isValid) {
+        throw new Error(packageValidation.message)
+      }
     }
 
     try {
@@ -1003,12 +1109,13 @@ export default function BookingClient() {
                             <SelectContent>
                               {locations.map(loc => (
                                 <SelectItem key={loc.id} value={loc.id}>
-                                  {loc.name} - ${loc.price}/hour
+                                  {loc.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
+                        
 
                         <div>
                           <Label>Number of People</Label>
@@ -1653,10 +1760,25 @@ export default function BookingClient() {
                     </div>
                   ) : totalHours > 0 && user ? (
                     <div className="border-t pt-4 space-y-2">
-                      <div className="flex justify-between">
-                        <span>Rate (${selectedLocation?.price}/hour)</span>
-                        <span>${selectedLocation?.price}</span>
-                      </div>
+                      {/* Role-based rates */}
+                      {peopleBreakdown.coStudents > 0 && (
+                        <div className="flex justify-between">
+                          <span>Students ({peopleBreakdown.coStudents}):</span>
+                          <span>${PRICING.student[totalHours === 1 ? '1hour' : 'over1hour']}/hr</span>
+                        </div>
+                      )}
+                      {peopleBreakdown.coWorkers > 0 && (
+                        <div className="flex justify-between">
+                          <span>Members ({peopleBreakdown.coWorkers}):</span>
+                          <span>${PRICING.member[totalHours === 1 ? '1hour' : 'over1hour']}/hr</span>
+                        </div>
+                      )}
+                      {peopleBreakdown.coTutors > 0 && (
+                        <div className="flex justify-between">
+                          <span>Tutors ({peopleBreakdown.coTutors}):</span>
+                          <span>${PRICING.tutor[totalHours === 1 ? '1hour' : 'over1hour']}/hr</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Duration</span>
                         <span>{totalHours} hours</span>

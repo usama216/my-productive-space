@@ -13,13 +13,14 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 
-const rateHeaders = ['30min(0.5hr)', '1 hr', '> 1 hr']
+const rateHeaders = ['1 hour', '>1 hour']
 const rateRows = [
-  { label: 'Guest', values: ['7', '6', '6'] },
-  { label: 'Member', values: ['5', '4', '4'] },
-  { label: 'Student', values: ['4', '3', '3'] },
-  { label: 'Tutor', values: ['6', '5', '5'] },
+  { label: 'Students', values: ['$4/hr*', '$3/hr*'] },
+  { label: 'Members', values: ['$5/hr', '$4/hr'] },
+  { label: 'Tutor', values: ['$6/hr', '$5/hr'] },
 ]
+
+const studentNote = "*Student ID would be required as proof of verification during payment"
 
 const promos = [
   {
@@ -133,12 +134,16 @@ export default function PricingPage() {
                     ))}
                   </tbody>
                 </table>
+                
+                <div className="mt-4 text-sm text-gray-600 text-center">
+                  <p>{studentNote}</p>
+                </div>
 
                 {/* Scenario Example */}
                 <div className="mt-6 p-4 bg-gray-50 rounded">
-                  <h3 className="font-semibold">Example: Guest booking 1.5 hrs</h3>
+                  <h3 className="font-semibold">Example: Student booking 2 hrs</h3>
                   <p>
-                    1 hr @ 6 + 0.5 hr @ (6/2) = <strong>$9</strong>
+                    2 hrs @ $3/hr = <strong>$6</strong>
                   </p>
                 </div>
               </div>

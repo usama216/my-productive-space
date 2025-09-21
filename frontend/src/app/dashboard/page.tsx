@@ -56,6 +56,7 @@ import { useRouter } from 'next/navigation'
 import { getUserProfile, updateUserProfile, UserProfile, formatUserName, getMemberTypeDisplayName, getVerificationStatusDisplayName, getVerificationStatusColor, getEffectiveMemberType } from '@/lib/userProfileService'
 import { StudentDocumentUpload } from '@/components/StudentDocumentUpload'
 import { StudentDocumentData } from '@/lib/studentDocumentService'
+import { getUserBookings, Booking as ApiBooking, formatBookingDate, getBookingStatus, getStatusColor, calculateDuration } from '@/lib/bookingService'
 
 // Mock data types
 interface Booking {
@@ -94,6 +95,8 @@ export default function Dashboard() {
   })
   const [studentDocument, setStudentDocument] = useState<StudentDocumentData | null>(null)
   const [originalMemberType, setOriginalMemberType] = useState<'STUDENT' | 'MEMBER' | 'TUTOR'>('MEMBER')
+  const [upcomingBookings, setUpcomingBookings] = useState<ApiBooking[]>([])
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false)
 
   // Sample data for testing (fallback)
   const sampleUserData = {
@@ -256,9 +259,29 @@ export default function Dashboard() {
     setStudentDocument(null)
   }
 
+  // Load upcoming bookings
+  const loadUpcomingBookings = async () => {
+    try {
+      setIsLoadingBookings(true)
+      const response = await getUserBookings()
+      if (response.success && response.bookings) {
+        // Filter for upcoming bookings only
+        const upcoming = response.bookings.filter(booking => 
+          booking.isUpcoming && booking.status === 'upcoming'
+        )
+        setUpcomingBookings(upcoming)
+      }
+    } catch (error) {
+      console.error('Error loading upcoming bookings:', error)
+    } finally {
+      setIsLoadingBookings(false)
+    }
+  }
+
   // Load user profile when component mounts or authUser changes
   useEffect(() => {
     loadUserProfile()
+    loadUpcomingBookings()
   }, [authUser?.id])
 
   const handleTabChange = (value: string) => {
@@ -417,14 +440,93 @@ export default function Dashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8">
-                      <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
-                      <p className="text-gray-600 mb-4">You don't have any upcoming bookings at the moment.</p>
-                      <Button onClick={() => router.push('/book-now')}>
-                        Book Now
-                      </Button>
-                    </div>
+                    {isLoadingBookings ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
+                        <p className="text-gray-600">Loading bookings...</p>
+                      </div>
+                    ) : upcomingBookings.length > 0 ? (
+                      <div className="space-y-4">
+                        {/* Show only the first booking */}
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-semibold text-sm">{upcomingBookings[0].location}</h4>
+                              <p className="text-xs text-gray-600">Ref: {upcomingBookings[0].bookingRef}</p>
+                            </div>
+                            <Badge className={getStatusColor(getBookingStatus(upcomingBookings[0]))}>
+                              {getBookingStatus(upcomingBookings[0])}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex items-center">
+                              <Calendar className="w-3 h-3 mr-1 text-gray-400" />
+                              <span>{formatBookingDate(upcomingBookings[0].startAt)}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="w-3 h-3 mr-1 text-gray-400" />
+                              <span>{calculateDuration(upcomingBookings[0].startAt, upcomingBookings[0].endAt)}h</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Users className="w-3 h-3 mr-1 text-gray-400" />
+                              <span>{upcomingBookings[0].pax} people</span>
+                            </div>
+                            <div className="flex items-center">
+                              <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                              <span className="text-xs">
+                                {upcomingBookings[0].seatNumbers && upcomingBookings[0].seatNumbers.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {upcomingBookings[0].seatNumbers.map((seat, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs px-1 py-0">
+                                        {seat}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  'No seats'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                            <span className="font-semibold text-sm">${upcomingBookings[0].totalAmount}</span>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => setActiveTab('mybookings')}
+                              className="text-xs"
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Show View All button if there are more than 1 booking */}
+                        {upcomingBookings.length > 1 && (
+                          <div className="text-center">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setActiveTab('mybookings')}
+                              className="text-xs"
+                            >
+                              View All ({upcomingBookings.length} total)
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
+                        <p className="text-gray-600 mb-4">You don't have any upcoming bookings at the moment.</p>
+                        <Button onClick={() => router.push('/book-now')}>
+                          Book Now
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -446,12 +548,12 @@ export default function Dashboard() {
                           verificationHistory
                         });
                         
-                        const formatDate = (dateString) => {
+                        const formatDate = (dateString: string) => {
                           const date = new Date(dateString);
                           return `${date.getMonth() + 1}/${date.getDate()}`;
                         };
                         
-                        const getStatusIcon = (status) => {
+                        const getStatusIcon = (status: string) => {
                           switch (status) {
                             case 'REJECTED':
                               return <AlertCircle className="h-4 w-4 text-red-600" />;
@@ -464,7 +566,7 @@ export default function Dashboard() {
                           }
                         };
                         
-                        const getStatusColor = (status) => {
+                        const getStatusColor = (status: string) => {
                           switch (status) {
                             case 'REJECTED':
                               return 'text-red-800';
@@ -477,7 +579,7 @@ export default function Dashboard() {
                           }
                         };
                         
-                        const getStatusText = (status) => {
+                        const getStatusText = (status: string) => {
                           switch (status) {
                             case 'REJECTED':
                               return 'rejected';

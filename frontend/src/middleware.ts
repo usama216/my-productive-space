@@ -52,11 +52,12 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/forgot-password"
 
   // If user is logged in and trying to access auth routes, redirect to home
-  if (isAuthRoute && user) {
-    return NextResponse.redirect(
-      new URL("/", request.url)
-    )
-  }
+  // Temporarily disabled for testing - uncomment the lines below to re-enable
+  // if (isAuthRoute && user) {
+  //   return NextResponse.redirect(
+  //     new URL("/", request.url)
+  //   )
+  // }
 
   // If user is not logged in and trying to access protected routes, redirect to login
   // Can customize this list based on the finalized protected routes

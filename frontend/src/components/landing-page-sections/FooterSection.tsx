@@ -101,7 +101,7 @@ export function FooterSection() {
                     rel="noopener noreferrer"
                     className="text-gray-800 hover:text-gray-600 hover:underline"
                   >
-                    Blk 208 Hougang st 21#01-201 S(530208)
+                    Blk 208 Hougang St 21 #01-201 S 530208
                   </a>
                 </li>
               </ul>

@@ -37,15 +37,23 @@ export function BookingForm() {
     students: 1,
     members: 0,
     tutors: 0,
-    memberType: 'student' as 'student' | 'regular' | 'premium',
     bookedForEmails: [] as string[]
   })
 
-  // Pricing constants (in real app, these would come from backend)
+  // Pricing constants based on duration (1 hour vs >1 hour)
   const PRICING = {
-    student: 15, // per hour
-    regular: 20, // per hour
-    premium: 25  // per hour
+    student: {
+      '1hour': 4,    // $4/hr for 1 hour
+      'over1hour': 3 // $3/hr for >1 hour
+    },
+    member: {
+      '1hour': 5,    // $5/hr for 1 hour  
+      'over1hour': 4 // $4/hr for >1 hour
+    },
+    tutor: {
+      '1hour': 6,    // $6/hr for 1 hour
+      'over1hour': 5 // $5/hr for >1 hour
+    }
   }
 
   // Load available promo codes
@@ -76,8 +84,23 @@ export function BookingForm() {
     const duration = calculateDuration()
     if (duration === 0) return { totalCost: 0, totalAmount: 0, discountAmount: 0 }
 
-    const basePrice = PRICING[formData.memberType]
-    const totalCost = basePrice * duration * formData.pax
+    // Determine pricing tier based on duration
+    const pricingTier = duration === 1 ? '1hour' : 'over1hour'
+    
+    // Calculate cost based on people breakdown
+    let totalCost = 0
+    
+    // Students
+    const studentCost = PRICING.student[pricingTier] * duration * formData.students
+    totalCost += studentCost
+    
+    // Members (coWorkers)
+    const memberCost = PRICING.member[pricingTier] * duration * formData.members
+    totalCost += memberCost
+    
+    // Tutors
+    const tutorCost = PRICING.tutor[pricingTier] * duration * formData.tutors
+    totalCost += tutorCost
 
     let discountAmount = 0
     if (selectedPromoCode) {
@@ -463,10 +486,25 @@ export function BookingForm() {
                   <span>Duration:</span>
                   <span>{calculateDuration()} hours</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Rate per person per hour:</span>
-                  <span>${PRICING[formData.memberType]}</span>
-                </div>
+                {/* Role-based rates */}
+                {formData.students > 0 && (
+                  <div className="flex justify-between">
+                    <span>Students ({formData.students}):</span>
+                    <span>${PRICING.student[calculateDuration() === 1 ? '1hour' : 'over1hour']}/hr</span>
+                  </div>
+                )}
+                {formData.members > 0 && (
+                  <div className="flex justify-between">
+                    <span>Members ({formData.members}):</span>
+                    <span>${PRICING.member[calculateDuration() === 1 ? '1hour' : 'over1hour']}/hr</span>
+                  </div>
+                )}
+                {formData.tutors > 0 && (
+                  <div className="flex justify-between">
+                    <span>Tutors ({formData.tutors}):</span>
+                    <span>${PRICING.tutor[calculateDuration() === 1 ? '1hour' : 'over1hour']}/hr</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Base cost:</span>
                   <span>${totalCost.toFixed(2)}</span>
