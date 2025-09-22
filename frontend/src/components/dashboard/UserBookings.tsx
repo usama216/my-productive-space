@@ -545,10 +545,10 @@ export function UserBookings() {
                               <Clock className="h-4 w-4 mr-1" />
                               Reschedule
                             </Button>
-                            <div className="text-xs text-orange-600 mt-1">
+                            {/* <div className="text-xs text-orange-600 mt-1">
                               <AlertTriangle className="h-3 w-3 inline mr-1" />
                               You can only reschedule once per booking
-                            </div>
+                            </div> */}
                           </>
                         )}
 
