@@ -243,6 +243,22 @@ export function UserBookings() {
 
   const currentTabBookings = getCurrentTabBookings()
 
+  // Handle reschedule booking
+  const handleReschedule = (booking: Booking) => {
+    // Check if booking has already been rescheduled
+    if ((booking.rescheduleCount || 0) >= 1) {
+      toast({
+        title: "Cannot Reschedule",
+        description: "You can only reschedule this booking once",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Navigate to reschedule page
+    window.location.href = `/reschedule/${booking.id}`
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -518,12 +534,30 @@ export function UserBookings() {
                           </Button>
                         )}
 
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReschedule(booking)}
+                              className="hover:bg-orange-50 border-orange-200 text-orange-700"
+                            >
+                              <Clock className="h-4 w-4 mr-1" />
+                              Reschedule
+                            </Button>
+                            <div className="text-xs text-orange-600 mt-1">
+                              <AlertTriangle className="h-3 w-3 inline mr-1" />
+                              You can only reschedule once per booking
+                            </div>
+                          </>
+                        )}
+
                         {activeTab === 'upcoming' && canCancelBooking(booking) && (
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => handleCancelBooking(booking)}
-                            className="hover:bg-red-50"
+                            className="bg-red-500 hover:bg-red-500/90 text-white border-red-500 hover:border-red-500"
                           >
                             <X className="h-4 w-4 mr-1" />
                             Cancel & Refund

@@ -33,6 +33,8 @@ export interface Booking {
   durationHours?: number
   timeUntilBooking?: string
   status?: string
+  rescheduleCount?: number
+  rescheduledAt?: string
   User?: {
     name: string
     email: string

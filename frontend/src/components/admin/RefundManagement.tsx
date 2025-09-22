@@ -497,13 +497,14 @@ export function RefundManagement() {
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
+                  className="border-gray-300 hover:border-gray-400 hover:bg-gray-50"
                   onClick={() => setSelectedRefund(null)}
                   disabled={isApproving || isRejecting}
                 >
                   Cancel
                 </Button>
                 <Button
-                  className="bg-red-500 hover:bg-red-600 text-white"
+                  className="bg-red-500 hover:bg-red-500/90 text-white border-red-500 hover:border-red-500"
                   onClick={() => handleRejectRefund(selectedRefund.id)}
                   disabled={isApproving || isRejecting}
                 >
@@ -517,7 +518,7 @@ export function RefundManagement() {
                   )}
                 </Button>
                 <Button
-                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  className="bg-orange-500 hover:bg-orange-500/90 text-white border-orange-500 hover:border-orange-500"
                   onClick={() => handleApproveRefund(selectedRefund.id)}
                   disabled={isApproving || isRejecting}
                 >
