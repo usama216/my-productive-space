@@ -204,9 +204,7 @@ export function RefundRequests({ userId, onRefundRequested }: RefundRequestsProp
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">Request Refund</Button>
-              </DialogTrigger>
+         
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Request Refund</DialogTitle>

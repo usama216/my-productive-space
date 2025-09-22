@@ -16,9 +16,11 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { Package, Ticket, Clock, AlertCircle, ExternalLink, Loader2, CheckCircle, XCircle, Wallet } from 'lucide-react'
 import { PromoCode, validatePromoCodeLocally, calculateDiscountLocally, formatDiscountDisplay, getPromoCodeStatusColor, getUserAvailablePromoCodes, applyPromoCode, calculateBookingDuration, validateMinimumHours, formatDurationDisplay, BookingDuration } from '@/lib/promoCodeService';
 import { getUserPackages, UserPackage as ApiUserPackage } from '@/lib/services/packageService';
+import { getUserCredits, UserCredit } from '@/lib/refundService';
+import { useToast } from '@/hooks/use-toast';
 
 // Package hour limits per day based on requirements - DEPRECATED
 // Now using dynamic hoursAllowed from package configuration
@@ -47,7 +49,7 @@ const getApplicablePackages = (bookingHours: number, userPackages: ApiUserPackag
   // All packages are applicable regardless of booking hours
   // No hour-based restrictions - users can use packages for any duration
   return userPackages.filter(pkg => {
-    const remainingPasses = pkg.remainingPasses || pkg.passCount || 0;
+    const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
     return remainingPasses > 0 && !pkg.isExpired;
   });
 };
@@ -64,7 +66,7 @@ const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, use
   const discountAmount = appliedHours * hourlyRate;
   const remainingAmount = remainingHours * hourlyRate;
   
-  const canUse = (pkg.remainingPasses || pkg.passCount || 0) > 0 && !pkg.isExpired;
+  const canUse = (pkg.remainingPasses || pkg.packageContents?.passCount || 0) > 0 && !pkg.isExpired;
   
   console.log('Package discount calculation:', {
     packageName: pkg.packageName,
@@ -81,7 +83,7 @@ const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, use
     remainingAmount,
     canUse,
     remainingPasses: pkg.remainingPasses,
-    passCount: pkg.passCount,
+    passCount: pkg.packageContents?.passCount,
     isExpired: pkg.isExpired
   });
   
@@ -99,12 +101,13 @@ const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, use
 type DiscountInfo =
   | { type: 'package'; id: string; discountAmount?: number; finalAmount?: number }
   | { type: 'promo'; id: string; discountAmount: number; finalAmount: number; promoCode: PromoCode }
+  | { type: 'credit'; id: string; discountAmount: number; finalAmount: number; creditAmount: number }
   | null;
 
 type Props = {
   onChange: (discountInfo: DiscountInfo) => void
-  onModeChange?: (mode: 'package' | 'promo') => void
-  mode: 'package' | 'promo'
+  onModeChange?: (mode: 'package' | 'promo' | 'credit') => void
+  mode: 'package' | 'promo' | 'credit'
   selectedPackage?: string
   promoCode?: string
   promoValid?: boolean
@@ -141,6 +144,12 @@ export function EntitlementTabs({
   } | null>(null)
   const [userPackages, setUserPackages] = useState<ApiUserPackage[]>([])
   const [isLoadingPackages, setIsLoadingPackages] = useState(false)
+  const [userCredits, setUserCredits] = useState<UserCredit[]>([])
+  const [totalCredit, setTotalCredit] = useState(0)
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false)
+  const [useCredit, setUseCredit] = useState(false)
+  const [creditAmount, setCreditAmount] = useState(0)
+  const { toast } = useToast()
 
   // Load user packages from API
   const loadUserPackages = useCallback(async () => {
@@ -169,6 +178,27 @@ export function EntitlementTabs({
     }
   }, [userId, bookingDuration]);
 
+  // Load user credits from API
+  const loadUserCredits = useCallback(async () => {
+    if (!userId) {
+      console.log('No userId provided, skipping credit load');
+      return;
+    }
+
+    setIsLoadingCredits(true);
+    try {
+      const data = await getUserCredits(userId);
+      setUserCredits(data.credits);
+      setTotalCredit(data.totalCredit);
+      console.log('User credits loaded:', data);
+    } catch (error) {
+      console.error('Error loading user credits:', error);
+      setUserCredits([]);
+      setTotalCredit(0);
+    } finally {
+      setIsLoadingCredits(false);
+    }
+  }, [userId]);
 
   // Load available promo codes from API
   const loadAvailablePromoCodes = useCallback(async () => {
@@ -194,15 +224,17 @@ export function EntitlementTabs({
     }
   }, [userId]);
 
-  // Load packages and promo codes when component mounts
+  // Load packages, promo codes, and credits when component mounts
   useEffect(() => {
     if (userId) {
       loadUserPackages();
       if (mode === 'promo') {
         loadAvailablePromoCodes();
+      } else if (mode === 'credit') {
+        loadUserCredits();
       }
     }
-  }, [mode, userId, loadUserPackages, loadAvailablePromoCodes]);
+  }, [mode, userId, loadUserPackages, loadAvailablePromoCodes, loadUserCredits]);
 
   // Recalculate promo code discount when bookingAmount changes
   useEffect(() => {
@@ -324,13 +356,13 @@ export function EntitlementTabs({
   // Check if package is valid for current booking
   const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
     // Use remainingPasses from the API response, fallback to passCount if not available
-    const remainingPasses = pkg.remainingPasses || pkg.passCount || 0;
+    const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
     return !pkg.isExpired && remainingPasses > 0
   }
 
   // Check if user has any valid packages
   const hasValidPackages = userPackages.some(pkg => {
-    const remainingPasses = pkg.remainingPasses || pkg.passCount || 0;
+    const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
     return !pkg.isExpired && remainingPasses > 0
   })
 
@@ -342,11 +374,11 @@ export function EntitlementTabs({
         onValueChange={(newMode) => {
           onChange(null);
           if (onModeChange && newMode !== mode) {
-            onModeChange(newMode as 'package' | 'promo');
+            onModeChange(newMode as 'package' | 'promo' | 'credit');
           }
         }}
       >
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="package" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Use Package
@@ -354,6 +386,10 @@ export function EntitlementTabs({
           <TabsTrigger value="promo" className="flex items-center gap-2">
             <Ticket className="w-4 h-4" />
             Apply Promo
+          </TabsTrigger>
+          <TabsTrigger value="credit" className="flex items-center gap-2">
+            <Wallet className="w-4 h-4" />
+            Use Credit
           </TabsTrigger>
         </TabsList>
 
@@ -440,7 +476,7 @@ export function EntitlementTabs({
                             userRole,
                             discount,
                             remainingPasses: pkg?.remainingPasses,
-                            passCount: pkg?.passCount
+                            passCount: pkg?.packageContents?.passCount
                           });
 
                           onChange({
@@ -456,7 +492,7 @@ export function EntitlementTabs({
                         </SelectTrigger>
                         <SelectContent>
                           {userPackages.map((pkg) => {
-                            const remaining = pkg.remainingPasses || pkg.passCount || 0;
+                            const remaining = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
                             const bookingHours = bookingDuration?.durationHours || 0;
                             const isValid = isPackageValidForBooking(pkg, bookingHours);
                             const discount =
@@ -477,7 +513,7 @@ export function EntitlementTabs({
                                     <div>
                                       <span className="font-medium">{pkg.packageName}</span>
                                       <span className="text-sm text-gray-500 ml-2">
-                                        ({remaining} of {pkg.totalPasses || pkg.passCount || 0} left)
+                                        ({remaining} of {pkg.totalPasses || pkg.packageContents?.passCount || 0} left)
                                       </span>
                                       {/* <div className="text-xs text-gray-500 mt-1">
                                         Package discount available
@@ -504,7 +540,7 @@ export function EntitlementTabs({
                           {(() => {
                             const pkg = userPackages.find((p) => p.id === selectedPackage);
                             if (!pkg) return null;
-                            const remaining = pkg.remainingPasses || pkg.passCount || 0;
+                            const remaining = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
 
                             return (
                               <div className="space-y-3">
@@ -834,6 +870,198 @@ export function EntitlementTabs({
                   <p className="text-gray-600 text-sm">No promo codes available at the moment</p>
                 </CardContent>
               </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="credit" className="mt-4 space-y-4">
+          <div>
+            {isLoadingCredits ? (
+              // Loading state
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                <span>Loading credits...</span>
+              </div>
+            ) : totalCredit <= 0 ? (
+              // No credits available
+              <div className="text-center py-8">
+                <Wallet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Credits Available</h3>
+                <p className="text-gray-600 mb-4">
+                  You don't have any store credits available at the moment.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Credits are added to your account when refunds are approved.
+                </p>
+              </div>
+            ) : (
+              // Credits available
+              <div className="space-y-4">
+                {/* Credit Summary */}
+                <Card className="bg-orange-50 border-orange-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-orange-900">Available Credits</h3>
+                        <p className="text-2xl font-bold text-orange-600">
+                          ${totalCredit.toFixed(2)}
+                        </p>
+                        <p className="text-sm text-orange-700">
+                          {userCredits.length} credit{userCredits.length !== 1 ? 's' : ''} available
+                        </p>
+                      </div>
+                      <Wallet className="w-8 h-8 text-orange-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Credit Usage Toggle */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="useCredit"
+                      checked={useCredit}
+                      onChange={(e) => {
+                        setUseCredit(e.target.checked);
+                        if (!e.target.checked) {
+                          setCreditAmount(0);
+                          onChange(null);
+                        } else {
+                          setCreditAmount(Math.min(totalCredit, bookingAmount));
+                        }
+                      }}
+                      className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                    />
+                    <Label htmlFor="useCredit" className="text-sm font-medium">
+                      Use store credits for this booking
+                    </Label>
+                  </div>
+
+                  {useCredit && (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="creditAmount" className="text-sm font-medium">
+                          Credit Amount to Use
+                        </Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="text-sm text-gray-500">$</span>
+                          <Input
+                            id="creditAmount"
+                            type="number"
+                            min="0"
+                            max={Math.min(totalCredit, bookingAmount)}
+                            step="0.01"
+                            value={creditAmount}
+                            onChange={(e) => {
+                              const inputAmount = parseFloat(e.target.value) || 0;
+                              const maxAmount = Math.min(totalCredit, bookingAmount);
+                              const amount = Math.min(inputAmount, maxAmount);
+                              
+                              // Validate that amount doesn't exceed available credit
+                              if (inputAmount > totalCredit) {
+                                toast({
+                                  title: "Invalid Credit Amount",
+                                  description: `You can only use up to $${totalCredit.toFixed(2)} in credits.`,
+                                  variant: "destructive"
+                                });
+                                return;
+                              }
+                              
+                              setCreditAmount(amount);
+                              
+                              // Always send credit info when checkbox is checked, even if amount is 0
+                              if (useCredit) {
+                                const finalAmount = Math.max(0, bookingAmount - amount);
+                                onChange({
+                                  type: 'credit',
+                                  id: 'credit',
+                                  discountAmount: amount,
+                                  finalAmount: finalAmount,
+                                  creditAmount: amount
+                                });
+                              }
+                            }}
+                            className="flex-1"
+                            placeholder="0.00"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const maxAmount = Math.min(totalCredit, bookingAmount);
+                              setCreditAmount(maxAmount);
+                              if (useCredit) {
+                                const finalAmount = Math.max(0, bookingAmount - maxAmount);
+                                onChange({
+                                  type: 'credit',
+                                  id: 'credit',
+                                  discountAmount: maxAmount,
+                                  finalAmount: finalAmount,
+                                  creditAmount: maxAmount
+                                });
+                              }
+                            }}
+                          >
+                            Use Max
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Maximum: ${Math.min(totalCredit, bookingAmount).toFixed(2)}
+                        </p>
+                      </div>
+
+                      {/* Credit Usage Summary */}
+                      {creditAmount > 0 && (
+                        <Card className="bg-orange-50 border-orange-200">
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span>Booking Amount:</span>
+                                <span>${bookingAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm text-orange-600">
+                                <span>Credit Applied:</span>
+                                <span>-${creditAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between font-medium border-t border-orange-200 pt-2">
+                                <span>Amount to Pay:</span>
+                                <span>${Math.max(0, bookingAmount - creditAmount).toFixed(2)}</span>
+                              </div>
+                              {bookingAmount - creditAmount === 0 && (
+                                <div className="text-sm text-orange-700 bg-orange-100 p-2 rounded text-center">
+                                  <span className="font-medium">✅ Fully Covered</span> - No payment required
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Credit Details */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Credit Details</Label>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {userCredits.map((credit) => (
+                            <div key={credit.id} className="flex items-center justify-between p-2 bg-orange-50 border border-orange-200 rounded text-sm">
+                              <div>
+                                <span className="font-medium text-orange-900">${credit.amount.toFixed(2)}</span>
+                                <span className="text-orange-600 ml-2">
+                                  from {credit.Booking?.bookingRef || 'Refund'}
+                                </span>
+                              </div>
+                              <div className="text-xs text-orange-500">
+                                Expires: {new Date(credit.expiresat).toLocaleDateString()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </TabsContent>

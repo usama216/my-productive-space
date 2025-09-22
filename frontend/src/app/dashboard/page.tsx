@@ -956,7 +956,7 @@ export default function Dashboard() {
             {/* Refund Requests Tab */}
             <TabsContent value="refunds" className="space-y-6">
               <RefundRequests userId={authUser?.id || ''} />
-              <RefundSystemTest />
+              
             </TabsContent>
 
             {/* My Bookings Tab */}

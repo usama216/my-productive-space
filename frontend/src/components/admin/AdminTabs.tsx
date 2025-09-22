@@ -48,7 +48,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-8">
+      <TabsList className="grid w-full grid-cols-7">
         <TabsTrigger value="overview">
           Overview
           {pendingStudents.length > 0 && (
@@ -64,7 +64,6 @@ export default function AdminTabs({
         <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
         <TabsTrigger value="refunds">Refund Management</TabsTrigger>
-        <TabsTrigger value="refunds"></TabsTrigger>
 
       </TabsList>
 

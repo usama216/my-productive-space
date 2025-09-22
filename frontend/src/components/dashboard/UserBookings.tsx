@@ -174,6 +174,14 @@ export function UserBookings() {
     return hoursDifference >= 5
   }
 
+  // Check if booking can be cancelled/refunded (≥5 hours in advance)
+  const canCancelBooking = (booking: Booking): boolean => {
+    const now = new Date()
+    const bookingStart = new Date(booking.startAt)
+    const hoursDifference = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60)
+    return hoursDifference >= 5 && booking.confirmedPayment && booking.refundstatus === 'NONE'
+  }
+
   // Handle edit booking - navigate to book-now page
   const handleEdit = (booking: Booking) => {
     if (!canEditBooking(booking)) {
@@ -216,7 +224,7 @@ export function UserBookings() {
       case 'past':
         return pastBookings
       case 'cancelled':
-        return bookings.filter(b => b.status === 'refunded')
+        return bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED')
       default:
         return []
     }
@@ -343,7 +351,7 @@ export function UserBookings() {
               : 'text-gray-600 hover:text-gray-900'
             }`}
         >
-          Cancelled ({bookings.filter(b => b.status === 'refunded').length})
+          Cancelled ({bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED').length})
         </button>
       </div>
 
@@ -352,7 +360,8 @@ export function UserBookings() {
         <CardHeader>
           <CardTitle>
             {activeTab === 'upcoming' ? 'Upcoming Bookings' : 
-             activeTab === 'ongoing' ? 'Ongoing Bookings' : 'Past Bookings'}
+             activeTab === 'ongoing' ? 'Ongoing Bookings' : 
+             activeTab === 'cancelled' ? 'Cancelled Bookings' : 'Past Bookings'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -498,7 +507,7 @@ export function UserBookings() {
                           </Button>
                         )}
 
-                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (
+                        {activeTab === 'upcoming' && canCancelBooking(booking) && (
                           <Button
                             size="sm"
                             variant="destructive"
@@ -508,6 +517,13 @@ export function UserBookings() {
                             <X className="h-4 w-4 mr-1" />
                             Cancel & Refund
                           </Button>
+                        )}
+
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && !canCancelBooking(booking) && (
+                          <div className="text-sm text-gray-500">
+                            <AlertTriangle className="h-4 w-4 inline mr-1" />
+                            Cannot cancel (less than 5 hours)
+                          </div>
                         )}
 
                         {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus !== 'NONE' && (
@@ -528,7 +544,7 @@ export function UserBookings() {
                           </div>
                         )}
 
-                        {activeTab === 'cancelled' && booking.status === 'refunded' && (
+                        {activeTab === 'cancelled' && (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') && (
                           <div className="flex items-center gap-2">
                             <Badge 
                               className="bg-orange-100 text-orange-800 border-orange-200 text-xs"

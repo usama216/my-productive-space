@@ -65,7 +65,7 @@ export default function BookingClient() {
   const router = useRouter()
   const { user, userId, isLoggedIn, loading: isLoadingAuth } = useAuth()
 
-  const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo'>('package')
+  const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo' | 'credit'>('package')
   const [selectedPackage, setSelectedPackage] = useState<string>('')
   const [promoCode, setPromoCode] = useState<string>('')
   const [promoValid, setPromoValid] = useState<boolean>(false)
@@ -76,6 +76,13 @@ export default function BookingClient() {
     discountAmount: number
     finalAmount: number
     promoCode?: PromoCode
+  } | null>(null)
+  const [creditInfo, setCreditInfo] = useState<{
+    type: string
+    id: string
+    discountAmount: number
+    finalAmount: number
+    creditAmount: number
   } | null>(null)
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
@@ -698,7 +705,7 @@ export default function BookingClient() {
     }
   })() : null
   
-  // Calculate final amounts - packages take precedence over promo codes
+  // Calculate final amounts - packages take precedence over promo codes, then credits
   let subtotal = baseSubtotal
   let discountAmount = 0
   
@@ -708,6 +715,9 @@ export default function BookingClient() {
   } else if (promoDiscountInfo) {
     subtotal = promoDiscountInfo.finalAmount
     discountAmount = promoDiscountInfo.discountAmount
+  } else if (creditInfo) {
+    subtotal = creditInfo.finalAmount
+    discountAmount = creditInfo.discountAmount
   }
 
   const total = subtotal
@@ -859,7 +869,7 @@ export default function BookingClient() {
         tutors: peopleBreakdown.coTutors,
         totalCost: baseSubtotal,
         promoCodeId: promoCodeInfo?.promoCode?.id || null,
-        discountAmount: promoCodeInfo?.discountAmount || 0,
+        discountAmount: (promoCodeInfo?.discountAmount || 0) + (creditInfo?.discountAmount || 0),
         totalAmount: total,
         memberType: memberType,
         bookedForEmails: [customerEmail],
@@ -868,7 +878,8 @@ export default function BookingClient() {
         paymentId: null,
         bookedAt: new Date().toISOString(),
         packageId: selectedPackage || null,
-        packageUsed: !!selectedPackage
+        packageUsed: !!selectedPackage,
+        creditAmount: creditInfo?.creditAmount || 0
       }
 
       // Create booking
@@ -966,7 +977,7 @@ export default function BookingClient() {
         tutors: peopleBreakdown.coTutors,
         totalCost: baseSubtotal,
         promoCodeId: promoCodeInfo?.promoCode?.id || null,
-        discountAmount: promoCodeInfo?.discountAmount || 0,
+        discountAmount: (promoCodeInfo?.discountAmount || 0) + (creditInfo?.discountAmount || 0),
         totalAmount: total,
         memberType: memberType,
         bookedForEmails: [customerEmail],
@@ -975,7 +986,8 @@ export default function BookingClient() {
         paymentId: null,
         bookedAt: new Date().toISOString(),
         packageId: selectedPackage || null,
-        packageUsed: !!selectedPackage
+        packageUsed: !!selectedPackage,
+        creditAmount: creditInfo?.creditAmount || 0
       }
 
       // Create booking
@@ -1360,8 +1372,8 @@ export default function BookingClient() {
                             setSelectedPackage('');
                             setPromoCode('');
                             setPromoValid(false);
-                    
                             setPromoCodeInfo(null);
+                            setCreditInfo(null);
                           }}
                           onChange={(discountInfo) => {
                             console.log('BookingClient received discountInfo:', discountInfo);
@@ -1372,6 +1384,7 @@ export default function BookingClient() {
                               setPromoCode('')
                               setPromoValid(false)
                               setPromoCodeInfo(null)
+                              setCreditInfo(null)
                             } else if (discountInfo && discountInfo.type === 'promo') {
                               console.log('Setting promo code info:', {
                                 originalAmount: baseSubtotal,
@@ -1385,6 +1398,21 @@ export default function BookingClient() {
                               setPromoValid(true)
                               setSelectedPackage('')
                               setPromoCodeInfo(discountInfo)
+                              setCreditInfo(null)
+                            } else if (discountInfo && discountInfo.type === 'credit') {
+                              console.log('Setting credit info:', {
+                                originalAmount: baseSubtotal,
+                                discountAmount: discountInfo.discountAmount,
+                                finalAmount: discountInfo.finalAmount,
+                                creditAmount: discountInfo.creditAmount
+                              });
+                              
+                              setEntitlementMode('credit')
+                              setCreditInfo(discountInfo)
+                              setSelectedPackage('')
+                              setPromoCode('')
+                              setPromoValid(false)
+                              setPromoCodeInfo(null)
                             } else {
                               // Clear all discounts
                               setEntitlementMode('package')
@@ -1392,6 +1420,7 @@ export default function BookingClient() {
                               setPromoCode('')
                               setPromoValid(false)
                               setPromoCodeInfo(null)
+                              setCreditInfo(null)
                             }
                           }}
                           selectedPackage={selectedPackage}
@@ -1800,6 +1829,14 @@ export default function BookingClient() {
                         </div>
                       )}
 
+                      {/* Show credit discount if applied */}
+                      {creditInfo && creditInfo.discountAmount > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Store Credit Applied</span>
+                          <span>-${creditInfo.discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+
                       {/* Package Discount Information */}
                       {selectedPackage && (() => {
                         // Find the selected package details
@@ -1895,7 +1932,10 @@ export default function BookingClient() {
                               🎉 Free Booking!
                             </p>
                             <p className="text-xs mt-1 text-green-600">
-                              Fully covered by package discount
+                              {selectedPackage ? 'Fully covered by package discount' :
+                               creditInfo ? 'Fully covered by store credit' :
+                               promoCodeInfo ? 'Fully covered by promo code' :
+                               'Fully covered by discount'}
                             </p>
                           </div>
                         </div>
@@ -1911,6 +1951,21 @@ export default function BookingClient() {
                             <p className="text-xs mt-1 text-green-600">
                               Original: ${baseSubtotal.toFixed(2)} | 
                               Final: ${promoCodeInfo.finalAmount.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show total savings if credit applied */}
+                      {creditInfo && creditInfo.discountAmount > 0 && (
+                        <div className="mt-3 p-3 rounded-md bg-blue-50 border border-blue-200">
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-blue-800">
+                              💳 Using ${creditInfo.creditAmount.toFixed(2)} store credit!
+                            </p>
+                            <p className="text-xs mt-1 text-blue-600">
+                              Original: ${baseSubtotal.toFixed(2)} | 
+                              Final: ${creditInfo.finalAmount.toFixed(2)}
                             </p>
                           </div>
                         </div>
