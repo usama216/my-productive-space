@@ -425,7 +425,7 @@ export default function Dashboard() {
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="passes">Passes</TabsTrigger>
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
-              <TabsTrigger value="credits">Store Credits</TabsTrigger>
+              <TabsTrigger value="credits">Wallet</TabsTrigger>
               <TabsTrigger value="refunds">Refund Requests</TabsTrigger>
             </TabsList>
 

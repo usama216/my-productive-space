@@ -12,9 +12,11 @@ import { NewPackage } from '@/lib/services/packageService'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { getAllPricingForLocation } from '@/lib/pricingService'
 
 const rateHeaders = ['1 hour', '>1 hour']
-const rateRows = [
+// Dynamic pricing will be loaded from database
+const fallbackRateRows = [
   { label: 'Students', values: ['$4/hr*', '$3/hr*'] },
   { label: 'Members', values: ['$5/hr', '$4/hr'] },
   { label: 'Tutor', values: ['$6/hr', '$5/hr'] },
@@ -33,6 +35,28 @@ const promos = [
 export default function PricingPage() {
   const router = useRouter()
   const { packages, loading: packagesLoading, error: packagesError } = usePackages('MEMBER')
+  const [rateRows, setRateRows] = useState(fallbackRateRows)
+  const [pricingLoading, setPricingLoading] = useState(true)
+
+  // Load dynamic pricing
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const pricing = await getAllPricingForLocation('Kovan')
+        setRateRows([
+          { label: 'Students', values: [`$${pricing.student.oneHourRate}/hr*`, `$${pricing.student.overOneHourRate}/hr*`] },
+          { label: 'Members', values: [`$${pricing.member.oneHourRate}/hr`, `$${pricing.member.overOneHourRate}/hr`] },
+          { label: 'Tutor', values: [`$${pricing.tutor.oneHourRate}/hr`, `$${pricing.tutor.overOneHourRate}/hr`] },
+        ])
+      } catch (error) {
+        console.error('Error loading pricing:', error)
+        // Keep fallback pricing
+      } finally {
+        setPricingLoading(false)
+      }
+    }
+    loadPricing()
+  }, [])
 
   const handleBuyNow = (packageData: NewPackage) => {
     router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=all`)

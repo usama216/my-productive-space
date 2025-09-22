@@ -48,7 +48,8 @@ export function RefundManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedRefund, setSelectedRefund] = useState<RefundTransaction | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
   const { toast } = useToast()
 
   const fetchData = async () => {
@@ -79,7 +80,7 @@ export function RefundManagement() {
 
   const handleApproveRefund = async (refundId: string) => {
     try {
-      setIsProcessing(true)
+      setIsApproving(true)
       const result = await approveRefund(refundId)
       
       toast({
@@ -97,13 +98,13 @@ export function RefundManagement() {
       })
       console.error('Error approving refund:', err)
     } finally {
-      setIsProcessing(false)
+      setIsApproving(false)
     }
   }
 
   const handleRejectRefund = async (refundId: string) => {
     try {
-      setIsProcessing(true)
+      setIsRejecting(true)
       await rejectRefund(refundId)
       
       toast({
@@ -121,7 +122,7 @@ export function RefundManagement() {
       })
       console.error('Error rejecting refund:', err)
     } finally {
-      setIsProcessing(false)
+      setIsRejecting(false)
     }
   }
 
@@ -273,21 +274,12 @@ export function RefundManagement() {
         >
           User Credits
         </button>
-        <button
-          onClick={() => setActiveTab('stats')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'stats'
-              ? 'bg-orange-500 text-white shadow-sm'
-              : 'text-gray-600 hover:text-orange-600 hover:bg-orange-50'
-          }`}
-        >
-          Statistics
-        </button>
+       
       </div>
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+        {/* <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Search by booking reference or email..."
@@ -295,7 +287,7 @@ export function RefundManagement() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
-        </div>
+        </div> */}
         {activeTab === 'refunds' && (
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -338,45 +330,13 @@ export function RefundManagement() {
                         {getStatusBadge(refund.refundstatus)}
                       </div>
                       {refund.refundstatus === 'REQUESTED' && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedRefund(refund)}
-                          >
-                            Review
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-red-500 hover:bg-red-600 text-white"
-                            onClick={() => handleRejectRefund(refund.id)}
-                            disabled={isProcessing}
-                          >
-                            {isProcessing ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Rejecting...
-                              </>
-                            ) : (
-                              'Reject'
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => handleApproveRefund(refund.id)}
-                            disabled={isProcessing}
-                          >
-                            {isProcessing ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Approving...
-                              </>
-                            ) : (
-                              'Approve'
-                            )}
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedRefund(refund)}
+                        >
+                          Review
+                        </Button>
                       )}
                     </div>
                     
@@ -445,9 +405,19 @@ export function RefundManagement() {
                         <span className="font-medium">
                           {formatCurrency(credit.amount)}
                         </span>
-                        <Badge variant={credit.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                        {/* <Badge variant={credit.status === 'ACTIVE' ? 'default' : 'secondary'}>
                           {credit.status}
-                        </Badge>
+                        </Badge> */}
+                        <Badge
+  className={
+    credit.status === "ACTIVE"
+      ? "bg-orange-600 text-white hover:bg-orange-700"
+      : "bg-gray-200 text-gray-800"
+  }
+>
+  {credit.status}
+</Badge>
+
                       </div>
                     </div>
                     
@@ -528,15 +498,16 @@ export function RefundManagement() {
                 <Button
                   variant="outline"
                   onClick={() => setSelectedRefund(null)}
+                  disabled={isApproving || isRejecting}
                 >
                   Cancel
                 </Button>
                 <Button
                   className="bg-red-500 hover:bg-red-600 text-white"
                   onClick={() => handleRejectRefund(selectedRefund.id)}
-                  disabled={isProcessing}
+                  disabled={isApproving || isRejecting}
                 >
-                  {isProcessing ? (
+                  {isRejecting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Rejecting...
@@ -548,9 +519,9 @@ export function RefundManagement() {
                 <Button
                   className="bg-orange-500 hover:bg-orange-600 text-white"
                   onClick={() => handleApproveRefund(selectedRefund.id)}
-                  disabled={isProcessing}
+                  disabled={isApproving || isRejecting}
                 >
-                  {isProcessing ? (
+                  {isApproving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Approving...

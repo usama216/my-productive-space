@@ -20,6 +20,7 @@ import {
   CreateBookingPayload,
   SeatAvailabilityResponse
 } from '@/lib/bookingService'
+import { getAllPricingForLocation } from '@/lib/pricingService'
 
 export function BookingForm() {
   const { toast } = useToast()
@@ -40,19 +41,21 @@ export function BookingForm() {
     bookedForEmails: [] as string[]
   })
 
-  // Pricing constants based on duration (1 hour vs >1 hour)
-  const PRICING = {
-    student: {
-      '1hour': 4,    // $4/hr for 1 hour
-      'over1hour': 3 // $3/hr for >1 hour
-    },
-    member: {
-      '1hour': 5,    // $5/hr for 1 hour  
-      'over1hour': 4 // $4/hr for >1 hour
-    },
-    tutor: {
-      '1hour': 6,    // $6/hr for 1 hour
-      'over1hour': 5 // $5/hr for >1 hour
+  // Dynamic pricing state
+  const [pricing, setPricing] = useState({
+    student: { oneHourRate: 4.00, overOneHourRate: 3.00 },
+    member: { oneHourRate: 5.00, overOneHourRate: 4.00 },
+    tutor: { oneHourRate: 6.00, overOneHourRate: 5.00 }
+  })
+
+  // Load pricing from database (single API call)
+  const loadPricing = async () => {
+    try {
+      const allPricing = await getAllPricingForLocation('Kovan')
+      setPricing(allPricing)
+    } catch (error) {
+      console.error('Error loading pricing:', error)
+      // Keep default pricing if database fetch fails
     }
   }
 
@@ -69,6 +72,7 @@ export function BookingForm() {
   }
 
   useEffect(() => {
+    loadPricing()
     loadPromoCodes()
   }, [])
 
@@ -84,22 +88,22 @@ export function BookingForm() {
     const duration = calculateDuration()
     if (duration === 0) return { totalCost: 0, totalAmount: 0, discountAmount: 0 }
 
-    // Determine pricing tier based on duration
-    const pricingTier = duration === 1 ? '1hour' : 'over1hour'
-    
-    // Calculate cost based on people breakdown
+    // Calculate cost based on people breakdown using dynamic pricing
     let totalCost = 0
     
     // Students
-    const studentCost = PRICING.student[pricingTier] * duration * formData.students
+    const studentRate = duration === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate
+    const studentCost = studentRate * duration * formData.students
     totalCost += studentCost
     
     // Members (coWorkers)
-    const memberCost = PRICING.member[pricingTier] * duration * formData.members
+    const memberRate = duration === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate
+    const memberCost = memberRate * duration * formData.members
     totalCost += memberCost
     
     // Tutors
-    const tutorCost = PRICING.tutor[pricingTier] * duration * formData.tutors
+    const tutorRate = duration === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate
+    const tutorCost = tutorRate * duration * formData.tutors
     totalCost += tutorCost
 
     let discountAmount = 0
@@ -490,19 +494,19 @@ export function BookingForm() {
                 {formData.students > 0 && (
                   <div className="flex justify-between">
                     <span>Students ({formData.students}):</span>
-                    <span>${PRICING.student[calculateDuration() === 1 ? '1hour' : 'over1hour']}/hr</span>
+                    <span>${calculateDuration() === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate}/hr</span>
                   </div>
                 )}
                 {formData.members > 0 && (
                   <div className="flex justify-between">
                     <span>Members ({formData.members}):</span>
-                    <span>${PRICING.member[calculateDuration() === 1 ? '1hour' : 'over1hour']}/hr</span>
+                    <span>${calculateDuration() === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate}/hr</span>
                   </div>
                 )}
                 {formData.tutors > 0 && (
                   <div className="flex justify-between">
                     <span>Tutors ({formData.tutors}):</span>
-                    <span>${PRICING.tutor[calculateDuration() === 1 ? '1hour' : 'over1hour']}/hr</span>
+                    <span>${calculateDuration() === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate}/hr</span>
                   </div>
                 )}
                 <div className="flex justify-between">

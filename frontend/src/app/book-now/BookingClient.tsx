@@ -37,27 +37,14 @@ import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
 import { PromoCode } from '@/lib/promoCodeService'
 import { getUserPackages, UserPackage } from '@/lib/services/packageService'
+import { getAllPricingForLocation } from '@/lib/pricingService'
 
 
 const locations = [
   { id: 'kovan', name: 'Kovan', address: 'Blk 208 Hougang St 21 #01-201 S 530208' }
 ]
 
-// Pricing structure based on user type and duration
-const PRICING = {
-  student: {
-    '1hour': 4,    // $4/hr for 1 hour
-    'over1hour': 3 // $3/hr for >1 hour
-  },
-  member: {
-    '1hour': 5,    // $5/hr for 1 hour  
-    'over1hour': 4 // $4/hr for >1 hour
-  },
-  tutor: {
-    '1hour': 6,    // $6/hr for 1 hour
-    'over1hour': 5 // $5/hr for >1 hour
-  }
-}
+// Dynamic pricing will be loaded from database
 
 export default function BookingClient() {
   const { toast } = useToast()
@@ -85,6 +72,24 @@ export default function BookingClient() {
     creditAmount: number
   } | null>(null)
 
+  // Dynamic pricing state
+  const [pricing, setPricing] = useState({
+    student: { oneHourRate: 4.00, overOneHourRate: 3.00 },
+    member: { oneHourRate: 5.00, overOneHourRate: 4.00 },
+    tutor: { oneHourRate: 6.00, overOneHourRate: 5.00 }
+  })
+
+  // Load pricing from database (single API call)
+  const loadPricing = async () => {
+    try {
+      const allPricing = await getAllPricingForLocation('Kovan')
+      setPricing(allPricing)
+    } catch (error) {
+      console.error('Error loading pricing:', error)
+      // Keep fallback pricing if database fetch fails
+    }
+  }
+
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [bookedSeats, setBookedSeats] = useState<string[]>([])
   const [isLoadingSeats, setIsLoadingSeats] = useState(false)
@@ -97,6 +102,7 @@ export default function BookingClient() {
     if (searchParams.get('step') === '3') {
       setBookingStep(3)
     }
+    loadPricing() // Load dynamic pricing on component mount
   }, [searchParams])
 
 
@@ -241,19 +247,20 @@ export default function BookingClient() {
 
   const [userPackages, setUserPackages] = useState<UserPackage[]>([])
   const [isLoadingPackages, setIsLoadingPackages] = useState(false)
-  const userString = localStorage.getItem("database_user");
 
   useEffect(() => {
     try {
-      const userData = JSON.parse(userString || '');
-      const fullName = `${userData?.firstName ?? ""} ${userData?.lastName ?? ""}`.trim();
-      setCustomerName(fullName || "");
-      setCustomerEmail(userData.email || "");
-      setCustomerPhone(userData.phone || "");
+      const userString = localStorage.getItem("database_user");
+      if (userString) {
+        const userData = JSON.parse(userString);
+        const fullName = `${userData?.firstName ?? ""} ${userData?.lastName ?? ""}`.trim();
+        setCustomerName(fullName || "");
+        setCustomerEmail(userData.email || "");
+        setCustomerPhone(userData.phone || "");
+      }
     } catch (error) {
       console.error("Error parsing database_user:", error);
     }
-
   }, []);
 
 
@@ -679,15 +686,18 @@ export default function BookingClient() {
     let totalCost = 0
 
     // Students (coStudents)
-    const studentCost = PRICING.student[pricingTier] * totalHours * peopleBreakdown.coStudents
+    const studentRate = totalHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate
+    const studentCost = studentRate * totalHours * peopleBreakdown.coStudents
     totalCost += studentCost
 
     // Members (coWorkers) 
-    const memberCost = PRICING.member[pricingTier] * totalHours * peopleBreakdown.coWorkers
+    const memberRate = totalHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate
+    const memberCost = memberRate * totalHours * peopleBreakdown.coWorkers
     totalCost += memberCost
 
     // Tutors (coTutors)
-    const tutorCost = PRICING.tutor[pricingTier] * totalHours * peopleBreakdown.coTutors
+    const tutorRate = totalHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate
+    const tutorCost = tutorRate * totalHours * peopleBreakdown.coTutors
     totalCost += tutorCost
 
     return totalCost
@@ -1791,19 +1801,19 @@ export default function BookingClient() {
                       {peopleBreakdown.coStudents > 0 && (
                         <div className="flex justify-between">
                           <span>Students ({peopleBreakdown.coStudents}):</span>
-                          <span>${PRICING.student[totalHours === 1 ? '1hour' : 'over1hour']}/hr</span>
+                          <span>${totalHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate}/hr</span>
                         </div>
                       )}
                       {peopleBreakdown.coWorkers > 0 && (
                         <div className="flex justify-between">
                           <span>Members ({peopleBreakdown.coWorkers}):</span>
-                          <span>${PRICING.member[totalHours === 1 ? '1hour' : 'over1hour']}/hr</span>
+                          <span>${totalHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate}/hr</span>
                         </div>
                       )}
                       {peopleBreakdown.coTutors > 0 && (
                         <div className="flex justify-between">
                           <span>Tutors ({peopleBreakdown.coTutors}):</span>
-                          <span>${PRICING.tutor[totalHours === 1 ? '1hour' : 'over1hour']}/hr</span>
+                          <span>${totalHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate}/hr</span>
                         </div>
                       )}
                       <div className="flex justify-between">

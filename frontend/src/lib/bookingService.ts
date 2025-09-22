@@ -86,6 +86,7 @@ export interface BookingFilters {
   dateTo?: string
   memberType?: string
   paymentStatus?: 'paid' | 'unpaid'
+  refundStatus?: 'none' | 'requested' | 'approved' | 'rejected' | 'cancelled'
   sortBy?: 'startAt' | 'totalAmount' | 'createdAt' | 'bookingRef'
   sortOrder?: 'asc' | 'desc'
 }

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertTriangle, Clock, Search, Settings, Mail, FileText } from 'lucide-react'
+import { AlertTriangle, Clock, Search, Settings, Mail, FileText, RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PromoCodeManagement } from './PromoCodeManagement'
 import { BookingManagement } from './BookingManagement'
@@ -12,43 +12,44 @@ import { UserManagement } from './UserManagement'
 import PackageManagement from './PackageManagement'
 import PackageUsageTable from './PackageUsageTable'
 import { RefundManagement } from './RefundManagement'
+import { PricingManagement } from './PricingManagement'
 
 export default function AdminTabs({
   activeTab,
   setActiveTab,
-  cancellations,
+  refundRequests,
   users,
   pendingStudents,
   isLoadingPendingStudents,
+  isLoadingRefunds,
   searchTerm,
   setSearchTerm,
   filterStatus,
   setFilterStatus,
-  setSelectedCancellation,
   setSelectedUser,
   StatusBadge,
-  filteredCancellations,
+  filteredRefundRequests,
   filteredUsers
 }: {
   activeTab: string
   setActiveTab: (value: string) => void
-  cancellations: any[]
+  refundRequests: any[]
   users: any[]
   pendingStudents: any[]
   isLoadingPendingStudents: boolean
+  isLoadingRefunds: boolean
   searchTerm: string
   setSearchTerm: (value: string) => void
   filterStatus: string
   setFilterStatus: (value: string) => void
-  setSelectedCancellation: (value: any) => void
   setSelectedUser: (value: any) => void
   StatusBadge: any
-  filteredCancellations: any[]
+  filteredRefundRequests: any[]
   filteredUsers: any[]
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-7">
+      <TabsList className="grid w-full grid-cols-8">
         <TabsTrigger value="overview">
           Overview
           {pendingStudents.length > 0 && (
@@ -64,36 +65,51 @@ export default function AdminTabs({
         <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
         <TabsTrigger value="refunds">Refund Management</TabsTrigger>
+        <TabsTrigger value="pricing">Pricing</TabsTrigger>
 
       </TabsList>
 
       {/* Overview Tab */}
       <TabsContent value="overview" className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Cancellations */}
+          {/* Recent Refund Requests */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <AlertTriangle className="w-5 h-5 mr-2" />
-                Recent Cancellations
+                Recent Refund Requests
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {cancellations.slice(0, 3).map(cancellation => (
-                <div key={cancellation.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
-                  <div>
-                    <p className="font-medium text-sm">{cancellation.bookingReference}</p>
-                    <p className="text-xs text-gray-600">{cancellation.userName}</p>
-                  </div>
-                  <div className="text-right">
-                    <StatusBadge status={cancellation.status} />
-                    <p className="text-xs text-gray-600 mt-1">${cancellation.refundAmount}</p>
-                  </div>
+              {isLoadingRefunds ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  <span className="text-sm text-gray-500">Loading refund requests...</span>
                 </div>
-              ))}
-              <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab('cancellations')}>
-                View All Cancellations
-              </Button>
+              ) : refundRequests.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertTriangle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No recent refund requests</p>
+                </div>
+              ) : (
+                <>
+                  {refundRequests.map(refund => (
+                    <div key={refund.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
+                      <div>
+                        <p className="font-medium text-sm">{refund.Booking?.bookingRef || 'N/A'}</p>
+                        <p className="text-xs text-gray-600">{refund.User?.email || 'N/A'}</p>
+                      </div>
+                      <div className="text-right">
+                        <StatusBadge status={refund.refundstatus} />
+                        <p className="text-xs text-gray-600 mt-1">${refund.refundamount}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab('refunds')}>
+                    View All Refund Requests
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -157,56 +173,6 @@ export default function AdminTabs({
         </div>
       </TabsContent>
 
-      {/* Cancellations Tab */}
-      <TabsContent value="cancellations">
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Cancellation Requests</CardTitle>
-              <div className="flex space-x-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search cancellations..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64"
-                  />
-                </div>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="processed">Processed</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {filteredCancellations.map(cancellation => (
-                <div key={cancellation.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-semibold">{cancellation.bookingReference}</h4>
-                      <p className="text-sm text-gray-600">{cancellation.userName} ({cancellation.userEmail})</p>
-                    </div>
-                    <StatusBadge status={cancellation.status} />
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => setSelectedCancellation(cancellation)}>
-                    Review
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
 
       {/* Users Tab */}
       <TabsContent value="users">
@@ -287,6 +253,10 @@ export default function AdminTabs({
         <PackageUsageTable />
       </TabsContent>
 
+      {/* Pricing Management Tab */}
+      <TabsContent value="pricing" className="space-y-4">
+        <PricingManagement />
+      </TabsContent>
 
       {/* Settings Tab */}
       <TabsContent value="settings">

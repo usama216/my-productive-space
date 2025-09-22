@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { getAllUsers } from '@/lib/userService'
+import { getAllRefundRequests, RefundTransaction } from '@/lib/refundService'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import AdminHeader from '@/components/admin/AdminHeader'
@@ -125,15 +126,15 @@ const mockUsers: UserAccount[] = [
 export default function AdminDashboard() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('overview')
-  const [cancellations, setCancellations] = useState<CancellationRequest[]>(mockCancellations)
+  const [refundRequests, setRefundRequests] = useState<RefundTransaction[]>([])
   const [users, setUsers] = useState<UserAccount[]>(mockUsers)
-  const [selectedCancellation, setSelectedCancellation] = useState<CancellationRequest | null>(null)
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [isLoading, setIsLoading] = useState(false)
   const [pendingStudents, setPendingStudents] = useState<any[]>([])
   const [isLoadingPendingStudents, setIsLoadingPendingStudents] = useState(false)
+  const [isLoadingRefunds, setIsLoadingRefunds] = useState(false)
 
   const fetchPendingStudents = async () => {
     setIsLoadingPendingStudents(true)
@@ -168,36 +169,30 @@ export default function AdminDashboard() {
     }
   }
 
+  const fetchRecentRefundRequests = async () => {
+    setIsLoadingRefunds(true)
+    try {
+      const response = await getAllRefundRequests()
+      if (response && Array.isArray(response)) {
+        // Get only recent refund requests (last 3)
+        const recentRefunds = response
+          .sort((a, b) => new Date(b.requestedat).getTime() - new Date(a.requestedat).getTime())
+          .slice(0, 3)
+        setRefundRequests(recentRefunds)
+      }
+    } catch (error) {
+      console.error('Error fetching refund requests:', error)
+      // Keep empty array if fetch fails
+    } finally {
+      setIsLoadingRefunds(false)
+    }
+  }
+
   useEffect(() => {
     fetchPendingStudents()
+    fetchRecentRefundRequests()
   }, [])
 
-  const handleCancellationAction = async (cancellation: CancellationRequest, action: 'approve' | 'reject') => {
-    setIsLoading(true)
-
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    setCancellations(prev => prev.map(c =>
-      c.id === cancellation.id
-        ? { ...c, status: action === 'approve' ? 'processed' : 'rejected' }
-        : c
-    ))
-
-    if (action === 'approve') {
-      toast({
-        title: "Cancellation approved",
-        description: `Refund of $${cancellation.refundAmount} approved for ${cancellation.bookingReference}. Email sent to customer.`,
-      })
-    } else {
-      toast({
-        title: "Cancellation rejected",
-        description: `Cancellation rejected for ${cancellation.bookingReference}. Email sent to customer.`,
-      })
-    }
-
-    setSelectedCancellation(null)
-    setIsLoading(false)
-  }
 
   const handleUserVerification = async (user: UserAccount, action: 'verify' | 'reject', rejectionReason?: string) => {
     setIsLoading(true)
@@ -274,11 +269,11 @@ export default function AdminDashboard() {
     )
   }
 
-  const filteredCancellations = cancellations.filter(c => {
-    const matchesSearch = c.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.bookingReference.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterStatus === 'all' || c.status === filterStatus
+  const filteredRefundRequests = refundRequests.filter(refund => {
+    const matchesSearch = refund.User?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      refund.Booking?.bookingRef?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      refund.refundreason?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesFilter = filterStatus === 'all' || refund.refundstatus?.toLowerCase() === filterStatus.toLowerCase()
     return matchesSearch && matchesFilter
   })
 
@@ -299,28 +294,22 @@ export default function AdminDashboard() {
         <AdminTabs
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          cancellations={cancellations}
+          refundRequests={refundRequests}
           users={users}
           pendingStudents={pendingStudents}
           isLoadingPendingStudents={isLoadingPendingStudents}
+          isLoadingRefunds={isLoadingRefunds}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           filterStatus={filterStatus}
           setFilterStatus={setFilterStatus}
-          setSelectedCancellation={setSelectedCancellation}
           setSelectedUser={setSelectedUser}
           StatusBadge={StatusBadge}
-          filteredCancellations={filteredCancellations}
+          filteredRefundRequests={filteredRefundRequests}
           filteredUsers={filteredUsers}
         />
       </div>
 
-      <CancellationReviewModal
-        selectedCancellation={selectedCancellation}
-        setSelectedCancellation={setSelectedCancellation}
-        handleCancellationAction={handleCancellationAction}
-        isLoading={isLoading}
-      />
 
       <UserVerificationModal
         selectedUser={selectedUser}
