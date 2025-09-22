@@ -92,7 +92,7 @@ export default function BookingClient() {
 
   const [studentsValidated, setStudentsValidated] = useState(false)
   const [validatedStudents, setValidatedStudents] = useState<StudentValidationStatus[]>([])
-  
+
   useEffect(() => {
     if (searchParams.get('step') === '3') {
       setBookingStep(3)
@@ -216,7 +216,7 @@ export default function BookingClient() {
 
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
-  
+
   const [bookingDuration, setBookingDuration] = useState<{
     startAt: string;
     endAt: string;
@@ -229,22 +229,37 @@ export default function BookingClient() {
   const [specialRequests, setSpecialRequests] = useState('')
 
   const [isLoading, setIsLoading] = useState(false)
-  const [bookingStep, setBookingStep] = useState(1) 
-  const [bookingId, setBookingId] = useState<string | null>(null) 
+  const [bookingStep, setBookingStep] = useState(1)
+  const [bookingId, setBookingId] = useState<string | null>(null)
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
-  
+
   const [confirmationHeadingError, setConfirmationHeadingError] = useState<string | null>(null)
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
-  const [finalTotal, setFinalTotal] = useState(0) 
-  
+  const [finalTotal, setFinalTotal] = useState(0)
+
   const [userPackages, setUserPackages] = useState<UserPackage[]>([])
   const [isLoadingPackages, setIsLoadingPackages] = useState(false)
+  const userString = localStorage.getItem("database_user");
+
+  useEffect(() => {
+    try {
+      const userData = JSON.parse(userString || '');
+      const fullName = `${userData?.firstName ?? ""} ${userData?.lastName ?? ""}`.trim();
+      setCustomerName(fullName || "");
+      setCustomerEmail(userData.email || "");
+      setCustomerPhone(userData.phone || "");
+    } catch (error) {
+      console.error("Error parsing database_user:", error);
+    }
+
+  }, []);
+
 
   const loadUserPackages = useCallback(async () => {
     if (!userId) return
-    
+
     setIsLoadingPackages(true)
     try {
       const packages = await getUserPackages(userId)
@@ -269,7 +284,7 @@ export default function BookingClient() {
       const endAt = endDate.toISOString();
       const durationMs = endDate.getTime() - startDate.getTime();
       const durationHours = durationMs / (1000 * 60 * 60);
-      
+
       setBookingDuration({
         startAt,
         endAt,
@@ -292,14 +307,14 @@ export default function BookingClient() {
       setConfirmationStatus('loading')
       setConfirmationError(null)
       setConfirmationHeadingError(null)
-      
+
       const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
       if (currentBooking.confirmedPayment && currentBooking.status === 'confirmed') {
         setConfirmedBookingData(currentBooking)
         setConfirmationStatus('success')
         return
       }
-      
+
       const paymentStatus = searchParams.get('status')
       if (isPaymentFailed(paymentStatus)) {
         setConfirmationStatus('error')
@@ -334,7 +349,6 @@ export default function BookingClient() {
 
 
       const result = await response.json()
-      console.log('Booking confirmed successfully:', result)
 
       // Store the confirmed booking data
       setConfirmedBookingData(result.booking)
@@ -381,22 +395,22 @@ export default function BookingClient() {
     }
   }, [user, isLoadingAuth, router])
 
-  useEffect(() => {
-    if (user) {
-      const metadata = user.user_metadata as any
-      if (metadata) {
-        if (!customerName) {
-          setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
-        }
-        if (!customerEmail) {
-          setCustomerEmail(user.email || '')
-        }
-        if (!customerPhone) {
-          setCustomerPhone(metadata.contactNumber || '')
-        }
-      }
-    }
-  }, [user, customerName, customerEmail, customerPhone])
+  // useEffect(() => {
+  //   if (user) {
+  //     const metadata = user.user_metadata as any
+  //     if (metadata) {
+  //       if (!customerName) {
+  //         setCustomerName(`${user.firstName || ''} ${user.lastName || ''}`.trim())
+  //       }
+  //       if (!customerEmail) {
+  //         setCustomerEmail(user.email || '')
+  //       }
+  //       if (!customerPhone) {
+  //         setCustomerPhone(user.contactNumber || '')
+  //       }
+  //     }
+  //   }
+  // }, [user, customerName, customerEmail, customerPhone])
 
   useEffect(() => {
     const locStr = searchParams.get('location')
@@ -621,7 +635,7 @@ export default function BookingClient() {
       if (response.ok) {
         const data = await response.json()
         setBookedSeats(data.bookedSeats || [])
-       
+
         if (data.summary?.pending > 0) {
           console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
         }
@@ -648,67 +662,66 @@ export default function BookingClient() {
   const handleStudentValidationChange = useCallback((allValid: boolean, students: any[]) => {
     setStudentsValidated(allValid)
     setValidatedStudents(students)
-    console.log('Student validation changed:', { allValid, students })
   }, [])
 
 
   const selectedLocation = locations.find(loc => loc.id === location)
   const totalHours = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60))) : 0
-  
+
   // Calculate base subtotal using people-based pricing
   const baseSubtotal = (() => {
     if (!selectedLocation || totalHours === 0) return 0
-    
+
     // Determine pricing tier based on duration
     const pricingTier = totalHours === 1 ? '1hour' : 'over1hour'
-    
+
     // Calculate cost based on people breakdown
     let totalCost = 0
-    
+
     // Students (coStudents)
     const studentCost = PRICING.student[pricingTier] * totalHours * peopleBreakdown.coStudents
     totalCost += studentCost
-    
+
     // Members (coWorkers) 
     const memberCost = PRICING.member[pricingTier] * totalHours * peopleBreakdown.coWorkers
     totalCost += memberCost
-    
+
     // Tutors (coTutors)
     const tutorCost = PRICING.tutor[pricingTier] * totalHours * peopleBreakdown.coTutors
     totalCost += tutorCost
-    
+
     return totalCost
   })()
 
   // Calculate discount if voucher is applied
   const discountInfo = null // Removed test voucher calculation
   const promoDiscountInfo = promoCodeInfo
-  
+
   // Calculate package discount if package is selected
   const packageDiscountInfo = selectedPackage ? (() => {
     const pkg = userPackages?.find(p => p.id === selectedPackage)
     if (!pkg || !bookingDuration) return null
-    
+
     // Use dynamic hoursAllowed from package configuration instead of hardcoded values
     const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
     const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
     const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
-    
+
     // Use the actual location price
     const pricePerHour = selectedLocation?.price || 0;
     const discountAmount = appliedHours * pricePerHour;
     const remainingAmount = remainingHours * pricePerHour;
-    
+
     return {
       discountAmount: discountAmount,
       finalAmount: remainingAmount
     }
   })() : null
-  
+
   // Calculate final amounts - packages take precedence over promo codes, then credits
   let subtotal = baseSubtotal
   let discountAmount = 0
-  
+
   if (packageDiscountInfo) {
     subtotal = packageDiscountInfo.finalAmount
     discountAmount = packageDiscountInfo.discountAmount
@@ -744,12 +757,12 @@ export default function BookingClient() {
       if (!response.ok) {
         throw new Error('Failed to fetch user packages')
       }
-      
+
       const data = await response.json()
       if (!data.success || !data.packages) {
         throw new Error('No packages found')
       }
-      
+
       // Find the selected package
       const selectedPkg = data.packages.find((pkg: any) => pkg.id === packageId)
       if (!selectedPkg) {
@@ -758,7 +771,7 @@ export default function BookingClient() {
           message: 'Selected package not found'
         }
       }
-      
+
       // Check if package has remaining passes
       const remainingPasses = selectedPkg.remainingPasses || selectedPkg.passCount || 0
       if (remainingPasses <= 0) {
@@ -767,7 +780,7 @@ export default function BookingClient() {
           message: `You have used all ${selectedPkg.passCount} passes from this package. Please select a different package or book without a package.`
         }
       }
-      
+
       return {
         isValid: true,
         message: 'Package is valid for use'
@@ -918,7 +931,7 @@ export default function BookingClient() {
       }
 
       const confirmResult = await confirmResponse.json();
-      
+
       // Update local storage with confirmed booking
       const updatedBooking = { ...result.booking, confirmedPayment: true, status: 'confirmed' }
       localStorage.setItem('currentBooking', JSON.stringify(updatedBooking))
@@ -1007,10 +1020,10 @@ export default function BookingClient() {
 
       const result = await response.json();
       const createdBookingId = result.booking?.id || result.id;
-      
+
       // Store booking data for payment step
       localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
-      
+
       return createdBookingId;
 
     } catch (error) {
@@ -1127,7 +1140,7 @@ export default function BookingClient() {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
 
                         <div>
                           <Label>Number of People</Label>
@@ -1209,7 +1222,7 @@ export default function BookingClient() {
                           )}
                         </div>
                       </div>
-                      
+
                       {/* Booking Duration Display */}
                       {bookingDuration && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1228,7 +1241,7 @@ export default function BookingClient() {
                           </p>
                         </div>
                       )}
-                      
+
                       {peopleBreakdown.coStudents > 0 && user && (
                         <div>
                           <StudentValidation
@@ -1236,12 +1249,11 @@ export default function BookingClient() {
                             onValidationChange={handleStudentValidationChange}
                           />
                           {peopleBreakdown.coStudents > 0 && (
-                            <div className={`mt-2 p-2 rounded-md text-sm ${
-                              studentsValidated 
-                                ? 'bg-green-50 border border-green-200 text-green-800' 
-                                : 'bg-orange-50 border border-orange-200 text-orange-800'
-                            }`}>
-                              {studentsValidated 
+                            <div className={`mt-2 p-2 rounded-md text-sm ${studentsValidated
+                              ? 'bg-green-50 border border-green-200 text-green-800'
+                              : 'bg-orange-50 border border-orange-200 text-orange-800'
+                              }`}>
+                              {studentsValidated
                                 ? `✅ All ${peopleBreakdown.coStudents} student${peopleBreakdown.coStudents > 1 ? 's' : ''} validated successfully!`
                                 : `⚠️ Please validate ${peopleBreakdown.coStudents} student${peopleBreakdown.coStudents > 1 ? 's' : ''} to continue`
                               }
@@ -1367,7 +1379,6 @@ export default function BookingClient() {
                         <EntitlementTabs
                           mode={entitlementMode}
                           onModeChange={(newMode) => {
-                            console.log('Mode changed to:', newMode);
                             setEntitlementMode(newMode);
                             setSelectedPackage('');
                             setPromoCode('');
@@ -1376,8 +1387,6 @@ export default function BookingClient() {
                             setCreditInfo(null);
                           }}
                           onChange={(discountInfo) => {
-                            console.log('BookingClient received discountInfo:', discountInfo);
-                            
                             if (discountInfo && discountInfo.type === 'package') {
                               setEntitlementMode('package')
                               setSelectedPackage(discountInfo.id)
@@ -1386,13 +1395,8 @@ export default function BookingClient() {
                               setPromoCodeInfo(null)
                               setCreditInfo(null)
                             } else if (discountInfo && discountInfo.type === 'promo') {
-                              console.log('Setting promo code info:', {
-                                originalAmount: baseSubtotal,
-                                discountAmount: discountInfo.discountAmount,
-                                finalAmount: discountInfo.finalAmount,
-                                expectedFinal: baseSubtotal - discountInfo.discountAmount
-                              });
-                              
+
+
                               setEntitlementMode('promo')
                               setPromoCode(discountInfo.promoCode?.code || '')
                               setPromoValid(true)
@@ -1400,13 +1404,7 @@ export default function BookingClient() {
                               setPromoCodeInfo(discountInfo)
                               setCreditInfo(null)
                             } else if (discountInfo && discountInfo.type === 'credit') {
-                              console.log('Setting credit info:', {
-                                originalAmount: baseSubtotal,
-                                discountAmount: discountInfo.discountAmount,
-                                finalAmount: discountInfo.finalAmount,
-                                creditAmount: discountInfo.creditAmount
-                              });
-                              
+
                               setEntitlementMode('credit')
                               setCreditInfo(discountInfo)
                               setSelectedPackage('')
@@ -1439,7 +1437,7 @@ export default function BookingClient() {
                       <Button
                         type="submit"
                         className="w-full bg-orange-500 hover:bg-orange-600"
-                       
+
                       >
                         {!user
                           ? 'Sign In Required'
@@ -1489,7 +1487,7 @@ export default function BookingClient() {
                             onBookingCreated={(bookingId) => setBookingId(bookingId)}
                           />
                         </p>
-                   
+
                       </div>
                     </div>
 
@@ -1554,8 +1552,8 @@ export default function BookingClient() {
                               </>
                             ) : (
                               <>
-                               
-                               
+
+
                               </>
                             )}
                           </div>
@@ -1573,11 +1571,11 @@ export default function BookingClient() {
                           {(() => {
                             const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
                             const isZeroAmount = currentBooking.totalAmount <= 0
-                            
+
                             return (
                               <>
                                 <p className="text-gray-600 mb-6">
-                                  {isZeroAmount 
+                                  {isZeroAmount
                                     ? "Your booking has been automatically confirmed as the total amount was $0.00. No payment was required."
                                     : "Your booking has been confirmed. You will receive a confirmation email shortly."
                                   }
@@ -1659,18 +1657,18 @@ export default function BookingClient() {
                         <span>{confirmedBookingData.pax} {confirmedBookingData.pax === 1 ? 'Person' : 'People'}</span>
                       </div>
 
-                                             <div className="flex items-center space-x-3">
-                         <Clock className="w-5 h-5 text-gray-400" />
-                         <div>
-                           <p className="text-sm">
-                             {new Date(confirmedBookingData.startAt).toLocaleDateString()}
-                           </p>
-                           <p className="text-sm text-gray-600">
-                             {new Date(confirmedBookingData.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                             {new Date(confirmedBookingData.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                           </p>
-                         </div>
-                       </div>
+                      <div className="flex items-center space-x-3">
+                        <Clock className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm">
+                            {new Date(confirmedBookingData.startAt).toLocaleDateString()}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {new Date(confirmedBookingData.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                            {new Date(confirmedBookingData.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
 
                       {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
                         <div className="flex items-center space-x-3">
@@ -1734,20 +1732,20 @@ export default function BookingClient() {
                         </div>
                       )}
 
-                                             {startDate && endDate && (
-                         <div className="flex items-center space-x-3">
-                           <Clock className="w-5 h-5 text-gray-400" />
-                           <div>
-                             <p className="text-sm">
-                               {startDate.toLocaleDateString()}
-                             </p>
-                             <p className="text-sm text-gray-600">
-                               {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                               {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                             </p>
-                           </div>
-                         </div>
-                       )}
+                      {startDate && endDate && (
+                        <div className="flex items-center space-x-3">
+                          <Clock className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm">
+                              {startDate.toLocaleDateString()}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                              {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
@@ -1842,17 +1840,17 @@ export default function BookingClient() {
                         // Find the selected package details
                         const pkg = userPackages?.find(p => p.id === selectedPackage)
                         if (!pkg || !bookingDuration) return null
-                        
+
                         // Use dynamic hoursAllowed from package configuration instead of hardcoded values
                         const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
                         const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
                         const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
-                        
+
                         // Use the actual location price
                         const pricePerHour = selectedLocation?.price || 0;
                         const packageDiscount = appliedHours * pricePerHour;
                         const remainingAmount = remainingHours * pricePerHour;
-                        
+
                         return (
                           <>
                             <div className="flex justify-between text-green-600">
@@ -1891,7 +1889,7 @@ export default function BookingClient() {
 
                       <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>${subtotal.toFixed(2)}</span> 
+                        <span>${subtotal.toFixed(2)}</span>
                       </div>
 
                       {selectedPaymentMethod === 'creditCard' && (
@@ -1924,7 +1922,7 @@ export default function BookingClient() {
                           )}
                         </span>
                       </div>
-                      
+
                       {total <= 0 && (
                         <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
                           <div className="text-center">
@@ -1933,9 +1931,9 @@ export default function BookingClient() {
                             </p>
                             <p className="text-xs mt-1 text-green-600">
                               {selectedPackage ? 'Fully covered by package discount' :
-                               creditInfo ? 'Fully covered by store credit' :
-                               promoCodeInfo ? 'Fully covered by promo code' :
-                               'Fully covered by discount'}
+                                creditInfo ? 'Fully covered by store credit' :
+                                  promoCodeInfo ? 'Fully covered by promo code' :
+                                    'Fully covered by discount'}
                             </p>
                           </div>
                         </div>
@@ -1949,7 +1947,7 @@ export default function BookingClient() {
                               🎉 You're saving ${promoCodeInfo.discountAmount.toFixed(2)}!
                             </p>
                             <p className="text-xs mt-1 text-green-600">
-                              Original: ${baseSubtotal.toFixed(2)} | 
+                              Original: ${baseSubtotal.toFixed(2)} |
                               Final: ${promoCodeInfo.finalAmount.toFixed(2)}
                             </p>
                           </div>
@@ -1964,7 +1962,7 @@ export default function BookingClient() {
                               💳 Using ${creditInfo.creditAmount.toFixed(2)} store credit!
                             </p>
                             <p className="text-xs mt-1 text-blue-600">
-                              Original: ${baseSubtotal.toFixed(2)} | 
+                              Original: ${baseSubtotal.toFixed(2)} |
                               Final: ${creditInfo.finalAmount.toFixed(2)}
                             </p>
                           </div>

@@ -7,15 +7,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { requestRefund, getUserRefundRequests } from '@/lib/refundService'
+import { useAuth } from '@/hooks/useAuth'
+import { requestRefund, getUserRefundRequests, RefundTransaction } from '@/lib/refundService'
 
 export function RefundSystemTest() {
+  const { userId } = useAuth() // Get dynamic user ID from auth context
   const [bookingId, setBookingId] = useState('')
   const [reason, setReason] = useState('')
-  const [userId, setUserId] = useState('b90c181e-874d-46c2-b1c8-3a510bbdef48')
+  const [testUserId, setTestUserId] = useState('') // For testing with different user IDs
   const [isLoading, setIsLoading] = useState(false)
-  const [refunds, setRefunds] = useState([])
+  const [refunds, setRefunds] = useState<RefundTransaction[]>([])
   const { toast } = useToast()
+
+  // Use dynamic user ID from auth, or test user ID if provided
+  const currentUserId = testUserId || userId
 
   const handleRequestRefund = async () => {
     if (!bookingId || !reason) {
@@ -27,9 +32,18 @@ export function RefundSystemTest() {
       return
     }
 
+    if (!currentUserId) {
+      toast({
+        title: "Error",
+        description: "User ID not available. Please log in.",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
       setIsLoading(true)
-      const result = await requestRefund(bookingId, reason, userId)
+      const result = await requestRefund(bookingId, reason, currentUserId)
       toast({
         title: "Success",
         description: "Refund request submitted successfully"
@@ -48,9 +62,18 @@ export function RefundSystemTest() {
   }
 
   const handleGetRefunds = async () => {
+    if (!currentUserId) {
+      toast({
+        title: "Error",
+        description: "User ID not available. Please log in.",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
       setIsLoading(true)
-      const result = await getUserRefundRequests(userId)
+      const result = await getUserRefundRequests(currentUserId)
       setRefunds(result)
       toast({
         title: "Success",
@@ -75,13 +98,26 @@ export function RefundSystemTest() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="userId">User ID</Label>
+            <Label htmlFor="currentUserId">Current User ID (from auth)</Label>
             <Input
-              id="userId"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              placeholder="Enter user ID"
+              id="currentUserId"
+              value={userId || 'Not logged in'}
+              disabled
+              className="bg-gray-50"
             />
+          </div>
+          
+          <div>
+            <Label htmlFor="testUserId">Test User ID (optional - leave empty to use current user)</Label>
+            <Input
+              id="testUserId"
+              value={testUserId}
+              onChange={(e) => setTestUserId(e.target.value)}
+              placeholder="Enter test user ID (optional)"
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Using: {currentUserId || 'No user ID available'}
+            </p>
           </div>
           
           <div>
@@ -131,7 +167,7 @@ export function RefundSystemTest() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {refunds.map((refund: any) => (
+              {refunds.map((refund) => (
                 <div key={refund.id} className="p-3 border rounded">
                   <div><strong>ID:</strong> {refund.id}</div>
                   <div><strong>Status:</strong> {refund.refundstatus}</div>

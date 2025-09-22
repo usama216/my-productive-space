@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/useAuth'
 import {
   Booking,
   getUserBookings,
@@ -25,6 +26,7 @@ import { requestRefund } from '@/lib/refundService'
 
 export function UserBookings() {
   const { toast } = useToast()
+  const { user: authUser } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [userStats, setUserStats] = useState({ upcomingBookings: 0, ongoingBookings: 0, pastBookings: 0 })
@@ -103,8 +105,17 @@ export function UserBookings() {
     try {
       setIsSubmittingRefund(true)
       
-      // For now, we'll use a placeholder userId. In a real app, this would come from auth context
-      const userId = "b90c181e-874d-46c2-b1c8-3a510bbdef48" // This should be dynamic
+      // Get user ID from auth context
+      const userId = authUser?.id
+      
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "User ID not available. Please log in.",
+          variant: "destructive"
+        })
+        return
+      }
       
       await requestRefund(selectedBooking.id, refundReason, userId)
       
