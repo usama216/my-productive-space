@@ -197,19 +197,53 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
           }
         })}
         {/* 5) Labels */}
-        {labels.map(lbl => (
-          <text
-            key={lbl.id}
-            x={lbl.x}
-            y={lbl.y}
-            fontSize={lbl.fontSize || 14}
-            fill={lbl.fill || '#000'}
-            textAnchor="middle"
-            alignmentBaseline="middle"
-          >
-            {lbl.text}
-          </text>
-        ))}
+        {labels.map(lbl => {
+          // Check if this is a seat label (starts with 'S' followed by numbers)
+          const isSeatLabel = lbl.text.match(/^S\d+$/)
+          
+          if (isSeatLabel) {
+            // For seat labels, make them clickable
+            const seatId = lbl.text // S1, S2, etc.
+            const isBooked = bookedSeats.includes(seatId)
+            const isSelected = selected.has(seatId)
+            const isDisabled = isBooked || (isMaxReached && !isSelected)
+            
+            return (
+              <text
+                key={lbl.id}
+                x={lbl.x}
+                y={lbl.y}
+                fontSize={lbl.fontSize || 14}
+                fill={isBooked ? '#000' : isSelected ? '#000' : '#000'}
+                textAnchor="middle"
+                alignmentBaseline="middle"
+                style={{
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  fontWeight: isSelected ? 'normal' : 'normal',
+                  transition: 'fill 0.2s ease, font-weight 0.2s ease'
+                }}
+                onClick={() => !isDisabled && toggleSeat(seatId)}
+              >
+                {lbl.text}
+              </text>
+            )
+          } else {
+            // For non-seat labels (table labels, etc.), keep them non-clickable
+            return (
+              <text
+                key={lbl.id}
+                x={lbl.x}
+                y={lbl.y}
+                fontSize={lbl.fontSize || 14}
+                fill={lbl.fill || '#000'}
+                textAnchor="middle"
+                alignmentBaseline="middle"
+              >
+                {lbl.text}
+              </text>
+            )
+          }
+        })}
       </svg>
     </div>
   )

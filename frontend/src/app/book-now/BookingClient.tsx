@@ -101,6 +101,8 @@ export default function BookingClient() {
   useEffect(() => {
     if (searchParams.get('step') === '3') {
       setBookingStep(3)
+      // Scroll to top when moving to confirmation step from URL
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
     loadPricing() // Load dynamic pricing on component mount
   }, [searchParams])
@@ -867,6 +869,9 @@ export default function BookingClient() {
     // For non-zero amounts, just move to payment step
     // Booking will be created when user clicks "Pay"
     setBookingStep(2)
+    
+    // Scroll to top when moving to payment step
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Handle zero amount bookings (free bookings)
@@ -955,6 +960,9 @@ export default function BookingClient() {
       })
       setBookingStep(3)
       setConfirmationStatus('success')
+      
+      // Scroll to top when moving to confirmation step
+      window.scrollTo({ top: 0, behavior: 'smooth' })
 
     } catch (error) {
       toast({

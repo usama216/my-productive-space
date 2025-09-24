@@ -148,23 +148,29 @@ export function UserBookings() {
     loadUserStats()
   }, [])
 
-  // Filter bookings by status
-  const upcomingBookings = bookings.filter(booking =>
-    booking.status === 'upcoming' || (new Date(booking.startAt) > new Date() && !booking.isCompleted && !booking.isOngoing)
-  )
+  // Filter bookings by status and sort them
+  const upcomingBookings = bookings
+    .filter(booking =>
+      booking.status === 'upcoming' || (new Date(booking.startAt) > new Date() && !booking.isCompleted && !booking.isOngoing)
+    )
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) // Earliest first
 
-  const ongoingBookings = bookings.filter(booking =>
-    booking.status === 'ongoing' || booking.isOngoing || (() => {
-      const now = new Date()
-      const start = new Date(booking.startAt)
-      const end = new Date(booking.endAt)
-      return now >= start && now <= end && !booking.isCompleted
-    })()
-  )
+  const ongoingBookings = bookings
+    .filter(booking =>
+      booking.status === 'ongoing' || booking.isOngoing || (() => {
+        const now = new Date()
+        const start = new Date(booking.startAt)
+        const end = new Date(booking.endAt)
+        return now >= start && now <= end && !booking.isCompleted
+      })()
+    )
+    .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime()) // Most recent first
 
-  const pastBookings = bookings.filter(booking =>
-    booking.status === 'completed' || booking.isCompleted || (new Date(booking.endAt) < new Date() && !booking.isOngoing)
-  )
+  const pastBookings = bookings
+    .filter(booking =>
+      booking.status === 'completed' || booking.isCompleted || (new Date(booking.endAt) < new Date() && !booking.isOngoing)
+    )
+    .sort((a, b) => new Date(b.endAt).getTime() - new Date(a.endAt).getTime()) // Most recent first
 
   // Update stats when bookings change
   useEffect(() => {
@@ -225,20 +231,51 @@ export function UserBookings() {
 
 
 
-  // Get current tab bookings
+  // Get current tab bookings with sorting by most recent date/time first
   const getCurrentTabBookings = () => {
+    let tabBookings: Booking[] = []
+    
     switch (activeTab) {
       case 'upcoming':
-        return upcomingBookings
+        tabBookings = upcomingBookings
+        break
       case 'ongoing':
-        return ongoingBookings
+        tabBookings = ongoingBookings
+        break
       case 'past':
-        return pastBookings
+        tabBookings = pastBookings
+        break
       case 'cancelled':
-        return bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED')
+        tabBookings = bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED')
+        break
       default:
         return []
     }
+    
+    // Sort bookings by most recent date/time first
+    return tabBookings.sort((a, b) => {
+      // For upcoming bookings, sort by startAt (earliest first)
+      if (activeTab === 'upcoming') {
+        return new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+      }
+      // For ongoing bookings, sort by startAt (most recent first)
+      if (activeTab === 'ongoing') {
+        return new Date(b.startAt).getTime() - new Date(a.startAt).getTime()
+      }
+      // For past bookings, sort by endAt (most recent first)
+      if (activeTab === 'past') {
+        return new Date(b.endAt).getTime() - new Date(a.endAt).getTime()
+      }
+      // For cancelled bookings, sort by updatedAt or createdAt (most recent first)
+      if (activeTab === 'cancelled') {
+        const aDate = new Date(a.updatedAt || a.createdAt || a.startAt).getTime()
+        const bDate = new Date(b.updatedAt || b.createdAt || b.startAt).getTime()
+        return bDate - aDate
+      }
+      
+      // Default sorting by startAt (most recent first)
+      return new Date(b.startAt).getTime() - new Date(a.startAt).getTime()
+    })
   }
 
   const currentTabBookings = getCurrentTabBookings()
