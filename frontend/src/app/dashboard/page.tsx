@@ -732,7 +732,7 @@ export default function Dashboard() {
                             return (
                               <Badge variant="outline" className={badgeClass}>
                                 {status === 'PENDING' 
-                                  ? 'Status verification Pending - Please check back in a few days.'
+                                  ? 'Student status verification Pending - Please check back in a few days.'
                                   : `Student Verification Status - ${statusText}`
                                 }
                               </Badge>
