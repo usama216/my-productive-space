@@ -120,8 +120,8 @@ export function UserBookings() {
       await requestRefund(selectedBooking.id, refundReason, userId)
       
       toast({
-        title: "Refund Requested",
-        description: "Your refund request has been submitted and is pending admin approval.",
+        title: "Refund Approved",
+        description: "Your refund has been approved and added to your store credits.",
       })
       
       setIsRefundDialogOpen(false)
@@ -713,8 +713,7 @@ export function UserBookings() {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Note:</strong> Refund requests are reviewed by our admin team. 
-                  Approved refunds will be added to your store credits, which expire in 30 days.
+                  <strong>Note:</strong> Approved refunds will be added to your store credits, which expire in 30 days.
                 </AlertDescription>
               </Alert>
               
@@ -759,7 +758,7 @@ export function UserBookings() {
                       Submitting...
                     </>
                   ) : (
-                    'Submit Refund Request'
+                    'Confirm Refund'
                   )}
                 </Button>
               </div>

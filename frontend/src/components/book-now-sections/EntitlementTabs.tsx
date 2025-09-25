@@ -166,7 +166,7 @@ export function EntitlementTabs({
 
       // All completed packages are applicable regardless of booking hours
       const applicablePackages = completedPackages;
-      console.log(`All applicable packages:`, applicablePackages);
+      
 
       setUserPackages(applicablePackages);
       console.log('User packages loaded:', applicablePackages);

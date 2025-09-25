@@ -95,7 +95,7 @@ export default function Dashboard() {
   })
   const [studentDocument, setStudentDocument] = useState<StudentDocumentData | null>(null)
   const [originalMemberType, setOriginalMemberType] = useState<'STUDENT' | 'MEMBER' | 'TUTOR'>('MEMBER')
-  const [upcomingBookings, setUpcomingBookings] = useState<ApiBooking[]>([])
+  const [upcomingBooking, setUpcomingBooking] = useState<ApiBooking | null>(null)
   const [isLoadingBookings, setIsLoadingBookings] = useState(false)
 
   // Sample data for testing (fallback)
@@ -259,20 +259,24 @@ export default function Dashboard() {
     setStudentDocument(null)
   }
 
-  // Load upcoming bookings
+  // Load most upcoming booking
   const loadUpcomingBookings = async () => {
     try {
       setIsLoadingBookings(true)
       const response = await getUserBookings()
       if (response.success && response.bookings) {
-        // Filter for upcoming bookings only
+        // Filter for upcoming bookings only and get the most upcoming one
         const upcoming = response.bookings.filter(booking => 
           booking.isUpcoming && booking.status === 'upcoming'
         )
-        setUpcomingBookings(upcoming)
+        // Sort by startAt date and get the first (most upcoming) booking
+        const sortedUpcoming = upcoming.sort((a, b) => 
+          new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+        )
+        setUpcomingBooking(sortedUpcoming[0] || null)
       }
     } catch (error) {
-      console.error('Error loading upcoming bookings:', error)
+      console.error('Error loading upcoming booking:', error)
     } finally {
       setIsLoadingBookings(false)
     }
@@ -443,41 +447,41 @@ export default function Dashboard() {
                     {isLoadingBookings ? (
                       <div className="text-center py-8">
                         <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
-                        <p className="text-gray-600">Loading bookings...</p>
+                        <p className="text-gray-600">Loading booking...</p>
                       </div>
-                    ) : upcomingBookings.length > 0 ? (
+                    ) : upcomingBooking ? (
                       <div className="space-y-4">
-                        {/* Show only the first booking */}
+                        {/* Show the most upcoming booking */}
                         <div className="border rounded-lg p-4 bg-gray-50">
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <h4 className="font-semibold text-sm">{upcomingBookings[0].location}</h4>
-                              <p className="text-xs text-gray-600">Ref: {upcomingBookings[0].bookingRef}</p>
+                              <h4 className="font-semibold text-sm">{upcomingBooking.location}</h4>
+                              <p className="text-xs text-gray-600">Ref: {upcomingBooking.bookingRef}</p>
                             </div>
-                            <Badge className={getStatusColor(getBookingStatus(upcomingBookings[0]))}>
-                              {getBookingStatus(upcomingBookings[0])}
+                            <Badge className={getStatusColor(getBookingStatus(upcomingBooking))}>
+                              {getBookingStatus(upcomingBooking)}
                             </Badge>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div className="flex items-center">
                               <Calendar className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{formatBookingDate(upcomingBookings[0].startAt)}</span>
+                              <span>{formatBookingDate(upcomingBooking.startAt)}</span>
                             </div>
                             <div className="flex items-center">
                               <Clock className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{calculateDuration(upcomingBookings[0].startAt, upcomingBookings[0].endAt)}h</span>
+                              <span>{calculateDuration(upcomingBooking.startAt, upcomingBooking.endAt)}h</span>
                             </div>
                             <div className="flex items-center">
                               <Users className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{upcomingBookings[0].pax} people</span>
+                              <span>{upcomingBooking.pax} people</span>
                             </div>
                             <div className="flex items-center">
                               <MapPin className="w-3 h-3 mr-1 text-gray-400" />
                               <span className="text-xs">
-                                {upcomingBookings[0].seatNumbers && upcomingBookings[0].seatNumbers.length > 0 ? (
+                                {upcomingBooking.seatNumbers && upcomingBooking.seatNumbers.length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
-                                    {upcomingBookings[0].seatNumbers.map((seat, index) => (
+                                    {upcomingBooking.seatNumbers.map((seat, index) => (
                                       <Badge key={index} variant="outline" className="text-xs px-1 py-0">
                                         {seat}
                                       </Badge>
@@ -491,31 +495,17 @@ export default function Dashboard() {
                           </div>
                           
                           <div className="mt-2 pt-2 border-t flex justify-between items-center">
-                            <span className="font-semibold text-sm">${upcomingBookings[0].totalAmount}</span>
+                            <span className="font-semibold text-sm">${upcomingBooking.totalAmount}</span>
                             <Button 
                               size="sm" 
                               variant="outline" 
                               onClick={() => setActiveTab('mybookings')}
                               className="text-xs"
                             >
-                              View Details
+                              View All Bookings
                             </Button>
                           </div>
                         </div>
-                        
-                        {/* Show View All button if there are more than 1 booking */}
-                        {upcomingBookings.length > 1 && (
-                          <div className="text-center">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => setActiveTab('mybookings')}
-                              className="text-xs"
-                            >
-                              View All ({upcomingBookings.length} total)
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8">

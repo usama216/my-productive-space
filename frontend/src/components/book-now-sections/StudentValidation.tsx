@@ -36,6 +36,7 @@ export type StudentValidationStatus = {
 type StudentValidationProps = {
   numberOfStudents: number
   onValidationChange: (allValid: boolean, validatedStudents: StudentValidationStatus[]) => void
+  currentUserEmail?: string // Add current user's email to prevent self-validation
 }
 
 // Real API call to validate student
@@ -89,7 +90,7 @@ const validateAllStudents = async (emails: string[]): Promise<StudentVerificatio
   }
 }
 
-export function StudentValidation({ numberOfStudents, onValidationChange }: StudentValidationProps) {
+export function StudentValidation({ numberOfStudents, onValidationChange, currentUserEmail }: StudentValidationProps) {
   const { toast } = useToast()
   const [validations, setValidations] = useState<StudentValidationStatus[]>([])
   const [isValidatingAll, setIsValidatingAll] = useState(false)
@@ -137,6 +138,31 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
         isValidating: false, 
         isValid: false, 
         error: 'Please enter a valid email address' 
+      })
+      return
+    }
+
+    // Check for duplicate emails
+    const currentEmail = slot.studentId.trim().toLowerCase()
+    const duplicateIndex = validations.findIndex((v, idx) => 
+      idx !== i && v.studentId.trim().toLowerCase() === currentEmail
+    )
+    
+    if (duplicateIndex !== -1) {
+      updateSlot(i, { 
+        isValidating: false, 
+        isValid: false, 
+        error: 'This email is already being used for another student' 
+      })
+      return
+    }
+
+    // Check if trying to use current user's email
+    if (currentUserEmail && currentEmail === currentUserEmail.toLowerCase()) {
+      updateSlot(i, { 
+        isValidating: false, 
+        isValid: false, 
+        error: 'You cannot validate your own email address here' 
       })
       return
     }
@@ -227,6 +253,26 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
       toast({
         title: "Invalid Email Addresses",
         description: `Please check these email addresses: ${invalidEmails.join(', ')}`,
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Check for duplicate emails
+    const emailCounts = emailsToValidate.reduce((acc, email) => {
+      const lowerEmail = email.toLowerCase()
+      acc[lowerEmail] = (acc[lowerEmail] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const duplicateEmails = Object.entries(emailCounts)
+      .filter(([_, count]) => count > 1)
+      .map(([email, _]) => email)
+    
+    if (duplicateEmails.length > 0) {
+      toast({
+        title: "Duplicate Email Addresses",
+        description: `Please ensure all email addresses are unique: ${duplicateEmails.join(', ')}`,
         variant: "destructive"
       })
       return
@@ -346,13 +392,33 @@ export function StudentValidation({ numberOfStudents, onValidationChange }: Stud
               <Input
                 placeholder="Enter student email address"
                 value={v.studentId}
-                onChange={e => updateSlot(i, { 
-                  studentId: e.target.value, 
-                  isValid: false, 
-                  error: null 
-                })}
+                onChange={e => {
+                  const newValue = e.target.value
+                  const currentEmail = newValue.trim().toLowerCase()
+                  
+                  let errorMessage = null
+                  
+                  // Check for duplicates in real-time
+                  if (currentEmail !== '') {
+                    const duplicateIndex = validations.findIndex((otherV, idx) => 
+                      idx !== i && otherV.studentId.trim().toLowerCase() === currentEmail
+                    )
+                    
+                    if (duplicateIndex !== -1) {
+                      errorMessage = 'This email is already being used for another student'
+                    } else if (currentUserEmail && currentEmail === currentUserEmail.toLowerCase()) {
+                      errorMessage = 'You cannot validate your own email address here'
+                    }
+                  }
+                  
+                  updateSlot(i, { 
+                    studentId: newValue, 
+                    isValid: false, 
+                    error: errorMessage
+                  })
+                }}
                 disabled={v.isValidating || v.isValid}
-                className="flex-1"
+                className={`flex-1 ${v.error && v.error.includes('already being used') ? 'border-red-500' : ''}`}
                 type="email"
               />
               

@@ -399,11 +399,11 @@ class PackageService {
       }
       
       const data = await response.json();
-      console.log('✅ User Packages API Response:', data);
+      
       
       // Handle the new API response structure: data.purchases instead of data.packages
       const rawPackages = data.purchases || data.packages || [];
-      console.log(`📦 Found ${rawPackages.length} user packages`);
+  
       
       // Map the packages to include the required fields
       const packages = rawPackages.map((pkg: any) => ({
@@ -431,8 +431,7 @@ class PackageService {
         createdAt: pkg.createdAt
       }));
       
-      console.log(`📦 Mapped ${packages.length} packages with remainingPasses:`, packages.map(p => ({ name: p.packageName, remaining: p.remainingPasses })));
-      
+    
       return { success: true, packages };
     } catch (error) {
       console.error('Error fetching user packages:', error);
@@ -452,8 +451,7 @@ class PackageService {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Unknown error occurred' }));
-        console.error(`❌ Admin API Error (${response.status}):`, errorData);
-        
+      
         let errorMessage = errorData.message || 'Failed to fetch all packages';
         if (response.status === 404) {
           errorMessage = 'No packages found';
@@ -467,12 +465,10 @@ class PackageService {
       }
       
       const data = await response.json();
-      console.log('✅ Admin API Response:', data);
-      
+    
       // Handle the actual API response structure: data.data.packages
       const packages = data.data?.packages || data.packages || [];
-      console.log(`📦 Found ${packages.length} packages for admin`);
-      
+    
       return { success: true, packages };
     } catch (error) {
       console.error('Error fetching all packages:', error);

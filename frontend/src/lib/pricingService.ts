@@ -24,7 +24,7 @@ export interface PricingResponse {
 // Get all pricing configurations
 export const getAllPricingConfigurations = async (): Promise<PricingConfiguration[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/pricing`);
+    const response = await fetch(`${API_BASE_URL}/pricing`);
     if (!response.ok) {
       throw new Error('Failed to fetch pricing configurations');
     }
@@ -42,7 +42,7 @@ export const getPricingByLocationAndMemberType = async (
   memberType: 'STUDENT' | 'MEMBER' | 'TUTOR'
 ): Promise<PricingConfiguration> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/pricing/${location}/${memberType}`);
+    const response = await fetch(`${API_BASE_URL}/pricing/${location}/${memberType}`);
     if (!response.ok) {
       throw new Error('Failed to fetch pricing configuration');
     }
@@ -64,7 +64,7 @@ export const upsertPricingConfiguration = async (pricingData: {
   isActive?: boolean;
 }): Promise<PricingConfiguration> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/pricing`, {
+    const response = await fetch(`${API_BASE_URL}/admin/pricing`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -86,7 +86,7 @@ export const upsertPricingConfiguration = async (pricingData: {
 
 export const deletePricingConfiguration = async (id: string): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/pricing/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/admin/pricing/${id}`, {
       method: 'DELETE',
     });
     
@@ -108,7 +108,7 @@ export const getAllPricingForLocation = async (
   tutor: { oneHourRate: number; overOneHourRate: number };
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/pricing/${location}`);
+    const response = await fetch(`${API_BASE_URL}/pricing/${location}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch pricing for ${location}`);
     }

@@ -38,6 +38,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { PromoCode } from '@/lib/promoCodeService'
 import { getUserPackages, UserPackage } from '@/lib/services/packageService'
 import { getAllPricingForLocation } from '@/lib/pricingService'
+import { getUserProfile, UserProfile } from '@/lib/userProfileService'
 
 
 const locations = [
@@ -50,7 +51,7 @@ export default function BookingClient() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user, userId, isLoggedIn, loading: isLoadingAuth } = useAuth()
+  const { user, userId, isLoggedIn, loading: isLoadingAuth, databaseUser } = useAuth()
 
   const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo' | 'credit'>('package')
   const [selectedPackage, setSelectedPackage] = useState<string>('')
@@ -97,6 +98,29 @@ export default function BookingClient() {
 
   const [studentsValidated, setStudentsValidated] = useState(false)
   const [validatedStudents, setValidatedStudents] = useState<StudentValidationStatus[]>([])
+  const [freshUserProfile, setFreshUserProfile] = useState<UserProfile | null>(null)
+  const [isLoadingUserProfile, setIsLoadingUserProfile] = useState(false)
+
+  // Fetch fresh user profile data
+  const loadFreshUserProfile = async () => {
+    if (!userId) return
+    
+    setIsLoadingUserProfile(true)
+    try {
+      console.log('🔄 Fetching fresh user profile for userId:', userId)
+      const profile = await getUserProfile(userId)
+      if (profile) {
+        console.log('✅ Fresh user profile loaded:', profile)
+        setFreshUserProfile(profile)
+      } else {
+        console.log('❌ Failed to load fresh user profile')
+      }
+    } catch (error) {
+      console.error('❌ Error loading fresh user profile:', error)
+    } finally {
+      setIsLoadingUserProfile(false)
+    }
+  }
 
   useEffect(() => {
     if (searchParams.get('step') === '3') {
@@ -105,7 +129,8 @@ export default function BookingClient() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
     loadPricing() // Load dynamic pricing on component mount
-  }, [searchParams])
+    loadFreshUserProfile() // Load fresh user profile
+  }, [searchParams, userId])
 
 
 
@@ -216,6 +241,87 @@ export default function BookingClient() {
     coStudents: 0,
     total: 1
   })
+
+  // Determine if student verification is needed using fresh API data
+  const isStudentAccount = freshUserProfile?.memberType === 'STUDENT'
+  const isBookingForSingleStudent = peopleBreakdown.coStudents === 1
+  const isVerifiedStudent = freshUserProfile?.studentVerificationStatus === 'VERIFIED'
+  
+  // Calculate how many students need verification
+  // If current user is a verified student, they don't need verification
+  // So we only need to verify the additional students
+  const studentsNeedingVerification = isVerifiedStudent 
+    ? Math.max(0, peopleBreakdown.coStudents - 1)  // Current user is verified, so verify others
+    : peopleBreakdown.coStudents  // Current user is not verified, so verify all
+  
+  const needsStudentVerification = studentsNeedingVerification > 0
+
+  // Debug console logs
+  console.log('🔍 Student Verification Debug (Fresh API Data):', {
+    freshUserProfile: freshUserProfile,
+    memberType: freshUserProfile?.memberType,
+    isStudentAccount: isStudentAccount,
+    isVerifiedStudent: isVerifiedStudent,
+    peopleBreakdown: peopleBreakdown,
+    coStudents: peopleBreakdown.coStudents,
+    studentsNeedingVerification: studentsNeedingVerification,
+    needsStudentVerification: needsStudentVerification,
+    studentsValidated: studentsValidated,
+    isLoadingUserProfile: isLoadingUserProfile,
+    // Also show local storage data for comparison
+    localDatabaseUser: databaseUser,
+    localMemberType: databaseUser?.memberType
+  })
+
+  // Auto-validate if student account is booking for only themselves
+  useEffect(() => {
+    console.log('🔄 Student validation useEffect triggered:', {
+      isStudentAccount,
+      isVerifiedStudent,
+      coStudents: peopleBreakdown.coStudents,
+      studentsNeedingVerification
+    })
+    
+    if (isVerifiedStudent && peopleBreakdown.coStudents === 1) {
+      console.log('✅ Auto-validating verified student booking for themselves')
+      setStudentsValidated(true)
+    } else if (peopleBreakdown.coStudents === 0) {
+      console.log('🔄 No students, clearing validation')
+      setStudentsValidated(false)
+    } else if (studentsNeedingVerification === 0) {
+      console.log('✅ All students are verified, auto-validating')
+      setStudentsValidated(true)
+    } else {
+      console.log('🔄 Students need verification, clearing auto-validation')
+      setStudentsValidated(false)
+    }
+  }, [isStudentAccount, isVerifiedStudent, peopleBreakdown.coStudents, studentsNeedingVerification])
+
+  // Auto-fill customer information when fresh user profile is loaded
+  useEffect(() => {
+    if (freshUserProfile && !isLoadingUserProfile) {
+      console.log('🔄 Auto-filling customer information with fresh user profile:', freshUserProfile)
+      
+      // Auto-fill customer name
+      if (freshUserProfile.firstName && freshUserProfile.lastName) {
+        const fullName = `${freshUserProfile.firstName} ${freshUserProfile.lastName}`
+        setCustomerName(fullName)
+        console.log('✅ Auto-filled customer name:', fullName)
+      }
+      
+      // Auto-fill customer email
+      if (freshUserProfile.email) {
+        setCustomerEmail(freshUserProfile.email)
+        console.log('✅ Auto-filled customer email:', freshUserProfile.email)
+      }
+      
+      // Auto-fill customer phone
+      if (freshUserProfile.contactNumber) {
+        setCustomerPhone(freshUserProfile.contactNumber)
+        console.log('✅ Auto-filled customer phone:', freshUserProfile.contactNumber)
+      }
+    }
+  }, [freshUserProfile, isLoadingUserProfile])
 
 
 
@@ -1062,9 +1168,28 @@ export default function BookingClient() {
     customerName &&
     customerEmail &&
     customerPhone &&
-    (peopleBreakdown.coStudents === 0 || studentsValidated) && // Only require validation if there are students
+    (!needsStudentVerification || studentsValidated) && // Only require validation if verification is needed
     selectedSeats.length === people &&
     user;
+
+  // Debug form validation
+  console.log('📝 Form Validation Debug:', {
+    location: !!location,
+    people: !!people,
+    startDate: !!startDate,
+    endDate: !!endDate,
+    customerName: !!customerName,
+    customerEmail: !!customerEmail,
+    customerPhone: !!customerPhone,
+    needsStudentVerification,
+    studentsValidated,
+    studentValidationPassed: !needsStudentVerification || studentsValidated,
+    selectedSeats: selectedSeats.length,
+    people,
+    seatsMatch: selectedSeats.length === people,
+    user: !!user,
+    isFormValid
+  })
 
   // Show loading state while checking auth
   if (isLoadingAuth) {
@@ -1260,29 +1385,85 @@ export default function BookingClient() {
                         </div>
                       )}
 
-                      {peopleBreakdown.coStudents > 0 && user && (
+                      {(() => {
+                        console.log('🎨 Rendering student verification UI:', {
+                          needsStudentVerification,
+                          isStudentAccount,
+                          isBookingForSingleStudent,
+                          coStudents: peopleBreakdown.coStudents,
+                          user: !!user
+                        })
+                        return null
+                      })()}
+
+                      {/* Show loading state while fetching user profile */}
+                      {isLoadingUserProfile && peopleBreakdown.coStudents > 0 && (
+                        <div className="mt-2 p-3 rounded-md bg-gray-50 border border-gray-200">
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                            <p className="text-sm text-gray-600">Loading user profile...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {needsStudentVerification && user && !isLoadingUserProfile && (
                         <div>
+                          {(() => {
+                            console.log('🔧 Rendering StudentValidation component for', studentsNeedingVerification, 'students')
+                            return null
+                          })()}
                           <StudentValidation
-                            numberOfStudents={peopleBreakdown.coStudents}
+                            numberOfStudents={studentsNeedingVerification}
                             onValidationChange={handleStudentValidationChange}
+                            currentUserEmail={freshUserProfile?.email}
                           />
-                          {peopleBreakdown.coStudents > 0 && (
-                            <div className={`mt-2 p-2 rounded-md text-sm ${studentsValidated
-                              ? 'bg-green-50 border border-green-200 text-green-800'
-                              : 'bg-orange-50 border border-orange-200 text-orange-800'
-                              }`}>
-                              {studentsValidated
-                                ? `✅ All ${peopleBreakdown.coStudents} student${peopleBreakdown.coStudents > 1 ? 's' : ''} validated successfully!`
-                                : `⚠️ Please validate ${peopleBreakdown.coStudents} student${peopleBreakdown.coStudents > 1 ? 's' : ''} to continue`
-                              }
+                          <div className={`mt-2 p-2 rounded-md text-sm ${studentsValidated
+                            ? 'bg-green-50 border border-green-200 text-green-800'
+                            : 'bg-orange-50 border border-orange-200 text-orange-800'
+                            }`}>
+                            {studentsValidated
+                              ? `✅ All ${studentsNeedingVerification} student${studentsNeedingVerification > 1 ? 's' : ''} validated successfully!`
+                              : `⚠️ Please validate ${studentsNeedingVerification} student${studentsNeedingVerification > 1 ? 's' : ''} to continue`
+                            }
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show info message for verified students */}
+                      {isVerifiedStudent && !isLoadingUserProfile && (
+                        <div className="mt-2 p-3 rounded-md bg-blue-50 border border-blue-200">
+                          {(() => {
+                            console.log('🔧 Rendering verified student message')
+                            return null
+                          })()}
+                          <div className="flex items-center">
+                            <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mr-2">
+                              <span className="text-blue-600 text-sm">✓</span>
                             </div>
-                          )}
+                            <div>
+                              <p className="text-sm font-medium text-blue-800">Student Verification</p>
+                              <p className="text-xs text-blue-600">
+                                {peopleBreakdown.coStudents === 1 
+                                  ? "You're booking as a verified student - no verification needed!"
+                                  : `You're verified! Only ${studentsNeedingVerification} additional student${studentsNeedingVerification > 1 ? 's' : ''} need${studentsNeedingVerification === 1 ? 's' : ''} verification.`
+                                }
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       )}
 
                       {/* Customer Information */}
                       <div className="border-t pt-6">
-                        <h3 className="text-lg font-medium mb-4">Contact Information</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-medium">Contact Information</h3>
+                          {isLoadingUserProfile ? (
+                            <div className="flex items-center text-sm text-gray-500">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
+                              <span>Loading profile...</span>
+                            </div>
+                          ) : null}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <Label htmlFor="name">Full Name *</Label>
@@ -1461,8 +1642,8 @@ export default function BookingClient() {
                           ? 'Sign In Required'
                           : selectedSeats.length !== people
                             ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
-                            : peopleBreakdown.coStudents > 0 && !studentsValidated
-                              ? `Validate ${peopleBreakdown.coStudents} Student${peopleBreakdown.coStudents > 1 ? 's' : ''} to Continue`
+                        : needsStudentVerification && !studentsValidated
+                          ? `Validate ${studentsNeedingVerification} Student${studentsNeedingVerification > 1 ? 's' : ''} to Continue`
                               : total <= 0
                                 ? (isLoading ? 'Confirming Free Booking...' : 'Confirm Free Booking')
                                 : (isLoading ? 'Processing...' : 'Continue to Payment')
@@ -1873,7 +2054,7 @@ export default function BookingClient() {
                           <>
                             <div className="flex justify-between text-green-600">
                               <span className='text-sm'>Package Applied</span>
-                              <span className='text-sm'>1 Person Only</span>
+                              <span className='text-sm'>{people} Person{people !== 1 ? 's' : ''} Only</span>
                             </div>
                             <div className="flex justify-between text-green-600">
                               <span className='text-sm'>Hours Covered</span>

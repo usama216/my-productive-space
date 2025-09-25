@@ -230,7 +230,7 @@ export default function PaymentStep({
           disabled={loading}
           className="flex-1 bg-orange-500 hover:bg-orange-600"
         >
-          {loading ? 'Processing…' : `Pay $${finalTotal.toFixed(2)}`}
+          {loading ? 'Processing…' : `Complete your booking`}
         </Button>
       </div>
     </div>

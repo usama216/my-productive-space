@@ -73,7 +73,7 @@ export interface PaymentCalculation {
 // User Credit Functions
 export const getUserCredits = async (userId: string): Promise<{ credits: UserCredit[]; totalCredit: number; count: number }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/refund/credits?userid=${userId}`);
+    const response = await fetch(`${API_BASE_URL}/refund/credits?userid=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch user credits');
     }
@@ -86,7 +86,7 @@ export const getUserCredits = async (userId: string): Promise<{ credits: UserCre
 
 export const getUserRefundRequests = async (userId: string): Promise<RefundTransaction[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/refund/requests?userid=${userId}`);
+    const response = await fetch(`${API_BASE_URL}/refund/requests?userid=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch refund requests');
     }
@@ -99,7 +99,7 @@ export const getUserRefundRequests = async (userId: string): Promise<RefundTrans
 
 export const getUserCreditUsage = async (userId: string): Promise<CreditUsage[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/refund/credit-usage?userid=${userId}`);
+    const response = await fetch(`${API_BASE_URL}/refund/credit-usage?userid=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch credit usage');
     }
@@ -110,9 +110,10 @@ export const getUserCreditUsage = async (userId: string): Promise<CreditUsage[]>
   }
 };
 
-export const requestRefund = async (bookingId: string, reason: string, userId: string): Promise<{ message: string; bookingId: string }> => {
+export const requestRefund = async (bookingId: string, reason: string, userId: string): Promise<{ message: string; bookingId: string; creditid?: string; creditamount?: number; expiresat?: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/refund/request`, {
+    // First, create the refund request
+    const response = await fetch(`${API_BASE_URL}/refund/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -127,7 +128,42 @@ export const requestRefund = async (bookingId: string, reason: string, userId: s
     if (!response.ok) {
       throw new Error('Failed to request refund');
     }
-    return await response.json();
+    
+    const refundResult = await response.json();
+    
+    // Get the refund transaction ID from the response or fetch it
+    // We need to get the refund transaction ID to approve it
+    const refundRequests = await getUserRefundRequests(userId);
+    const latestRefund = refundRequests.find(r => r.bookingid === bookingId && r.refundstatus === 'REQUESTED');
+    
+    if (latestRefund) {
+      // Auto-approve the refund immediately
+      try {
+        const approveResponse = await fetch(`${API_BASE_URL}/admin/refund/refunds/${latestRefund.id}/approve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        });
+        
+        if (approveResponse.ok) {
+          const approveResult = await approveResponse.json();
+          return {
+            message: 'Refund approved successfully',
+            bookingId: bookingId,
+            creditid: approveResult.creditid,
+            creditamount: approveResult.creditamount,
+            expiresat: approveResult.expiresat
+          };
+        }
+      } catch (approveError) {
+        console.error('Error auto-approving refund:', approveError);
+        // Return the original result even if approval fails
+      }
+    }
+    
+    return refundResult;
   } catch (error) {
     console.error('Error requesting refund:', error);
     throw error;
@@ -136,7 +172,7 @@ export const requestRefund = async (bookingId: string, reason: string, userId: s
 
 export const calculatePayment = async (bookingAmount: number, userId: string): Promise<PaymentCalculation> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/credit/calculate-payment`, {
+    const response = await fetch(`${API_BASE_URL}/credit/calculate-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -160,7 +196,7 @@ export const calculatePayment = async (bookingAmount: number, userId: string): P
 // Admin Functions
 export const getAllRefundRequests = async (): Promise<RefundTransaction[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/refund/refunds`);
+    const response = await fetch(`${API_BASE_URL}/admin/refund/refunds`);
     if (!response.ok) {
       throw new Error('Failed to fetch refund requests');
     }
@@ -173,7 +209,7 @@ export const getAllRefundRequests = async (): Promise<RefundTransaction[]> => {
 
 export const getAllUserCredits = async (): Promise<UserCredit[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/refund/credits`);
+    const response = await fetch(`${API_BASE_URL}/admin/refund/credits`);
     if (!response.ok) {
       throw new Error('Failed to fetch user credits');
     }
@@ -186,7 +222,7 @@ export const getAllUserCredits = async (): Promise<UserCredit[]> => {
 
 export const approveRefund = async (refundId: string): Promise<{ message: string; creditid: string; creditamount: number; expiresat: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/refund/refunds/${refundId}/approve`, {
+    const response = await fetch(`${API_BASE_URL}/admin/refund/refunds/${refundId}/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -206,7 +242,7 @@ export const approveRefund = async (refundId: string): Promise<{ message: string
 
 export const rejectRefund = async (refundId: string): Promise<{ message: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/refund/refunds/${refundId}/reject`, {
+    const response = await fetch(`${API_BASE_URL}/admin/refund/refunds/${refundId}/reject`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -226,7 +262,7 @@ export const rejectRefund = async (refundId: string): Promise<{ message: string 
 
 export const getRefundStats = async (): Promise<{ totalRefunded: number; totalTransactions: number; averageRefund: number }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/refund/stats`);
+    const response = await fetch(`${API_BASE_URL}/admin/refund/stats`);
     if (!response.ok) {
       throw new Error('Failed to fetch refund stats');
     }
