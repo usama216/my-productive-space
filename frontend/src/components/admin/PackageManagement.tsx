@@ -67,7 +67,7 @@ const PackageManagement: React.FC = () => {
   const fetchPackages = async () => {
     try {
       setLoading(true);
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
       const response = await fetch(`${API_BASE_URL}/admin/packages`);
       if (response.ok) {
         const data = await response.json();
@@ -110,7 +110,7 @@ const PackageManagement: React.FC = () => {
         hoursAllowed: parseInt(formData.hoursAllowed)
       };
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
       const url = editingPackage ? `${API_BASE_URL}/admin/packages/${editingPackage.id}` : `${API_BASE_URL}/admin/packages`;
       const method = editingPackage ? 'PUT' : 'POST';
 
@@ -171,7 +171,7 @@ const PackageManagement: React.FC = () => {
   // Handle delete
   const handleDelete = async (packageId: string) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
       const response = await fetch(`${API_BASE_URL}/admin/packages/${packageId}`, {
         method: 'DELETE',
       });

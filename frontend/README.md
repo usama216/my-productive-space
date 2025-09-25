@@ -52,7 +52,7 @@ This document describes the implementation of a comprehensive promo code system 
 
 #### API Base Configuration
 ```typescript
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:3000/api';
 ```
 
 #### Real-Time Validation Flow
@@ -86,13 +86,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/a
 
 ### Prerequisites
 1. **Backend API**: Ensure the promo code backend APIs are running
-2. **Environment Variables**: Set `NEXT_PUBLIC_API_URL` in your `.env.local`
+2. **Environment Variables**: Set `NEXT_PUBLIC_BACKEND_BASE_URL` in your `.env.local`
 3. **Database**: Ensure promo code tables are properly set up
 
 ### Environment Setup
 ```bash
 # .env.local
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
+NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:3000/api
 ```
 
 ### Testing the System
@@ -194,7 +194,7 @@ curl -X POST "http://localhost:3000/api/promocode/apply" \
 ### Common Issues
 
 #### 1. **API Connection Errors**
-- Check `NEXT_PUBLIC_API_URL` environment variable
+- Check `NEXT_PUBLIC_BACKEND_BASE_URL` environment variable
 - Ensure backend server is running
 - Check network connectivity
 

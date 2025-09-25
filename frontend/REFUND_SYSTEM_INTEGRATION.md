@@ -136,7 +136,7 @@ import { RefundSystemTest } from '@/components/RefundSystemTest'
 ### Environment Variables
 Make sure these are set in your `.env.local`:
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8000
 ```
 
 ### Backend Requirements
