@@ -30,6 +30,7 @@ export default function BuyNowPage() {
 
   // Get the target role from URL params first
   const typeParam = searchParams.get('type')
+  const stepParam = searchParams.get('step')
   const typeMapping: { [key: string]: string } = {
     'cowork': 'MEMBER',
     'costudy': 'STUDENT',
@@ -38,7 +39,10 @@ export default function BuyNowPage() {
     'tutor': 'TUTOR',
     'member': 'MEMBER'
   }
-  const targetRole = typeMapping[typeParam || ''] || 'MEMBER'
+  
+  // For step 3 (confirmation), don't fetch packages by role since we already have the package
+  // For other steps, use the role from URL params or default to MEMBER
+  const targetRole = stepParam === '3' ? null : (typeMapping[typeParam || ''] || 'MEMBER')
 
   const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
 
@@ -262,21 +266,7 @@ export default function BuyNowPage() {
     )
   }
 
-  if (packages.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="pt-32 text-center">
-          <Alert className="max-w-md mx-auto">
-            <Package className="h-4 w-4" />
-            <AlertTitle>No Packages Available</AlertTitle>
-            <AlertDescription>Please check back later or contact support</AlertDescription>
-          </Alert>
-          <Button onClick={() => router.push('/pricing')} className="mt-4">View All Packages</Button>
-        </div>
-      </div>
-    )
-  }
+  
 
   // Main component render
   return (

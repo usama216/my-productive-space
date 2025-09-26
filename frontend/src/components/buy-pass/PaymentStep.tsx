@@ -216,11 +216,7 @@ export default function PaymentStep({
         </Button>
       </div>
 
-      {loading && (
-        <div className="text-center text-sm text-gray-600">
-          <p>Redirecting to payment gateway...</p>
-        </div>
-      )}
+   
     </div>
   )
 }

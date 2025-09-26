@@ -867,50 +867,6 @@ export default function BookingClient() {
   }
 
 
-  // Validate package usage before booking
-  const validatePackageUsage = async (packageId: string) => {
-    try {
-      // Get user's packages to check remaining passes
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/new-packages/user-packages?userId=${user?.id}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch user packages')
-      }
-
-      const data = await response.json()
-      if (!data.success || !data.packages) {
-        throw new Error('No packages found')
-      }
-
-      // Find the selected package
-      const selectedPkg = data.packages.find((pkg: any) => pkg.id === packageId)
-      if (!selectedPkg) {
-        return {
-          isValid: false,
-          message: 'Selected package not found'
-        }
-      }
-
-      // Check if package has remaining passes
-      const remainingPasses = selectedPkg.remainingPasses || selectedPkg.passCount || 0
-      if (remainingPasses <= 0) {
-        return {
-          isValid: false,
-          message: `You have used all ${selectedPkg.passCount} passes from this package. Please select a different package or book without a package.`
-        }
-      }
-
-      return {
-        isValid: true,
-        message: 'Package is valid for use'
-      }
-    } catch (error) {
-      console.error('Error validating package usage:', error)
-      return {
-        isValid: false,
-        message: 'Failed to validate package usage. Please try again.'
-      }
-    }
-  }
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -953,18 +909,6 @@ export default function BookingClient() {
       return
     }
 
-    // Validate package usage if package is selected
-    if (selectedPackage) {
-      const packageValidation = await validatePackageUsage(selectedPackage)
-      if (!packageValidation.isValid) {
-        toast({
-          title: "Package usage limit reached",
-          description: packageValidation.message,
-          variant: "destructive",
-        })
-        return
-      }
-    }
 
     // Check if it's a zero amount booking - handle immediately
     if (total <= 0) {
@@ -1087,13 +1031,6 @@ export default function BookingClient() {
       throw new Error('User not authenticated')
     }
 
-    // Validate package usage if package is selected
-    if (selectedPackage) {
-      const packageValidation = await validatePackageUsage(selectedPackage)
-      if (!packageValidation.isValid) {
-        throw new Error(packageValidation.message)
-      }
-    }
 
     try {
       // Prepare booking payload
@@ -1207,7 +1144,7 @@ export default function BookingClient() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="pt-20 pb-12">
+      <div className="pt-32 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {!user && (
             <Alert className="mb-6 border-orange-200 bg-orange-50">
@@ -1429,29 +1366,7 @@ export default function BookingClient() {
                         </div>
                       )}
 
-                      {/* Show info message for verified students */}
-                      {isVerifiedStudent && !isLoadingUserProfile && (
-                        <div className="mt-2 p-3 rounded-md bg-blue-50 border border-blue-200">
-                          {(() => {
-                            console.log('🔧 Rendering verified student message')
-                            return null
-                          })()}
-                          <div className="flex items-center">
-                            <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mr-2">
-                              <span className="text-blue-600 text-sm">✓</span>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-blue-800">Student Verification</p>
-                              <p className="text-xs text-blue-600">
-                                {peopleBreakdown.coStudents === 1 
-                                  ? "You're booking as a verified student - no verification needed!"
-                                  : `You're verified! Only ${studentsNeedingVerification} additional student${studentsNeedingVerification > 1 ? 's' : ''} need${studentsNeedingVerification === 1 ? 's' : ''} verification.`
-                                }
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                 
 
                       {/* Customer Information */}
                       <div className="border-t pt-6">
@@ -1635,8 +1550,13 @@ export default function BookingClient() {
 
                       <Button
                         type="submit"
-                        className="w-full bg-orange-500 hover:bg-orange-600"
-
+                        className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={
+                          !user ||
+                          selectedSeats.length !== people ||
+                          (needsStudentVerification && !studentsValidated) ||
+                          isLoading
+                        }
                       >
                         {!user
                           ? 'Sign In Required'
@@ -1662,6 +1582,20 @@ export default function BookingClient() {
                           </Button>
                           {' '}to make your booking
                         </p>
+                      )}
+
+                      {needsStudentVerification && !studentsValidated && user && (
+                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium text-amber-800">Student Verification Required</p>
+                              <p className="text-xs text-amber-700 mt-1">
+                                Please complete student verification for all {studentsNeedingVerification} student{studentsNeedingVerification > 1 ? 's' : ''} before proceeding to payment.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </form>
                   )}

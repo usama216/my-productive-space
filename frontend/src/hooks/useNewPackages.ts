@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import packageService, { NewPackage, UserPackage, UserPass, PurchaseHistory, PurchaseRequest } from '@/lib/services/packageService';
 
-export const usePackages = (role?: string) => {
+export const usePackages = (role?: string | null) => {
   const [packages, setPackages] = useState<NewPackage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

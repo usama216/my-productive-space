@@ -29,7 +29,7 @@ export const rescheduleBooking = async (
   rescheduleData: RescheduleRequest
 ): Promise<RescheduleResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/api/reschedule/booking/${bookingId}`, {
+    const response = await fetch(`${API_BASE}/reschedule/booking/${bookingId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +68,7 @@ export const getAvailableSeatsForReschedule = async (
       endAt
     })
 
-    const response = await fetch(`${API_BASE}/api/reschedule/booking/${bookingId}/available-seats?${params}`)
+    const response = await fetch(`${API_BASE}/reschedule/booking/${bookingId}/available-seats?${params}`)
 
     const result = await response.json()
 
@@ -96,7 +96,7 @@ export const getBookingForReschedule = async (bookingId: string): Promise<{
   error?: string
 }> => {
   try {
-    const response = await fetch(`${API_BASE}/api/booking/${bookingId}`)
+    const response = await fetch(`${API_BASE}/booking/${bookingId}`)
     const result = await response.json()
 
     if (!response.ok) {

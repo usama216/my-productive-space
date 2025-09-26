@@ -876,6 +876,19 @@ export function EntitlementTabs({
 
         <TabsContent value="credit" className="mt-4 space-y-4">
           <div>
+            {/* Credit Disclaimer */}
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Important Notice</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Credits are only available for 30 days from the date they are issued.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {isLoadingCredits ? (
               // Loading state
               <div className="flex items-center justify-center py-8">
@@ -928,7 +941,19 @@ export function EntitlementTabs({
                           setCreditAmount(0);
                           onChange(null);
                         } else {
-                          setCreditAmount(Math.min(totalCredit, bookingAmount));
+                          // Auto-apply maximum available credit when checkbox is checked
+                          const maxAmount = Math.min(totalCredit, bookingAmount);
+                          setCreditAmount(maxAmount);
+                          
+                          // Immediately apply the credit and update total amount
+                          const finalAmount = Math.max(0, bookingAmount - maxAmount);
+                          onChange({
+                            type: 'credit',
+                            id: 'credit',
+                            discountAmount: maxAmount,
+                            finalAmount: finalAmount,
+                            creditAmount: maxAmount
+                          });
                         }
                       }}
                       className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
@@ -970,7 +995,7 @@ export function EntitlementTabs({
                               
                               setCreditAmount(amount);
                               
-                              // Always send credit info when checkbox is checked, even if amount is 0
+                              // Immediately apply credit changes and update total amount
                               if (useCredit) {
                                 const finalAmount = Math.max(0, bookingAmount - amount);
                                 onChange({
@@ -992,6 +1017,8 @@ export function EntitlementTabs({
                             onClick={() => {
                               const maxAmount = Math.min(totalCredit, bookingAmount);
                               setCreditAmount(maxAmount);
+                              
+                              // Immediately apply maximum credit and update total amount
                               if (useCredit) {
                                 const finalAmount = Math.max(0, bookingAmount - maxAmount);
                                 onChange({

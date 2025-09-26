@@ -559,7 +559,7 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-2">
-                        {activeTab === 'upcoming' && canEditBooking(booking) && (
+                        {/* {activeTab === 'upcoming' && canEditBooking(booking) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -569,7 +569,7 @@ export function UserBookings() {
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
-                        )}
+                        )} */}
 
                         {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && (
                           <>

@@ -113,7 +113,7 @@ export async function getUserPackagesForBooking(
   userRole: 'STUDENT' | 'MEMBER' | 'TUTOR'
 ): Promise<UserPackage[]> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/user-packages/${userId}`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/user-packages/${userId}/${userRole}`)
     
     if (!response.ok) {
       throw new Error('Failed to fetch user packages')
@@ -125,12 +125,8 @@ export async function getUserPackagesForBooking(
       throw new Error(data.message || 'Failed to fetch user packages')
     }
 
-    // Filter packages for user role and active status
-    return data.packages.filter((pkg: any) => 
-      pkg.targetRole === userRole && 
-      pkg.remainingCount > 0 &&
-      new Date(pkg.expiresAt) > new Date()
-    )
+    // Return packages directly as they are already filtered by role on the backend
+    return data.packages
   } catch (error) {
     console.error('Error fetching user packages:', error)
     return []
