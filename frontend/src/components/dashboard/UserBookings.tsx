@@ -505,8 +505,8 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="font-medium">${booking.totalAmount}</div>
-                        {booking.extensionamounts && booking.extensionamounts.length > 0 && (
+                        <div className="font-medium">${booking.totalactualcost}</div>
+                        {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
                           <div className="text-xs text-blue-600">
                             Total: ${(() => {
                               const originalCost = booking.totalCost || 0
@@ -514,7 +514,7 @@ export function UserBookings() {
                               return (originalCost + extensionTotal).toFixed(2)
                             })()}
                           </div>
-                        )}
+                        )} */}
                       </div>
 
                       {/* <div className="text-sm">
