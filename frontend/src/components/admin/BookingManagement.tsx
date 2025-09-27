@@ -233,6 +233,8 @@ export function BookingManagement() {
       'Member Type',
       'Special Requests',
       'Total Amount',
+      'Extension Amounts',
+      'Total Actual Cost',
       'Status',
       'Payment Status',
       'Pax',
@@ -241,24 +243,35 @@ export function BookingManagement() {
       'Tutors'
     ]
     
-    const rows = bookings.map(booking => [
-      booking.id,
-      booking.bookingRef,
-      booking.bookedForEmails?.[0] || 'N/A',
-      formatBookingDate(booking.startAt),
-      formatBookingDate(booking.endAt),
-      calculateDuration(booking.startAt, booking.endAt),
-      booking.location,
-      booking.memberType,
-      booking.specialRequests || '',
-      booking.totalAmount,
-      getBookingStatus(booking),
-      booking.confirmedPayment ? 'PAID' : 'UNPAID',
-      booking.pax,
-      booking.students,
-      booking.members,
-      booking.tutors
-    ])
+    const rows = bookings.map(booking => {
+      const extensionAmounts = booking.extensionamounts && booking.extensionamounts.length > 0 
+        ? booking.extensionamounts.join('; ') 
+        : 'None'
+      const totalActualCost = booking.extensionamounts && booking.extensionamounts.length > 0
+        ? ((booking.totalCost || 0) + booking.extensionamounts.reduce((sum: number, amount: number) => sum + amount, 0)).toFixed(2)
+        : booking.totalAmount
+
+      return [
+        booking.id,
+        booking.bookingRef,
+        booking.bookedForEmails?.[0] || 'N/A',
+        formatBookingDate(booking.startAt),
+        formatBookingDate(booking.endAt),
+        calculateDuration(booking.startAt, booking.endAt),
+        booking.location,
+        booking.memberType,
+        booking.specialRequests || '',
+        booking.totalAmount,
+        extensionAmounts,
+        totalActualCost,
+        getBookingStatus(booking),
+        booking.confirmedPayment ? 'PAID' : 'UNPAID',
+        booking.pax,
+        booking.students,
+        booking.members,
+        booking.tutors
+      ]
+    })
     
     return [headers, ...rows]
       .map(row => row.map(field => `"${field}"`).join(','))
@@ -542,6 +555,15 @@ export function BookingManagement() {
                       <TableCell>
                         <div className="text-sm">
                           <div className="font-medium">${booking.totalAmount}</div>
+                          {booking.extensionamounts && booking.extensionamounts.length > 0 && (
+                            <div className="text-xs text-blue-600">
+                              Total: ${(() => {
+                                const originalCost = booking.totalCost || 0
+                                const extensionTotal = booking.extensionamounts.reduce((sum: number, amount: number) => sum + amount, 0)
+                                return (originalCost + extensionTotal).toFixed(2)
+                              })()}
+                            </div>
+                          )}
                           {booking.discountAmount && booking.discountAmount > 0 && (
                             <div className="text-xs text-green-600">
                               -${booking.discountAmount} off

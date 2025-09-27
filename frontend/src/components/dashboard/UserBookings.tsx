@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2 } from 'lucide-react'
+import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2, Timer } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -227,6 +227,16 @@ export function UserBookings() {
     window.location.href = `/book-now?edit=${bookingData}`
   }
 
+  // Handle reschedule booking
+  const handleReschedule = (booking: Booking) => {
+    window.location.href = `/reschedule/${booking.id}`
+  }
+
+  // Handle extend booking
+  const handleExtend = (booking: Booking) => {
+    window.location.href = `/extend/${booking.id}`
+  }
+
 
 
 
@@ -280,21 +290,6 @@ export function UserBookings() {
 
   const currentTabBookings = getCurrentTabBookings()
 
-  // Handle reschedule booking
-  const handleReschedule = (booking: Booking) => {
-    // Check if booking has already been rescheduled
-    if ((booking.rescheduleCount || 0) >= 1) {
-      toast({
-        title: "Cannot Reschedule",
-        description: "You can only reschedule this booking once",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Navigate to reschedule page
-    window.location.href = `/reschedule/${booking.id}`
-  }
 
   return (
     <div className="space-y-6">
@@ -511,18 +506,15 @@ export function UserBookings() {
                     <TableCell>
                       <div className="text-sm">
                         <div className="font-medium">${booking.totalAmount}</div>
-
-                        {/* {booking.discountAmount && booking.discountAmount > 0 && (
-    <div className="text-xs text-green-600">
-      -${booking.discountAmount} off
-    </div>
-  )}
-
-  {booking.PromoCode?.code && (
-    <div className="text-xs text-blue-600">
-      {booking.PromoCode.code} applied
-    </div>
-  )} */}
+                        {booking.extensionamounts && booking.extensionamounts.length > 0 && (
+                          <div className="text-xs text-blue-600">
+                            Total: ${(() => {
+                              const originalCost = booking.totalCost || 0
+                              const extensionTotal = booking.extensionamounts.reduce((sum: number, amount: number) => sum + amount, 0)
+                              return (originalCost + extensionTotal).toFixed(2)
+                            })()}
+                          </div>
+                        )}
                       </div>
 
                       {/* <div className="text-sm">
@@ -548,7 +540,9 @@ export function UserBookings() {
                       {booking.confirmedPayment ? (
                         <div className="flex items-center space-x-1 text-green-600">
                           <CheckCircle className="h-4 w-4" />
-                          <span className="text-sm">Paid</span>
+                          <span className="text-sm">
+                            {booking.extensionamounts && booking.extensionamounts.length > 0 ? 'Paid + Extended' : 'Paid'}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center space-x-1 text-red-600">
@@ -587,6 +581,18 @@ export function UserBookings() {
                               You can only reschedule once per booking
                             </div> */}
                           </>
+                        )}
+
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleExtend(booking)}
+                            className="hover:bg-blue-50 border-blue-200 text-blue-700"
+                          >
+                            <Timer className="h-4 w-4 mr-1" />
+                            Extend
+                          </Button>
                         )}
 
                         {activeTab === 'upcoming' && canCancelBooking(booking) && (

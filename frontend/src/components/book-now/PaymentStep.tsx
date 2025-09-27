@@ -24,6 +24,14 @@ type Props = {
   // New props for booking creation
   onCreateBooking?: () => Promise<string | null> // Function to create booking and return booking ID
   onBookingCreated?: (bookingId: string) => void // Callback when booking is created
+  // Extension specific props
+  isExtension?: boolean
+  extensionData?: {
+    newEndAt: string
+    seatNumbers: string[]
+    extensionHours: number
+    extensionCost: number
+  }
 }
 
 export default function PaymentStep({
@@ -39,6 +47,8 @@ export default function PaymentStep({
   onPaymentMethodChange,
   onCreateBooking,
   onBookingCreated,
+  isExtension = false,
+  extensionData,
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
@@ -86,14 +96,16 @@ export default function PaymentStep({
       }
 
       // Include booking ID in the redirect URL for confirmation
-      const redirectUrl = `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}`
+      const redirectUrl = isExtension 
+        ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&extension=true&extensionHours=${extensionData?.extensionHours || 0}&extensionCost=${extensionData?.extensionCost || 0}&newEndAt=${encodeURIComponent(extensionData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(extensionData?.seatNumbers || []))}&originalEndAt=${encodeURIComponent(extensionData?.originalEndAt || '')}`
+        : `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}`
 
       const body = {
         amount: finalTotal.toFixed(2),
         currency: 'SGD',
         email: customer.email,
         name: customer.name,
-        purpose: 'Test Order Payment for My Productive Space',
+        purpose: isExtension ? 'Booking Extension Payment for My Productive Space' : 'Test Order Payment for My Productive Space',
         reference_number: `${currentBookingId}`,
         redirect_url: redirectUrl,
         // webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
@@ -101,6 +113,8 @@ export default function PaymentStep({
 
         payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)], // Array of strings
         bookingId: currentBookingId, // Use the created booking ID
+        isExtension: isExtension, // Flag to identify extension payments
+        extensionData: extensionData, // Extension details for backend processing
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
@@ -230,7 +244,7 @@ export default function PaymentStep({
           disabled={loading}
           className="flex-1 bg-orange-500 hover:bg-orange-600"
         >
-          {loading ? 'Processing…' : `Complete your booking`}
+          {loading ? 'Processing…' : isExtension ? `Pay $${finalTotal.toFixed(2)} to Extend` : `Complete your booking`}
         </Button>
       </div>
     </div>

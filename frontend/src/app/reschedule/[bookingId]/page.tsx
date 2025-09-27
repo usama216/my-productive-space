@@ -157,22 +157,22 @@ export default function ReschedulePage() {
             return
           }
           
-          if (!bookingData.confirmedPayment) {
-            toast({
-              title: "Cannot Reschedule",
-              description: "Only paid bookings can be rescheduled",
-              variant: "destructive"
-            })
-            router.push('/dashboard')
-            return
-          }
-        } else {
-          toast({
-            title: "Error",
-            description: response.error || "Failed to load booking details",
-            variant: "destructive"
-          })
-          router.push('/dashboard')
+        //   if (!bookingData.confirmedPayment) {
+        //     toast({
+        //       title: "Cannot Reschedule",
+        //       description: "Only paid bookings can be rescheduled",
+        //       variant: "destructive"
+        //     })
+      
+        //     return
+        //   }
+        // } else {
+        //   toast({
+        //     title: "Error",
+        //     description: response.error || "Failed to load booking details",
+        //     variant: "destructive"
+        //   })
+        //   router.push('/dashboard')
         }
       } catch (error) {
         console.error('Error loading booking:', error)
@@ -181,7 +181,7 @@ export default function ReschedulePage() {
           description: "Failed to load booking details",
           variant: "destructive"
         })
-        router.push('/dashboard')
+  
       } finally {
         setLoading(false)
       }
