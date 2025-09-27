@@ -353,18 +353,48 @@ export function EntitlementTabs({
     }
   }
 
+  // // Check if package is valid for current booking
+  // const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
+  //   // Use remainingPasses from the API response, fallback to passCount if not available
+  //   const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
+  //   return !pkg.isExpired && remainingPasses > 0
+  // }
+
+  // // Check if user has any valid packages
+  // const hasValidPackages = userPackages.some(pkg => {
+  //   const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
+  //   return !pkg.isExpired && remainingPasses > 0
+  // })
+
   // Check if package is valid for current booking
-  const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
-    // Use remainingPasses from the API response, fallback to passCount if not available
-    const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
-    return !pkg.isExpired && remainingPasses > 0
+// Check if package is valid for current booking
+const isPackageValidForBooking = (pkg: ApiUserPackage, bookingHours: number) => {
+  const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
+
+  // Invalid agar expired hai OR passes khatam ho gaye OR usedPasses === totalPasses
+  return !pkg.isExpired && remainingPasses > 0 && pkg.usedPasses < (pkg.totalPasses || 0);
+};
+
+// Check if user has any valid packages
+const hasValidPackages = userPackages.some(pkg => {
+  const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
+
+  return !pkg.isExpired && remainingPasses > 0 && pkg.usedPasses < (pkg.totalPasses || 0);
+});
+
+
+const getRemainingPasses = (pkg: ApiUserPackage) => {
+  const baseRemaining = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
+
+  // Agar sab passes use ho gaye -> no passes left
+  if (pkg.usedPasses >= (pkg.totalPasses || 0)) {
+    return 0;
   }
 
-  // Check if user has any valid packages
-  const hasValidPackages = userPackages.some(pkg => {
-    const remainingPasses = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
-    return !pkg.isExpired && remainingPasses > 0
-  })
+  return baseRemaining;
+};
+
+
 
   return (
     <div className="border-t pt-6">
@@ -490,46 +520,39 @@ export function EntitlementTabs({
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select a package to use..." />
                         </SelectTrigger>
-                        <SelectContent>
-                          {userPackages.map((pkg) => {
-                            const remaining = pkg.remainingPasses || pkg.packageContents?.passCount || 0;
-                            const bookingHours = bookingDuration?.durationHours || 0;
-                            const isValid = isPackageValidForBooking(pkg, bookingHours);
-                            const discount =
-                              bookingHours > 0
-                                ? calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice)
-                                : null;
-                            const packageHours = PACKAGE_HOUR_LIMITS[pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS] || 0;
+                      <SelectContent>
+  {userPackages.map((pkg) => {
+    const remaining = getRemainingPasses(pkg);
+    const bookingHours = bookingDuration?.durationHours || 0;
+    const isValid = isPackageValidForBooking(pkg, bookingHours);
+    const discount =
+      bookingHours > 0
+        ? calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice)
+        : null;
+    const packageHours = PACKAGE_HOUR_LIMITS[pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS] || 0;
 
-                            return (
-                              <SelectItem
-                                key={pkg.id}
-                                value={pkg.id}
-                                disabled={!isValid || remaining === 0}
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center gap-2">
-                                    <span>{getPackageTypeIcon(pkg.packageType)}</span>
-                                    <div>
-                                      <span className="font-medium">{pkg.packageName}</span>
-                                      <span className="text-sm text-gray-500 ml-2">
-                                        ({remaining} of {pkg.totalPasses || pkg.packageContents?.passCount || 0} left)
-                                      </span>
-                                      {/* <div className="text-xs text-gray-500 mt-1">
-                                        Package discount available
-                                      </div>
-                                      {discount && bookingHours > 0 && (
-                                        <div className="text-xs text-green-600 mt-1">
-                                          Save ${discount.discountAmount.toFixed(2)}
-                                        </div>
-                                      )} */}
-                                    </div>
-                                  </div>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
+    return (
+      <SelectItem
+        key={pkg.id}
+        value={pkg.id}
+        disabled={!isValid || remaining === 0}
+      >
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <span>{getPackageTypeIcon(pkg.packageType)}</span>
+            <div>
+              <span className="font-medium">{pkg.packageName}</span>
+              <span className="text-sm text-gray-500 ml-2">
+                ({remaining} of {pkg.totalPasses || pkg.packageContents?.passCount || 0} left)
+              </span>
+            </div>
+          </div>
+        </div>
+      </SelectItem>
+    );
+  })}
+</SelectContent>
+
                       </Select>
                     </div>
 
