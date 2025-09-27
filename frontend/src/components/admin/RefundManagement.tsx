@@ -37,6 +37,11 @@ import {
   RefundTransaction,
   UserCredit
 } from '@/lib/refundService'
+import { 
+  formatSingaporeDate, 
+  formatSingaporeDateOnly,
+  formatSingaporeTimeOnly
+} from '@/lib/timezoneUtils'
 
 export function RefundManagement() {
   const [refunds, setRefunds] = useState<RefundTransaction[]>([])
@@ -134,7 +139,9 @@ export function RefundManagement() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Ensure dates are treated as UTC by adding 'Z' if not present
+    const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+    return new Date(utcDateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

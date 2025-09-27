@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Package, Users, Calendar, TrendingUp, Search, Filter } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { formatSingaporeDateOnly } from '@/lib/timezoneUtils'
 
 interface PackageUsage {
   id: string
@@ -285,15 +286,15 @@ export default function PackageUsageTable() {
                       </TableCell>
                       
                       <TableCell className="text-sm text-gray-500">
-                        {pkg.purchasedAt ? new Date(pkg.purchasedAt).toLocaleDateString() : 'N/A'}
+                        {pkg.purchasedAt ? new Date(pkg.purchasedAt.endsWith('Z') ? pkg.purchasedAt : pkg.purchasedAt + 'Z').toLocaleDateString() : 'N/A'}
                       </TableCell>
                       
                       <TableCell className="text-sm text-gray-500">
-                        {pkg.expiresAt ? new Date(pkg.expiresAt).toLocaleDateString() : 'N/A'}
+                        {pkg.expiresAt ? new Date(pkg.expiresAt.endsWith('Z') ? pkg.expiresAt : pkg.expiresAt + 'Z').toLocaleDateString() : 'N/A'}
                       </TableCell>
                       
                       <TableCell className="text-sm text-gray-500">
-                        {pkg.lastUsed ? new Date(pkg.lastUsed).toLocaleDateString() : 'Never'}
+                        {pkg.lastUsed ? new Date(pkg.lastUsed.endsWith('Z') ? pkg.lastUsed : pkg.lastUsed + 'Z').toLocaleDateString() : 'Never'}
                       </TableCell>
                     </TableRow>
                   ))}

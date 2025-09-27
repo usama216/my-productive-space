@@ -27,6 +27,12 @@ import {
   getStatusColor,
   calculateDuration
 } from '@/lib/bookingService'
+import { 
+  formatSingaporeDate, 
+  formatSingaporeDateOnly, 
+  formatSingaporeTimeOnly,
+  formatBookingDateRange
+} from '@/lib/timezoneUtils'
 
 export function BookingManagement() {
   const { toast } = useToast()
@@ -543,8 +549,7 @@ export function BookingManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          <div className="font-medium">{formatBookingDate(booking.startAt)}</div>
-                          <div className="text-gray-500">to {formatBookingDate(booking.endAt)}</div>
+                          <div className="font-medium">{formatBookingDateRange(booking.startAt, booking.endAt)}</div>
                         </div>
                       </TableCell>
                       <TableCell>

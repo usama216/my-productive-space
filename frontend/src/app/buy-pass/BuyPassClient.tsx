@@ -20,6 +20,7 @@ import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import PaymentStep from '@/components/buy-pass/PaymentStep'
 import ConfirmationStep from '@/components/buy-pass/ConfirmationStep'
+import { formatSingaporeDateOnly, getCurrentSingaporeTime } from '@/lib/timezoneUtils'
 
 export default function BuyNowPage() {
   const searchParams = useSearchParams()
@@ -606,23 +607,13 @@ export default function BuyNowPage() {
                             <span className="block">
                               Package activated on:{" "}
                               <span className="font-medium">
-                                {new Date().toLocaleDateString("en-GB", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
+                                {new Date().toLocaleDateString()}
                               </span>
                             </span>
                             <span className="block">
                               Package expires on:{" "}
                               <span className="font-medium text-red-500">
-                                {new Date(
-                                  new Date().setDate(new Date().getDate() + selectedPackage.validityDays)
-                                ).toLocaleDateString("en-GB", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
+                                {new Date(new Date().getTime() + selectedPackage.validityDays * 24 * 60 * 60 * 1000).toLocaleDateString()}
                               </span>
                             </span>
                           </div>

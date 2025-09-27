@@ -39,6 +39,17 @@ import { PromoCode } from '@/lib/promoCodeService'
 import { getUserPackages, UserPackage } from '@/lib/services/packageService'
 import { getAllPricingForLocation } from '@/lib/pricingService'
 import { getUserProfile, UserProfile } from '@/lib/userProfileService'
+import { 
+  getCurrentSingaporeTime,
+  getSingaporeTimeConstraints,
+  toDatePickerDate,
+  fromDatePickerToUTC,
+  formatSingaporeDate,
+  formatSingaporeDateOnly,
+  formatSingaporeTimeOnly,
+  formatBookingDateRange,
+  toSingaporeTime
+} from '@/lib/timezoneUtils'
 
 
 const locations = [
@@ -395,8 +406,9 @@ export default function BookingClient() {
 
   useEffect(() => {
     if (startDate && endDate) {
-      const startAt = startDate.toISOString();
-      const endAt = endDate.toISOString();
+      // Convert Singapore time to UTC for database storage
+      const startAt = fromDatePickerToUTC(startDate).toISOString();
+      const endAt = fromDatePickerToUTC(endDate).toISOString();
       const durationMs = endDate.getTime() - startDate.getTime();
       const durationHours = durationMs / (1000 * 60 * 60);
 
@@ -410,7 +422,8 @@ export default function BookingClient() {
     }
   }, [startDate, endDate])
 
-  const maxBookingDate = addMonths(new Date(), 2)
+  const { minDate, maxDate } = getSingaporeTimeConstraints()
+  const maxBookingDate = maxDate
 
   const isPaymentFailed = useCallback((status: string | null) => {
     return status === 'canceled' || status === 'cancelled' || status === 'failed' ||
@@ -1288,7 +1301,7 @@ export default function BookingClient() {
                             dateFormat="MMM d, yyyy h:mm aa"
                             placeholderText="Select start time"
                             className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent ${!user ? "bg-gray-50" : ""}`}
-                            minDate={new Date()}
+                            minDate={minDate}
                             maxDate={maxBookingDate}
                             {...getStartTimeConstraints()}
                             disabled={!user}
@@ -1334,7 +1347,7 @@ export default function BookingClient() {
                           <p className="text-xs text-blue-600 mt-1">
                             {bookingDuration.startAt && bookingDuration.endAt && (
                               <>
-                                From {new Date(bookingDuration.startAt).toLocaleString()} to {new Date(bookingDuration.endAt).toLocaleString()}
+                                From {formatSingaporeDate(bookingDuration.startAt)} to {formatSingaporeDate(bookingDuration.endAt)}
                               </>
                             )}
                           </p>
@@ -1826,11 +1839,7 @@ export default function BookingClient() {
                         <Clock className="w-5 h-5 text-gray-400" />
                         <div>
                           <p className="text-sm">
-                            {new Date(confirmedBookingData.startAt).toLocaleDateString()}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {new Date(confirmedBookingData.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                            {new Date(confirmedBookingData.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {formatBookingDateRange(confirmedBookingData.startAt, confirmedBookingData.endAt)}
                           </p>
                         </div>
                       </div>

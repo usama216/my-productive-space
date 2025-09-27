@@ -277,7 +277,9 @@ export const updateStudentVerification = async (id: string, status: 'VERIFIED' |
 
 // Utility functions
 export const formatUserDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleString('en-US', {
+  // Ensure dates are treated as UTC by adding 'Z' if not present
+  const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+  return new Date(utcDateString).toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

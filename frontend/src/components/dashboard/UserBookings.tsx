@@ -23,6 +23,16 @@ import {
   calculateDuration
 } from '@/lib/bookingService'
 import { requestRefund } from '@/lib/refundService'
+import { 
+  formatSingaporeDate, 
+  formatSingaporeDateOnly, 
+  formatSingaporeTimeOnly,
+  formatBookingDateRange,
+  toSingaporeTime,
+  isPastInSingapore,
+  isFutureInSingapore,
+  calculateDurationSingapore
+} from '@/lib/timezoneUtils'
 
 export function UserBookings() {
   const { toast } = useToast()
@@ -482,13 +492,12 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="font-medium">{formatBookingDate(booking.startAt)}</div>
-                        <div className="text-gray-500">to {formatBookingDate(booking.endAt)}</div>
+                        <div className="font-medium">{formatBookingDateRange(booking.startAt, booking.endAt)}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {calculateDuration(booking.startAt, booking.endAt)} hours
+                        {calculateDurationSingapore(booking.startAt, booking.endAt)} hours
                       </div>
                     </TableCell>
                     <TableCell>
@@ -508,7 +517,7 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="font-medium">${booking.totalactualcost}</div>
+                      <div className="font-medium">${booking.extensionamounts && booking.extensionamounts.length > 0 ? booking.totalactualcost : booking.totalAmount}</div>
                         {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
                           <div className="text-xs text-blue-600">
                             Total: ${(() => {
@@ -729,7 +738,7 @@ export function UserBookings() {
                 <div className="p-3 bg-gray-50 rounded-md text-sm">
                   <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
                   <div><strong>Location:</strong> {selectedBooking.location}</div>
-                  <div><strong>Date:</strong> {formatBookingDate(selectedBooking.startAt)}</div>
+                  <div><strong>Date:</strong> {formatBookingDateRange(selectedBooking.startAt, selectedBooking.endAt)}</div>
                   <div><strong>Amount:</strong> ${selectedBooking.totalAmount}</div>
                 </div>
               </div>
