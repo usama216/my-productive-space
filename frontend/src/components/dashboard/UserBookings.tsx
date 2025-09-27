@@ -151,24 +151,27 @@ export function UserBookings() {
   // Filter bookings by status and sort them
   const upcomingBookings = bookings
     .filter(booking =>
-      booking.status === 'upcoming' || (new Date(booking.startAt) > new Date() && !booking.isCompleted && !booking.isOngoing)
+      (booking.status === 'upcoming' || (new Date(booking.startAt) > new Date() && !booking.isCompleted && !booking.isOngoing)) &&
+      booking.status !== 'refunded' && booking.refundstatus !== 'APPROVED' // Exclude refunded bookings
     )
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) // Earliest first
 
   const ongoingBookings = bookings
     .filter(booking =>
-      booking.status === 'ongoing' || booking.isOngoing || (() => {
+      (booking.status === 'ongoing' || booking.isOngoing || (() => {
         const now = new Date()
         const start = new Date(booking.startAt)
         const end = new Date(booking.endAt)
         return now >= start && now <= end && !booking.isCompleted
-      })()
+      })()) &&
+      booking.status !== 'refunded' && booking.refundstatus !== 'APPROVED' // Exclude refunded bookings
     )
     .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime()) // Most recent first
 
   const pastBookings = bookings
     .filter(booking =>
-      booking.status === 'completed' || booking.isCompleted || (new Date(booking.endAt) < new Date() && !booking.isOngoing)
+      (booking.status === 'completed' || booking.isCompleted || (new Date(booking.endAt) < new Date() && !booking.isOngoing)) &&
+      booking.status !== 'refunded' && booking.refundstatus !== 'APPROVED' // Exclude refunded bookings
     )
     .sort((a, b) => new Date(b.endAt).getTime() - new Date(a.endAt).getTime()) // Most recent first
 
@@ -499,7 +502,7 @@ export function UserBookings() {
                             ))}
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs">No seats assigned</span>
+                          <span className="text-gray-400 text-xs">---</span>
                         )}
                       </div>
                     </TableCell>
@@ -637,11 +640,9 @@ export function UserBookings() {
                             <Badge 
                               className="bg-orange-100 text-orange-800 border-orange-200 text-xs"
                             >
-                              Refunded (Record Only)
+                              Refunded 
                             </Badge>
-                            <span className="text-xs text-orange-600">
-                              Seats released for others
-                            </span>
+                          
                           </div>
                         )}
 

@@ -122,16 +122,19 @@ export default function BuyNowPage() {
       }
 
       if (foundPackage) {
+        console.log('🎯 Auto-selecting package from URL:', foundPackage.name)
         setSelectedPackage(foundPackage)
+        setError(null) // Clear any previous errors
       } else {
+        console.error('❌ Package not found:', decodedPackageName)
         setError(`Package "${decodedPackageName}" not found`)
       }
     }
 
-    if (typeParam) {
+    if (typeParam && targetRole) {
       setPackageType(targetRole)
     }
-  }, [searchParams, packages])
+  }, [searchParams, packages, targetRole])
 
   // Handle step 3 - payment confirmation
   useEffect(() => {
@@ -151,6 +154,14 @@ export default function BuyNowPage() {
       setUserPackageId(userPackageIdParam)
     }
   }, [searchParams])
+
+  // Auto-select package when selectedPackage changes from URL parameter
+  useEffect(() => {
+    if (selectedPackage && packages.length > 0) {
+      console.log('🎯 Package auto-selected, triggering selection logic for:', selectedPackage.name)
+      // The package selection dropdown should now show the selected package
+    }
+  }, [selectedPackage, packages])
 
   // Helper functions
   const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user

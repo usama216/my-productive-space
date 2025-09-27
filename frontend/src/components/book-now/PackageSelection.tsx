@@ -8,7 +8,8 @@ import { Package, Clock, Users, CheckCircle } from 'lucide-react'
 import { UserPackage, calculatePackageDiscount, getHourlyRate, formatPackageDiscount } from '@/lib/services/packageApplicationService'
 
 interface PackageSelectionProps {
-  totalHours: number
+  individualPersonHours: number // Hours per person (not total booking hours)
+  totalPeople: number // Number of people in the booking
   userRole: 'STUDENT' | 'MEMBER' | 'TUTOR'
   userId: string
   onPackageSelect: (packageId: string | null, discount: any) => void
@@ -16,7 +17,8 @@ interface PackageSelectionProps {
 }
 
 export default function PackageSelection({
-  totalHours,
+  individualPersonHours,
+  totalPeople,
   userRole,
   userId,
   onPackageSelect,
@@ -58,12 +60,12 @@ export default function PackageSelection({
       const packageData = userPackages.find(pkg => pkg.id === packageId)
       if (packageData) {
         const hourlyRate = getHourlyRate(userRole)
-        const discount = calculatePackageDiscount(totalHours, [packageData], userRole, hourlyRate)
+        const discount = calculatePackageDiscount(individualPersonHours, totalPeople, [packageData], userRole, hourlyRate)
         onPackageSelect(packageId, discount)
       }
     } else {
       const hourlyRate = getHourlyRate(userRole)
-      const discount = calculatePackageDiscount(totalHours, [], userRole, hourlyRate)
+      const discount = calculatePackageDiscount(individualPersonHours, totalPeople, [], userRole, hourlyRate)
       onPackageSelect(null, discount)
     }
   }
@@ -154,7 +156,8 @@ export default function PackageSelection({
           Available Packages
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Select a package to apply discount to your {totalHours} hour booking
+          Select a package to apply discount to your {individualPersonHours} hour booking per person
+          {totalPeople > 1 && ` (${totalPeople} people total)`}
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

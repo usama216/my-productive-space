@@ -54,33 +54,49 @@ const getApplicablePackages = (bookingHours: number, userPackages: ApiUserPackag
   });
 };
 
-// Calculate package discount based on dynamic hoursAllowed from package configuration
-const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, userRole: string = 'MEMBER', locationPrice: number = 0) => {
+// Calculate package discount based on individual person hours (not total booking hours)
+const calculatePackageDiscount = (
+  pkg: ApiUserPackage, 
+  individualPersonHours: number, // Hours per person (not total booking hours)
+  totalPeople: number, // Number of people in the booking
+  userRole: string = 'MEMBER', 
+  locationPrice: number = 0
+) => {
   // Use dynamic hoursAllowed from package configuration instead of hardcoded values
   const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
-  const appliedHours = Math.min(bookingHours, discountHours);
-  const remainingHours = Math.max(0, bookingHours - appliedHours);
+  
+  // Package applies to ONE person only, not all people
+  const appliedHours = Math.min(individualPersonHours, discountHours);
+  const remainingHoursForPackagePerson = Math.max(0, individualPersonHours - appliedHours);
   
   // Use the actual location price instead of hardcoded rates
   const hourlyRate = locationPrice || HOURLY_RATES[userRole as keyof typeof HOURLY_RATES] || 6.00;
+  
+  // Calculate discount for ONE person only
   const discountAmount = appliedHours * hourlyRate;
-  const remainingAmount = remainingHours * hourlyRate;
+  
+  // Calculate remaining amount for ALL people
+  // - Remaining hours for the person with package
+  // - Full cost for all other people
+  const remainingAmount = (remainingHoursForPackagePerson * hourlyRate) + 
+                         (individualPersonHours * hourlyRate * (totalPeople - 1));
   
   const canUse = (pkg.remainingPasses || pkg.packageContents?.passCount || 0) > 0 && !pkg.isExpired;
   
-  console.log('Package discount calculation:', {
+  console.log('Package discount calculation (individual person hours):', {
     packageName: pkg.packageName,
     packageType: pkg.packageType,
     hoursAllowed: pkg.hoursAllowed,
     discountHours,
-    bookingHours,
-    appliedHours,
-    remainingHours,
+    individualPersonHours,
+    totalPeople,
+    appliedHours, // Applied to 1 person only
+    remainingHoursForPackagePerson,
     userRole,
     hourlyRate,
     locationPrice,
-    discountAmount,
-    remainingAmount,
+    discountAmount, // Discount for 1 person only
+    remainingAmount, // Cost for all people
     canUse,
     remainingPasses: pkg.remainingPasses,
     passCount: pkg.packageContents?.passCount,
@@ -93,7 +109,7 @@ const calculatePackageDiscount = (pkg: ApiUserPackage, bookingHours: number, use
     remainingAmount,
     canUse,
     appliedHours,
-    remainingHours,
+    remainingHours: remainingHoursForPackagePerson,
     packageHours: discountHours
   };
 };
@@ -116,6 +132,7 @@ type Props = {
   bookingDuration?: BookingDuration
   userRole?: 'STUDENT' | 'MEMBER' | 'TUTOR'
   locationPrice?: number
+  totalPeople?: number // Number of people in the booking
 }
 
 export function EntitlementTabs({
@@ -129,7 +146,8 @@ export function EntitlementTabs({
   bookingAmount = 0,
   bookingDuration,
   userRole = 'MEMBER',
-  locationPrice = 0
+  locationPrice = 0,
+  totalPeople = 1
 }: Props) {
   const [localPromo, setLocalPromo] = useState(promoCode || '')
   const [promoFeedback, setPromoFeedback] = useState<{ isValid: boolean; message: string } | null>(null)
@@ -492,17 +510,18 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                         value={selectedPackage || ""}
                         onValueChange={(val) => {
                           const pkg = userPackages.find((p) => p.id === val);
-                          const bookingHours = bookingDuration?.durationHours || 0;
+                          const individualPersonHours = bookingDuration?.durationHours || 0;
                           const discount =
-                            pkg && bookingHours > 0
-                              ? calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice)
+                            pkg && individualPersonHours > 0
+                              ? calculatePackageDiscount(pkg, individualPersonHours, totalPeople, userRole, locationPrice)
                               : null;
 
                           console.log('Package selected:', {
                             packageId: val,
                             packageName: pkg?.packageName,
                             packageType: pkg?.packageType,
-                            bookingHours,
+                            individualPersonHours,
+                            totalPeople,
                             userRole,
                             discount,
                             remainingPasses: pkg?.remainingPasses,
@@ -523,11 +542,11 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                       <SelectContent>
   {userPackages.map((pkg) => {
     const remaining = getRemainingPasses(pkg);
-    const bookingHours = bookingDuration?.durationHours || 0;
-    const isValid = isPackageValidForBooking(pkg, bookingHours);
+    const individualPersonHours = bookingDuration?.durationHours || 0;
+    const isValid = isPackageValidForBooking(pkg, individualPersonHours);
     const discount =
-      bookingHours > 0
-        ? calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice)
+      individualPersonHours > 0
+        ? calculatePackageDiscount(pkg, individualPersonHours, totalPeople, userRole, locationPrice)
         : null;
     const packageHours = PACKAGE_HOUR_LIMITS[pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS] || 0;
 
@@ -596,21 +615,26 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                 </div> */}
 
                                 {(() => {
-                                  const bookingHours = bookingDuration?.durationHours || 0;
+                                  const individualPersonHours = bookingDuration?.durationHours || 0;
                                   const packageHours = PACKAGE_HOUR_LIMITS[pkg.packageType as keyof typeof PACKAGE_HOUR_LIMITS] || 0;
-                                  const discount = calculatePackageDiscount(pkg, bookingHours, userRole, locationPrice);
+                                  const discount = calculatePackageDiscount(pkg, individualPersonHours, totalPeople, userRole, locationPrice);
 
                                   return (
                                 <div className="space-y-2">
                                   <div className="text-sm text-green-700">
                                     <span className="font-medium">Package Type:</span>{" "}
                                     {pkg.packageName}
-                                    {bookingHours > 0 && (
+                                    {individualPersonHours > 0 && (
                                       <span className="ml-2">
                                         <span className="font-medium">
-                                          Booking Hours:
+                                          Hours per Person:
                                         </span>{" "}
-                                        {bookingHours}h
+                                        {individualPersonHours}h
+                                        {totalPeople > 1 && (
+                                          <span className="ml-1 text-gray-500">
+                                            ({totalPeople} people total)
+                                          </span>
+                                        )}
                                       </span>
                                     )}
                                   </div>
@@ -618,7 +642,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                       {discount && (
                                         <div className="space-y-2">
                                           <div className="text-sm text-green-700 bg-green-100 p-2 rounded">
-                                            <span className="font-medium">Discount Applied:</span>{" "}
+                                            <span className="font-medium">Package Applied to 1 Person:</span>{" "}
                                             ${discount.discountAmount.toFixed(2)} saved
                                             {discount.remainingAmount > 0 && (
                                               <span className="ml-2">
@@ -662,24 +686,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
             )}
 
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-500 text-center">
-              Need more passes?{' '}
-              <a
-                href="/buy-pass#packages"
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                Buy passes here
-              </a>
-              {' '}or explore our{' '}
-              <a
-                href="/pricing"
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                membership plans
-              </a>
-            </p>
-          </div>
+        
         </TabsContent>
 
 

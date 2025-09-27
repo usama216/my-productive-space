@@ -820,19 +820,38 @@ export default function BookingClient() {
     const pkg = userPackages?.find(p => p.id === selectedPackage)
     if (!pkg || !bookingDuration) return null
 
-    // Use dynamic hoursAllowed from package configuration instead of hardcoded values
+    // Package applies to individual person hours, not total booking hours
     const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
-    const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
-    const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
-
-    // Use the actual location price
-    const pricePerHour = selectedLocation?.price || 0;
-    const discountAmount = appliedHours * pricePerHour;
-    const remainingAmount = remainingHours * pricePerHour;
+    const individualPersonHours = bookingDuration.durationHours; // Hours per person
+    
+    // Package can only cover hours for ONE person, not all people
+    const appliedHours = Math.min(individualPersonHours, discountHours);
+    const remainingHours = Math.max(0, individualPersonHours - appliedHours);
+    
+    // Calculate discount based on the user role (since package applies to the person who owns it)
+    // We need to determine which person the package applies to - for simplicity, assume it's the first person
+    const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
+                      peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+    
+    // Get the hourly rate for the person with the package
+    const pricePerHour = memberType === 'STUDENT' ? 
+      (individualPersonHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
+      memberType === 'TUTOR' ? 
+      (individualPersonHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
+      (individualPersonHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
+    
+    const discountAmount = appliedHours * pricePerHour; // Discount for 1 person
+    
+    // Calculate remaining cost for ALL people
+    const remainingAmount = (remainingHours * pricePerHour) + // Remaining hours for the person with package
+                           (baseSubtotal - (individualPersonHours * pricePerHour)); // Cost for other people (baseSubtotal minus the person with package)
 
     return {
       discountAmount: discountAmount,
-      finalAmount: remainingAmount
+      finalAmount: remainingAmount,
+      appliedHours: appliedHours,
+      remainingHours: remainingHours,
+      packageAppliedToPerson: 1 // Package applies to 1 person only
     }
   })() : null
 
@@ -1112,6 +1131,7 @@ export default function BookingClient() {
   // Debug form validation
   console.log('📝 Form Validation Debug:', {
     location: !!location,
+    peopleCount: people,
     people: !!people,
     startDate: !!startDate,
     endDate: !!endDate,
@@ -1122,7 +1142,6 @@ export default function BookingClient() {
     studentsValidated,
     studentValidationPassed: !needsStudentVerification || studentsValidated,
     selectedSeats: selectedSeats.length,
-    people,
     seatsMatch: selectedSeats.length === people,
     user: !!user,
     isFormValid
@@ -1543,7 +1562,17 @@ export default function BookingClient() {
                           bookingAmount={baseSubtotal}
                           bookingDuration={bookingDuration}
                           userRole={peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'}
-                          locationPrice={selectedLocation?.price || 0}
+                          locationPrice={(() => {
+                            // Get the appropriate hourly rate based on user role and booking duration
+                            const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+                            const individualPersonHours = bookingDuration?.durationHours || 0
+                            return memberType === 'STUDENT' ? 
+                              (individualPersonHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
+                              memberType === 'TUTOR' ? 
+                              (individualPersonHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
+                              (individualPersonHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
+                          })()}
+                          totalPeople={people}
                         />
                       )}
                       {/* ──────────────────────────────────────────────── */}
@@ -1785,10 +1814,13 @@ export default function BookingClient() {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-3">
+                    
+                      {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
+                        <div className="flex items-center space-x-3">
                         <Users className="w-5 h-5 text-gray-400" />
                         <span>{confirmedBookingData.pax} {confirmedBookingData.pax === 1 ? 'Person' : 'People'}</span>
                       </div>
+                      )}
 
                       <div className="flex items-center space-x-3">
                         <Clock className="w-5 h-5 text-gray-400" />
@@ -1979,17 +2011,20 @@ export default function BookingClient() {
                         const appliedHours = Math.min(bookingDuration.durationHours, discountHours);
                         const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
 
-                        // Use the actual location price
-                        const pricePerHour = selectedLocation?.price || 0;
+                        // Get the appropriate hourly rate based on user role and booking duration
+                        const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+                        const individualPersonHours = bookingDuration.durationHours
+                        const pricePerHour = memberType === 'STUDENT' ? 
+                          (individualPersonHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
+                          memberType === 'TUTOR' ? 
+                          (individualPersonHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
+                          (individualPersonHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
                         const packageDiscount = appliedHours * pricePerHour;
                         const remainingAmount = remainingHours * pricePerHour;
 
                         return (
                           <>
-                            <div className="flex justify-between text-green-600">
-                              <span className='text-sm'>Package Applied</span>
-                              <span className='text-sm'>{people} Person{people !== 1 ? 's' : ''} Only</span>
-                            </div>
+                          
                             <div className="flex justify-between text-green-600">
                               <span className='text-sm'>Hours Covered</span>
                               <span className='text-sm'>{appliedHours?.toFixed(2)}h free</span>

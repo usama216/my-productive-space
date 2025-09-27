@@ -627,7 +627,7 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-4 bg-blue-50 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600">0</div>
                         <div className="text-sm text-blue-600">Total Bookings</div>
@@ -636,7 +636,7 @@ export default function Dashboard() {
                         <div className="text-2xl font-bold text-green-600">0</div>
                         <div className="text-sm text-green-600">Hours Used</div>
                       </div>
-                    </div>
+                    </div> */}
                   </CardContent>
                 </Card>
               </div>

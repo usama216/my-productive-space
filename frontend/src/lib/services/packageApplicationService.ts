@@ -47,10 +47,11 @@ const HOURLY_RATES = {
 } as const
 
 /**
- * Calculate package discount for booking
+ * Calculate package discount for booking - applies to individual person hours only
  */
 export function calculatePackageDiscount(
-  totalHours: number,
+  individualPersonHours: number, // Hours per person (not total booking hours)
+  totalPeople: number, // Number of people in the booking
   userPackages: UserPackage[],
   userRole: 'STUDENT' | 'MEMBER' | 'TUTOR',
   hourlyRate: number
@@ -61,6 +62,7 @@ export function calculatePackageDiscount(
   )
 
   if (applicablePackages.length === 0) {
+    const totalHours = individualPersonHours * totalPeople
     return {
       totalHours,
       basePrice: totalHours * hourlyRate,
@@ -76,13 +78,18 @@ export function calculatePackageDiscount(
     return bLimit - aLimit // Higher limit first
   })
 
-  // Apply the best package
+  // Apply the best package - but only to ONE person's hours
   const bestPackage = sortedPackages[0]
   const discountHours = PACKAGE_HOUR_LIMITS[bestPackage.packageType]
-  const appliedHours = Math.min(totalHours, discountHours)
-  const remainingHours = Math.max(0, totalHours - appliedHours)
-  const discountAmount = appliedHours * hourlyRate
-  const finalPrice = remainingHours * hourlyRate
+  const appliedHours = Math.min(individualPersonHours, discountHours) // Applied to 1 person only
+  const remainingHoursForPackagePerson = Math.max(0, individualPersonHours - appliedHours)
+  
+  // Calculate total costs
+  const totalHours = individualPersonHours * totalPeople
+  const basePrice = totalHours * hourlyRate
+  const discountAmount = appliedHours * hourlyRate // Discount for 1 person only
+  const finalPrice = (remainingHoursForPackagePerson * hourlyRate) + // Remaining hours for person with package
+                    (individualPersonHours * hourlyRate * (totalPeople - 1)) // Full cost for other people
 
   const packageDiscount: PackageDiscount = {
     packageId: bestPackage.id,
@@ -91,14 +98,14 @@ export function calculatePackageDiscount(
     targetRole: bestPackage.targetRole,
     discountHours,
     appliedHours,
-    remainingHours,
+    remainingHours: remainingHoursForPackagePerson,
     discountAmount,
     finalPrice
   }
 
   return {
     totalHours,
-    basePrice: totalHours * hourlyRate,
+    basePrice,
     packageDiscount,
     finalPrice,
     skipPayment: finalPrice === 0
