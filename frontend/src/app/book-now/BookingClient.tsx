@@ -437,12 +437,11 @@ export default function BookingClient() {
       setConfirmationHeadingError(null)
 
       const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
-      // COMMENTED OUT FOR TESTING - Re-enable in production
-      // if (currentBooking.confirmedPayment && currentBooking.status === 'confirmed') {
-      //   setConfirmedBookingData(currentBooking)
-      //   setConfirmationStatus('success')
-      //   return
-      // }
+      if (currentBooking.confirmedPayment && currentBooking.status === 'confirmed') {
+        setConfirmedBookingData(currentBooking)
+        setConfirmationStatus('success')
+        return
+      }
 
       const paymentStatus = searchParams.get('status')
       if (isPaymentFailed(paymentStatus)) {
