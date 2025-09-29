@@ -2010,7 +2010,7 @@ export default function BookingClient() {
                       </div>
                       <div className="flex justify-between">
                         <span>Base Subtotal</span>
-                        <span>${baseSubtotal}</span>
+                        <span>${baseSubtotal.toFixed(2)}</span>
                       </div>
 
                       {/* Show discount if applied */}
