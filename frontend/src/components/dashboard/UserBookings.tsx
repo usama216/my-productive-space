@@ -196,10 +196,11 @@ export function UserBookings() {
 
   const currentBookings = ongoingBookings
 
-  // Check if booking can be edited (≥5 hours in advance)
+  // Check if booking can be edited/rescheduled (≥5 hours in advance)
   const canEditBooking = (booking: Booking): boolean => {
     const now = new Date()
-    const bookingStart = new Date(booking.startAt)
+    // Handle both ISO string formats (with and without timezone)
+    const bookingStart = new Date(booking.startAt.includes('Z') ? booking.startAt : booking.startAt + 'Z')
     const hoursDifference = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60)
     return hoursDifference >= 5
   }
@@ -207,9 +208,56 @@ export function UserBookings() {
   // Check if booking can be cancelled/refunded (≥5 hours in advance)
   const canCancelBooking = (booking: Booking): boolean => {
     const now = new Date()
-    const bookingStart = new Date(booking.startAt)
+    // Handle both ISO string formats (with and without timezone)
+    const bookingStart = new Date(booking.startAt.includes('Z') ? booking.startAt : booking.startAt + 'Z')
     const hoursDifference = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60)
     return hoursDifference >= 5 && booking.confirmedPayment && booking.refundstatus === 'NONE'
+  }
+
+  // Check if booking can be extended (<5 hours before start OR ongoing, but NOT past)
+  const canExtendBooking = (booking: Booking): boolean => {
+    const now = new Date()
+    // Handle both ISO string formats (with and without timezone)
+    const bookingStart = new Date(booking.startAt.includes('Z') ? booking.startAt : booking.startAt + 'Z')
+    const bookingEnd = new Date(booking.endAt.includes('Z') ? booking.endAt : booking.endAt + 'Z')
+    const hoursDifference = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60)
+    
+    console.log('🔍 canExtendBooking check:', {
+      bookingRef: booking.bookingRef,
+      now: now.toISOString(),
+      startAt: booking.startAt,
+      endAt: booking.endAt,
+      bookingStartParsed: bookingStart.toISOString(),
+      bookingEndParsed: bookingEnd.toISOString(),
+      hoursDifference,
+      confirmedPayment: booking.confirmedPayment,
+      refundstatus: booking.refundstatus
+    })
+    
+    // Check if booking is past (ended)
+    const isPast = now.getTime() > bookingEnd.getTime()
+    if (isPast) {
+      console.log('❌ Booking is past')
+      return false
+    }
+    
+    // Check if booking is ongoing
+    const isOngoing = now.getTime() >= bookingStart.getTime() && now.getTime() <= bookingEnd.getTime()
+    
+    // Can extend if:
+    // 1. Less than 5 hours before start (hoursDifference < 5 and positive)
+    // 2. Currently ongoing
+    const canExtend = (hoursDifference < 5 && hoursDifference >= 0) || isOngoing
+    
+    console.log('📊 Extend decision:', {
+      isOngoing,
+      canExtend,
+      confirmedPayment: booking.confirmedPayment,
+      refundstatus: booking.refundstatus,
+      finalResult: canExtend && booking.confirmedPayment && booking.refundstatus === 'NONE'
+    })
+    
+    return canExtend && booking.confirmedPayment && booking.refundstatus === 'NONE'
   }
 
   // Handle edit booking - navigate to book-now page
@@ -309,6 +357,7 @@ export function UserBookings() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold">My Bookings</h2>
+        <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline mt-2'>All timezones are based on GMT+8</p>
       </div>
 
 
@@ -577,7 +626,7 @@ export function UserBookings() {
                           </Button>
                         )} */}
 
-                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && (
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && canEditBooking(booking) && (
                           <>
                             <Button
                               size="sm"
@@ -588,14 +637,10 @@ export function UserBookings() {
                               <Clock className="h-4 w-4 mr-1" />
                               Reschedule
                             </Button>
-                            {/* <div className="text-xs text-orange-600 mt-1">
-                              <AlertTriangle className="h-3 w-3 inline mr-1" />
-                              You can only reschedule once per booking
-                            </div> */}
                           </>
                         )}
 
-                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && (
+                        {activeTab === 'upcoming' && canExtendBooking(booking) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -619,12 +664,9 @@ export function UserBookings() {
                           </Button>
                         )}
 
-                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && !canCancelBooking(booking) && (
-                          <div className="text-sm text-gray-500">
-                            <AlertTriangle className="h-4 w-4 inline mr-1" />
-                            Cannot cancel (less than 5 hours)
-                          </div>
-                        )}
+                      
+
+                     
 
                         {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus !== 'NONE' && (
                           <div className="flex items-center gap-2">
@@ -663,10 +705,48 @@ export function UserBookings() {
                         )}
 
                         {activeTab === 'ongoing' && (
-                          <div className="text-sm text-green-600 font-medium">
-                            <Clock className="h-4 w-4 inline mr-1" />
-                            In Progress
-                          </div>
+                          <>
+                            <div className="text-sm text-green-600 font-medium mb-2">
+                              <Clock className="h-4 w-4 inline mr-1" />
+                              In Progress
+                            </div>
+                            
+                            {booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && canEditBooking(booking) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleReschedule(booking)}
+                                className="hover:bg-orange-50 border-orange-200 text-orange-700"
+                              >
+                                <Clock className="h-4 w-4 mr-1" />
+                                Reschedule
+                              </Button>
+                            )}
+
+                            {canExtendBooking(booking) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleExtend(booking)}
+                                className="hover:bg-blue-50 border-blue-200 text-blue-700"
+                              >
+                                <Timer className="h-4 w-4 mr-1" />
+                                Extend Now
+                              </Button>
+                            )}
+
+                            {canCancelBooking(booking) && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleCancelBooking(booking)}
+                                className="bg-red-500 hover:bg-red-500/90 text-white border-red-500 hover:border-red-500"
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Cancel & Refund
+                              </Button>
+                            )}
+                          </>
                         )}
 
                         {activeTab === 'past' && (
@@ -729,7 +809,7 @@ export function UserBookings() {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Note:</strong> Approved refunds will be added to your store credits, which expire in 30 days.
+                  <strong>Note:</strong> Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation
                 </AlertDescription>
               </Alert>
               

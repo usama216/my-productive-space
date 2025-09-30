@@ -913,7 +913,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                 <div>
                   <p className="text-sm font-medium text-amber-800">Important Notice</p>
                   <p className="text-xs text-amber-700 mt-1">
-                    Credits are only available for 30 days from the date they are issued.
+                    Credits are only available for 30 days from the date they are issued. Store credits used cannot be refunded for any cancellation
                   </p>
                 </div>
               </div>

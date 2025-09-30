@@ -329,7 +329,7 @@ export function RefundRequests({ userId, onRefundRequested }: RefundRequestsProp
         <Alert className="mt-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Note:</strong> Approved refunds will be added to your store credits, which expire in 30 days.
+            <strong>Note:</strong> Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation
           </AlertDescription>
         </Alert>
       </CardContent>
