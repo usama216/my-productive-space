@@ -1347,14 +1347,17 @@ export default function BookingClient() {
                             disabled={!startDate || !user}
                             {...endTimeConstraints}
                           />
-                          {startDate && (
+                          {/* {startDate && (
                             <p className="text-xs text-gray-500 mt-1">
                               💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)
                             </p>
-                          )}
+                          )} */}
                         </div>
+                     
+                        <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline'>All timezones are based on GMT+8</p>
+   
                       </div>
-
+                     
                       {/* Booking Duration Display */}
                       {bookingDuration && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1891,6 +1894,7 @@ export default function BookingClient() {
                           <p className="text-sm text-gray-600">{selectedLocation.address}</p>
                         </div>
                       </div>
+
                       <div className="flex items-center space-x-3">
                         <Users className="w-5 h-5 text-gray-400" />
                         <span>{people} {people === 1 ? 'Person' : 'People'}</span>
