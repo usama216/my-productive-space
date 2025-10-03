@@ -8,7 +8,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { isSameDay, endOfDay, parseISO, addMonths, addDays, setHours, setMinutes } from 'date-fns'
-import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle, Ticket, Package } from 'lucide-react'
+import { MapPin, Clock, Users, Calendar, CreditCard, Shield, AlertCircle, AlertTriangle, Ticket, Package, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -210,17 +210,17 @@ export default function BookingClient() {
     // …and so on S4–S15…
 
     // tables
-    { id: 'lbl-T1', text: 'T1', x: 80, y: 80 },
-    { id: 'lbl-T2', text: 'T2', x: 80, y: 160 },
-    { id: 'lbl-T3', text: 'T3', x: 60, y: 285 },
-    { id: 'lbl-T4', text: 'T4', x: 80, y: 425 },
-    { id: 'lbl-T5', text: 'T5', x: 340, y: 90 },
-    { id: 'lbl-T6', text: 'T6', x: 340, y: 195 },
-    { id: 'lbl-T7', text: 'T7', x: 320, y: 300 },
-    { id: 'lbl-T8', text: 'T8', x: 340, y: 400 },
-    { id: 'lbl-T9', text: 'T9', x: 340, y: 460 },
-    { id: 'lbl-T10', text: 'T10', x: 320, y: 520 },
-    { id: 'lbl-T10a', text: 'T10a', x: 320, y: 560 },
+    { id: 'lbl-T1', text: '', x: 80, y: 80 },
+    { id: 'lbl-T2', text: '', x: 80, y: 160 },
+    { id: 'lbl-T3', text: '', x: 60, y: 285 },
+    { id: 'lbl-T4', text: '', x: 80, y: 425 },
+    { id: 'lbl-T5', text: '', x: 340, y: 90 },
+    { id: 'lbl-T6', text: '', x: 340, y: 195 },
+    { id: 'lbl-T7', text: '', x: 320, y: 300 },
+    { id: 'lbl-T8', text: '', x: 340, y: 400 },
+    { id: 'lbl-T9', text: '', x: 340, y: 460 },
+    { id: 'lbl-T10', text: '', x: 320, y: 520 },
+    { id: 'lbl-T10a', text: '', x: 320, y: 560 },
     // …etc for T4–T10a…
   ]
 
@@ -236,7 +236,7 @@ export default function BookingClient() {
 
     // right-wall monitors
     { id: 'monitor_right1', src: '/seat_booking_img/monitor_R.png', x: 365, y: 185, width: 16, height: 24 },
-    { id: 'monitor_right2', src: '/seat_booking_img/monitor_R.png', x: 360, y: 285, width: 16, height: 24 },
+    { id: 'monitor_right2', src: '/seat_booking_img/monitor_R.png', x: 360, y: 390, width: 16, height: 24 },
     { id: 'monitor_right3', src: '/seat_booking_img/monitor_R.png', x: 380, y: 520, width: 16, height: 24 },
     // and so on for each monitor, smiley‐face PNG, etc.
   ]
@@ -404,6 +404,50 @@ export default function BookingClient() {
     }
   }, [userId, loadUserPackages])
 
+  // Auto-select package from URL parameter when packages are loaded
+  useEffect(() => {
+    const packageParam = searchParams.get('package')
+    if (packageParam && userPackages.length > 0 && !selectedPackage) {
+      const decodedPackageName = decodeURIComponent(packageParam)
+      
+      // Try exact match first
+      let foundPackage = userPackages.find(pkg => pkg.packageName === decodedPackageName)
+      
+      // If no exact match, try case-insensitive match
+      if (!foundPackage) {
+        foundPackage = userPackages.find(pkg =>
+          pkg.packageName.toLowerCase() === decodedPackageName.toLowerCase()
+        )
+      }
+      
+      // If still no match, try partial match
+      if (!foundPackage) {
+        foundPackage = userPackages.find(pkg =>
+          pkg.packageName.toLowerCase().includes(decodedPackageName.toLowerCase()) ||
+          decodedPackageName.toLowerCase().includes(pkg.packageName.toLowerCase())
+        )
+      }
+      
+      if (foundPackage) {
+        console.log('✅ Auto-selecting package from URL:', foundPackage.packageName)
+        setSelectedPackage(foundPackage.id)
+        setEntitlementMode('package')
+        
+        toast({
+          title: "Package Selected",
+          description: `${foundPackage.packageName} has been automatically selected for your booking.`,
+        })
+      } else {
+        console.log('⚠️ Package not found in user packages:', decodedPackageName)
+        toast({
+          title: "Package Not Found",
+          description: `You don't have the "${decodedPackageName}" package. Please purchase it first or select a different package.`,
+          variant: "destructive"
+        })
+      }
+    }
+  }, [searchParams, userPackages, selectedPackage, toast])
+
   useEffect(() => {
     if (startDate && endDate) {
       // Convert Singapore time to UTC for database storage
@@ -549,6 +593,7 @@ export default function BookingClient() {
     const cT = parseInt(searchParams.get('coTutors') ?? '0', 10)
     const cS = parseInt(searchParams.get('coStudents') ?? '0', 10)
     const total = cW + cT + cS
+    const packageParam = searchParams.get('package')
 
     // Set location with a small delay to ensure Select component is ready
     if (locStr) {
@@ -567,6 +612,12 @@ export default function BookingClient() {
 
     setPeopleBreakdown({ coWorkers: cW, coTutors: cT, coStudents: cS, total })
     setPeople(total)
+
+    // Auto-select package if package parameter is in URL
+    if (packageParam) {
+      console.log('🎯 Package parameter detected in URL:', packageParam)
+      setEntitlementMode('package')
+    }
   }, [searchParams])
 
 
@@ -588,15 +639,53 @@ export default function BookingClient() {
     }
   }
 
+  // Helper function to STRICTLY enforce 15-minute intervals
+  const enforceStrict15Minutes = (date: Date | null): Date | null => {
+    if (!date) return null;
+    
+    const strictDate = new Date(date);
+    const minutes = strictDate.getMinutes();
+    const remainder = minutes % 15;
+    
+    // Reject any time that's not on a 15-minute boundary
+    if (remainder !== 0) {
+      // Always round DOWN to the previous 15-minute mark for strict enforcement
+      const validMinutes = minutes - remainder;
+      strictDate.setMinutes(validMinutes);
+      strictDate.setSeconds(0);
+      strictDate.setMilliseconds(0);
+      
+      toast({
+        title: "Invalid Time",
+        description: `Only 15-minute intervals allowed. Changed to ${strictDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        variant: "destructive"
+      });
+    } else {
+      // Time is already on 15-minute boundary, just clear seconds/milliseconds
+      strictDate.setSeconds(0);
+      strictDate.setMilliseconds(0);
+    }
+    
+    return strictDate;
+  };
+
   const handleStartChange = (date: Date | null) => {
-    setStartDate(date)
+    const validDate = enforceStrict15Minutes(date);
+    setStartDate(validDate)
     // Clear end date when start date changes to force reselection
     setEndDate(null)
   }
 
   const handleEndChange = (date: Date | null) => {
-    setEndDate(date)
+    const validDate = enforceStrict15Minutes(date);
+    setEndDate(validDate)
   }
+
+  // Filter function to only allow 15-minute intervals in time picker
+  const filterTime = (time: Date): boolean => {
+    const minutes = time.getMinutes();
+    return minutes % 15 === 0; // Only allow :00, :15, :30, :45
+  };
 
   // Get constraints for end date selection
   const getEndDateConstraints = () => {
@@ -1313,11 +1402,13 @@ export default function BookingClient() {
                           <DatePicker
                             selected={startDate}
                             onChange={handleStartChange}
+                            onChangeRaw={(e) => e?.preventDefault()}
                             selectsStart
                             startDate={startDate}
                             endDate={endDate}
                             showTimeSelect
                             timeIntervals={15}
+                            filterTime={filterTime}
                             dateFormat="MMM d, yyyy h:mm aa"
                             placeholderText="Select start time"
                             className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent ${!user ? "bg-gray-50" : ""}`}
@@ -1334,6 +1425,7 @@ export default function BookingClient() {
                           <DatePicker
                             selected={endDate}
                             onChange={handleEndChange}
+                            onChangeRaw={(e) => e?.preventDefault()}
                             selectsEnd
                             startDate={startDate}
                             endDate={endDate}
@@ -1341,6 +1433,7 @@ export default function BookingClient() {
                             maxDate={endMaxDate}
                             showTimeSelect
                             timeIntervals={15}
+                            filterTime={filterTime}
                             dateFormat="MMM d, yyyy h:mm aa"
                             placeholderText="Select end time"
                             className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent ${!user ? "bg-gray-50" : ""}`}
@@ -1353,10 +1446,11 @@ export default function BookingClient() {
                             </p>
                           )} */}
                         </div>
-                     
-                        <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline'>All timezones are based on GMT+8</p>
-   
                       </div>
+                     
+                      <div className="flex flex-col gap-1 mt-2">
+                        <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All timezones are based on GMT+8</p>
+                        </div>
                      
                       {/* Booking Duration Display */}
                       {bookingDuration && (
@@ -1884,8 +1978,8 @@ export default function BookingClient() {
                         </div>
                       )}
                     </div>
-                  ) : selectedLocation && user ? (
-                    // Show form data when not yet confirmed
+                  ) : selectedLocation && user && bookingStep !== 3 ? (
+                    // Show form data when not yet confirmed (hide during step 3 loading)
                     <div className="space-y-3">
                       <div className="flex items-start space-x-3">
                         <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
@@ -1944,6 +2038,13 @@ export default function BookingClient() {
                         </div>
                       )}
                     </div>
+                  ) : bookingStep === 3 && confirmationStatus === 'loading' ? (
+                    // Show loading state during confirmation
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-orange-500" />
+                      <p className="text-sm text-gray-600">Confirming your booking...</p>
+                      <p className="text-xs text-gray-500 mt-1">Please wait</p>
+                    </div>
                   ) : null}
 
                   {confirmedBookingData ? (
@@ -1982,7 +2083,7 @@ export default function BookingClient() {
                       </div>
 
                     </div>
-                  ) : totalHours > 0 && user ? (
+                  ) : totalHours > 0 && user && bookingStep !== 3 ? (
                     <div className="border-t pt-4 space-y-2">
                       {/* Role-based rates */}
                       {peopleBreakdown.coStudents > 0 && (

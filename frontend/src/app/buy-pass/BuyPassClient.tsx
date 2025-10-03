@@ -369,22 +369,7 @@ export default function BuyNowPage() {
                         </Select>
                       </div>
 
-                      {/* Quantity */}
-                      <div>
-                        <Label>Quantity</Label>
-                        <Select value={quantity.toString()} onValueChange={(val) => setQuantity(parseInt(val))}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[1, 2, 3, 4, 5].map(num => (
-                              <SelectItem key={num} value={num.toString()}>
-                                {num} {num === 1 ? 'Package' : 'Packages'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {/* Quantity - Fixed at 1 (hidden from UI) */}
 
                       {/* Customer Info */}
                       <div className="space-y-4">
@@ -594,39 +579,60 @@ export default function BuyNowPage() {
                       <div>
                         <h4 className="font-medium">{selectedPackage.name}</h4>
                         <p className="text-sm text-gray-600">{selectedPackage.description}</p>
-                        <div className="mt-2 flex items-center space-x-2">
-                          <Package className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">{selectedPackage.packageType}</span>
-                        </div>
-                        <div className="mt-1 flex items-center space-x-2">
-                          <Clock className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">{selectedPackage.validityDays} days validity</span>
-                        </div>
-                        <div className="mt-1 flex items-center space-x-2">
-                          <div className="text-xs text-gray-500">
-                            <span className="block">
-                              Package activated on:{" "}
-                              <span className="font-medium">
-                                {new Date().toLocaleDateString()}
-                              </span>
+                        
+                        {/* Package Details Box */}
+                        <div className="mt-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <h5 className="text-sm font-semibold text-orange-900 mb-2">Package Includes:</h5>
+                          
+                          {/* Passes Count - Most Important */}
+                          <div className="flex items-center space-x-2 mb-2">
+                            <CheckCircle className="w-5 h-5 text-orange-600" />
+                            <span className="text-sm font-medium text-orange-900">
+                              {selectedPackage.passCount} {selectedPackage.passCount === 1 ? 'Pass' : 'Passes'}
                             </span>
-                            <span className="block">
-                              Package expires on:{" "}
-                              <span className="font-medium text-red-500">
-                                {new Date(new Date().getTime() + selectedPackage.validityDays * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                              </span>
-                            </span>
+                            <span className="text-xs text-orange-700">(1 pass per booking)</span>
+                          </div>
+                          
+                          {/* Package Type */}
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Package className="w-4 h-4 text-orange-600" />
+                            <span className="text-sm text-orange-900">{selectedPackage.packageType.replace('_', ' ')}</span>
+                          </div>
+                          
+                          {/* Validity Days */}
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-orange-600" />
+                            <span className="text-sm text-orange-900">{selectedPackage.validityDays} days validity</span>
                           </div>
                         </div>
-                         <div className="mt-1 flex items-center space-x-2">
-                          <span className="text-sm text-gray-600">Please note that pass will be activated upon payment</span>
+
+                        {/* Activation & Expiry Info */}
+                        <div className="mt-3 text-xs text-gray-500 space-y-1">
+                          <span className="block">
+                            Package activated on:{" "}
+                            <span className="font-medium">
+                              {new Date().toLocaleDateString()}
+                            </span>
+                          </span>
+                          <span className="block">
+                            Package expires on:{" "}
+                            <span className="font-medium text-red-500">
+                              {new Date(new Date().getTime() + selectedPackage.validityDays * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                            </span>
+                          </span>
+                        </div>
+                        
+                        <div className="mt-2 text-xs text-amber-600 italic">
+                          ⚠️ Please note that pass will be activated upon payment
                         </div>
                       </div>
                       
-                 
+                      {/* Divider */}
+                      <div className="border-t border-gray-200"></div>
 
                       {/* Pricing Breakdown */}
                       <div className="space-y-2">
+                        <h5 className="text-sm font-semibold text-gray-700 mb-2">Package Price</h5>
                         <div className="flex justify-between">
                           <span>Package Price</span>
                           <span>${selectedPackage.price}</span>
@@ -634,10 +640,6 @@ export default function BuyNowPage() {
                         <div className="flex justify-between">
                           <span>Outlet Fee</span>
                           <span>${selectedPackage.outletFee}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Quantity</span>
-                          <span>× {quantity}</span>
                         </div>
                         {selectedPackage.originalPrice && selectedPackage.originalPrice > selectedPackage.price && (
                           <div className="flex justify-between text-green-600">

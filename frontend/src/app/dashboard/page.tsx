@@ -436,97 +436,35 @@ export default function Dashboard() {
        
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Quick Stats Card - Now on LEFT */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <Calendar className="w-5 h-5 mr-2" />
-                      Upcoming Bookings
+                      <BarChart3 className="w-5 h-5 mr-2" />
+                      Quick Stats
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {isLoadingBookings ? (
-                      <div className="text-center py-8">
-                        <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
-                        <p className="text-gray-600">Loading booking...</p>
+                    {/* <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-4 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">0</div>
+                        <div className="text-sm text-blue-600">Total Bookings</div>
                       </div>
-                    ) : upcomingBooking ? (
-                      <div className="space-y-4">
-                        {/* Show the most upcoming booking */}
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-semibold text-sm">{upcomingBooking.location}</h4>
-                              <p className="text-xs text-gray-600">Ref: {upcomingBooking.bookingRef}</p>
-                            </div>
-                            <Badge className={getStatusColor(getBookingStatus(upcomingBooking))}>
-                              {getBookingStatus(upcomingBooking)}
-                            </Badge>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center">
-                              <Calendar className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{formatBookingDate(upcomingBooking.startAt)}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Clock className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{calculateDuration(upcomingBooking.startAt, upcomingBooking.endAt)}h</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Users className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{upcomingBooking.pax} people</span>
-                            </div>
-                            <div className="flex items-center">
-                              <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                              <span className="text-xs">
-                                {upcomingBooking.seatNumbers && upcomingBooking.seatNumbers.length > 0 ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {upcomingBooking.seatNumbers.map((seat, index) => (
-                                      <Badge key={index} variant="outline" className="text-xs px-1 py-0">
-                                        {seat}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  'No seats'
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-2 pt-2 border-t flex justify-between items-center">
-                            <span className="font-semibold text-sm">${upcomingBooking.totalAmount}</span>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => setActiveTab('mybookings')}
-                              className="text-xs"
-                            >
-                              View All Bookings
-                            </Button>
-                          </div>
-                        </div>
+                      <div className="text-center p-4 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">0</div>
+                        <div className="text-sm text-green-600">Hours Used</div>
                       </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
-                        <p className="text-gray-600 mb-4">You don't have any upcoming bookings at the moment.</p>
-                        <Button onClick={() => router.push('/book-now')}>
-                          Book Now
-                        </Button>
-                      </div>
-                    )}
+                    </div> */}
                   </CardContent>
                 </Card>
 
-             
+                {/* Upcoming Bookings Card - Now on RIGHT with Bell Icon */}
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center">
-                        <BarChart3 className="w-5 h-5 mr-2" />
-                        Quick Stats
+                        <Calendar className="w-5 h-5 mr-2" />
+                        Upcoming Bookings
                       </CardTitle>
                       {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' && (() => {
                         // ONLY show notification if there's verification history
@@ -627,16 +565,79 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {/* <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">0</div>
-                        <div className="text-sm text-blue-600">Total Bookings</div>
+                    {isLoadingBookings ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
+                        <p className="text-gray-600">Loading booking...</p>
                       </div>
-                      <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">0</div>
-                        <div className="text-sm text-green-600">Hours Used</div>
+                    ) : upcomingBooking ? (
+                      <div className="space-y-4">
+                        {/* Show the most upcoming booking */}
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-semibold text-sm">{upcomingBooking.location}</h4>
+                              <p className="text-xs text-gray-600">Ref: {upcomingBooking.bookingRef}</p>
+                            </div>
+                            <Badge className={getStatusColor(getBookingStatus(upcomingBooking))}>
+                              {getBookingStatus(upcomingBooking)}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex items-center">
+                              <Calendar className="w-3 h-3 mr-1 text-gray-400" />
+                              <span>{formatBookingDate(upcomingBooking.startAt)}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="w-3 h-3 mr-1 text-gray-400" />
+                              <span>{calculateDuration(upcomingBooking.startAt, upcomingBooking.endAt)}h</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Users className="w-3 h-3 mr-1 text-gray-400" />
+                              <span>{upcomingBooking.pax} people</span>
+                            </div>
+                            <div className="flex items-center">
+                              <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                              <span className="text-xs">
+                                {upcomingBooking.seatNumbers && upcomingBooking.seatNumbers.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {upcomingBooking.seatNumbers.map((seat, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs px-1 py-0">
+                                        {seat}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  'No seats'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                            <span className="font-semibold text-sm">${upcomingBooking.totalAmount}</span>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => setActiveTab('mybookings')}
+                              className="text-xs"
+                            >
+                              View All Bookings
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div> */}
+                    ) : (
+                      <div className="text-center py-8">
+                        <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
+                        <p className="text-gray-600 mb-4">You don't have any upcoming bookings at the moment.</p>
+                        <Button onClick={() => router.push('/book-now')}>
+                          Book Now
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

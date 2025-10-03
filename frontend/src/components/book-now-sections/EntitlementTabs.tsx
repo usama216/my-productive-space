@@ -289,10 +289,12 @@ export function EntitlementTabs({
     }
   }, [bookingAmount, selectedPromoCode]);
 
-  // Validate and apply promo code
-  const handleValidatePromo = useCallback(async () => {
-    if (!localPromo.trim()) {
-      setPromoFeedback({ isValid: false, message: 'Please enter a promo code' });
+  // Validate and apply promo code (accepts optional promo code parameter for one-click apply)
+  const handleValidatePromo = useCallback(async (promoCodeParam?: string) => {
+    const codeToApply = promoCodeParam || localPromo.trim();
+    
+    if (!codeToApply) {
+      setPromoFeedback({ isValid: false, message: 'Please select a promo code' });
       return;
     }
 
@@ -303,7 +305,7 @@ export function EntitlementTabs({
 
     try {
       const foundPromo = availablePromos.find(promo =>
-        promo.code.toLowerCase() === localPromo.toLowerCase()
+        promo.code.toLowerCase() === codeToApply.toLowerCase()
       );
 
       if (!foundPromo) {
@@ -314,6 +316,11 @@ export function EntitlementTabs({
       const localValidation = validatePromoCodeLocally(foundPromo, bookingAmount);
       if (!localValidation.isValid) {
         setPromoFeedback({ isValid: false, message: localValidation.message });
+        toast({
+          title: "Invalid Promo Code",
+          description: localValidation.message,
+          variant: "destructive"
+        });
         return;
       }
 
@@ -342,17 +349,32 @@ export function EntitlementTabs({
           finalAmount: apiResponse.calculation.finalAmount,
           promoCode: apiResponse.promoCode
         });
+
+        toast({
+          title: "Promo Code Applied!",
+          description: `${foundPromo.code} - Save $${apiResponse.calculation.discountAmount.toFixed(2)}`,
+        });
       } else {
         setPromoFeedback({
           isValid: false,
           message: apiResponse.eligibility.reason || 'Failed to apply promo code'
         });
+        toast({
+          title: "Cannot Apply Promo",
+          description: apiResponse.eligibility.reason || 'Failed to apply promo code',
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error applying promo code:', error);
       setPromoFeedback({ isValid: false, message: 'Error applying promo code' });
+      toast({
+        title: "Error",
+        description: "Error applying promo code. Please try again.",
+        variant: "destructive"
+      });
     }
-  }, [localPromo, userId, bookingAmount, availablePromos, onChange]);
+  }, [localPromo, userId, bookingAmount, availablePromos, onChange, toast]);
 
   const handleRemovePromo = useCallback(() => {
     setLocalPromo('');
@@ -695,57 +717,13 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
             <Label className={`text-sm font-medium mb-2 block ${selectedPromoCode ? 'text-gray-500' : ''}`}>
               Discount Code {selectedPromoCode && '(Already Applied)'}
             </Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder={selectedPromoCode ? "Promo code already applied" : "Enter promo code"}
-                value={localPromo}
-                onChange={(e) => setLocalPromo(e.target.value.toUpperCase())}
-                className={`flex-1 ${selectedPromoCode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-                disabled={!!selectedPromoCode}
-              />
-              <Button
-                type="button"
-                onClick={handleValidatePromo}
-                variant="outline"
-                disabled={!localPromo.trim() || isLoadingPromos || !!selectedPromoCode}
-              >
-                {isLoadingPromos ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : selectedPromoCode ? (
-                  'Promo Applied'
-                ) : (
-                  'APPLY PROMO'
-                )}
-              </Button>
-            </div>
-
+            {/* Applied Promo Code Indicator */}
             {selectedPromoCode && (
-              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+              <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
                 <p className="flex items-center gap-1">
-                  <span>ℹ️</span>
-                  <span>Remove the current promo code to apply a different one</span>
+                  <span>✅</span>
+                  <span>Promo code <strong>{selectedPromoCode.code}</strong> is applied. Remove it below to apply a different one.</span>
                 </p>
-              </div>
-            )}
-
-            {promoFeedback && (
-              <div className={`mt-3 p-3 rounded-md ${!promoFeedback.isValid
-                  ? 'bg-red-50 border border-red-200'
-                  : 'bg-green-50 border border-green-200'
-                }`}>
-                <div className="flex items-center gap-2">
-                  {!promoFeedback.isValid ? (
-                    <XCircle className="w-5 h-5 text-red-600" />
-                  ) : (
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  )}
-                  <p className={`text-sm font-medium ${!promoFeedback.isValid
-                      ? 'text-red-800'
-                      : 'text-green-800'
-                    }`}>
-                    {promoFeedback.message}
-                  </p>
-                </div>
               </div>
             )}
 
@@ -841,11 +819,11 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                               </div>
                               <p className="text-sm text-gray-600 mt-1">{promo.description}</p>
                               <div className="flex flex-col gap-1 mt-1">
-                                {promo.minimumAmount && (
+                                {/* {promo.minimumAmount && (
                                   <p className="text-xs text-gray-500">
                                     Min. order: ${promo.minimumAmount}
                                   </p>
-                                )}
+                                )} */}
                                 {promo.minimumHours && (
                                   <div className="flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-blue-500" />
@@ -854,7 +832,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                     </p>
                                   </div>
                                 )}
-                                {bookingDuration && (
+                                {/* {bookingDuration && (
                                   <div className="mt-1">
                                     <p className={`text-xs font-medium ${meetsMinimumHours ? 'text-green-600' : 'text-red-600'
                                       }`}>
@@ -864,8 +842,8 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                       }
                                     </p>
                                   </div>
-                                )}
-                                {bookingDuration && promo.minimumHours && (
+                                )} */}
+                                {/* {bookingDuration && promo.minimumHours && (
                                   <div className="mt-1">
                                     {(() => {
                                       const validation = validateMinimumHours(promo, bookingDuration);
@@ -877,15 +855,39 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                       );
                                     })()}
                                   </div>
-                                )}
+                                )} */}
                               </div>
                             </div>
                           </div>
-                          <div className="text-right text-xs text-gray-500">
-                            <p>Uses: {promo.userUsageCount || 0}/{promo.maxUsagePerUser || 1}</p>
-                            <p className="text-green-600 font-medium">
-                              {promo.remainingUses || 0} uses left
-                            </p>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="text-right text-xs text-gray-500">
+                              <p>Uses: {promo.userUsageCount || 0}/{promo.maxUsagePerUser || 1}</p>
+                              <p className="text-green-600 font-medium">
+                                {promo.remainingUses || 0} uses left
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => {
+                                setLocalPromo(promo.code);
+                                handleValidatePromo(promo.code);
+                              }}
+                              disabled={!!selectedPromoCode || !isEligible}
+                              className={`${selectedPromoCode?.id === promo.id
+                                  ? 'bg-green-600 hover:bg-green-700'
+                                  : 'bg-orange-500 hover:bg-orange-600'
+                                } text-white`}
+                            >
+                              {selectedPromoCode?.id === promo.id ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Applied
+                                </>
+                              ) : (
+                                'Apply'
+                              )}
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -972,11 +974,12 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                           onChange(null);
                         } else {
                           // Auto-apply maximum available credit when checkbox is checked
-                          const maxAmount = Math.min(totalCredit, bookingAmount);
+                          // Round to 2 decimal places
+                          const maxAmount = parseFloat(Math.min(totalCredit, bookingAmount).toFixed(2));
                           setCreditAmount(maxAmount);
                           
                           // Immediately apply the credit and update total amount
-                          const finalAmount = Math.max(0, bookingAmount - maxAmount);
+                          const finalAmount = parseFloat(Math.max(0, bookingAmount - maxAmount).toFixed(2));
                           onChange({
                             type: 'credit',
                             id: 'credit',
@@ -1011,7 +1014,8 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                             onChange={(e) => {
                               const inputAmount = parseFloat(e.target.value) || 0;
                               const maxAmount = Math.min(totalCredit, bookingAmount);
-                              const amount = Math.min(inputAmount, maxAmount);
+                              // Round to 2 decimal places
+                              const amount = parseFloat(Math.min(inputAmount, maxAmount).toFixed(2));
                               
                               // Validate that amount doesn't exceed available credit
                               if (inputAmount > totalCredit) {
@@ -1027,7 +1031,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                               
                               // Immediately apply credit changes and update total amount
                               if (useCredit) {
-                                const finalAmount = Math.max(0, bookingAmount - amount);
+                                const finalAmount = parseFloat(Math.max(0, bookingAmount - amount).toFixed(2));
                                 onChange({
                                   type: 'credit',
                                   id: 'credit',
@@ -1045,12 +1049,13 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const maxAmount = Math.min(totalCredit, bookingAmount);
+                              // Round to 2 decimal places
+                              const maxAmount = parseFloat(Math.min(totalCredit, bookingAmount).toFixed(2));
                               setCreditAmount(maxAmount);
                               
                               // Immediately apply maximum credit and update total amount
                               if (useCredit) {
-                                const finalAmount = Math.max(0, bookingAmount - maxAmount);
+                                const finalAmount = parseFloat(Math.max(0, bookingAmount - maxAmount).toFixed(2));
                                 onChange({
                                   type: 'credit',
                                   id: 'credit',
@@ -1097,7 +1102,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                       )}
 
                       {/* Credit Details */}
-                      <div className="space-y-2">
+                      {/* <div className="space-y-2">
                         <Label className="text-sm font-medium">Credit Details</Label>
                         <div className="space-y-2 max-h-32 overflow-y-auto">
                           {userCredits.map((credit) => (
@@ -1114,7 +1119,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                             </div>
                           ))}
                         </div>
-                      </div>
+                      </div> */}
                     </div>
                   )}
                 </div>

@@ -51,14 +51,47 @@ export default function BookingForm() {
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
 
-  const handleStartChange = (date: Date) => {
-    setStartDate(date)
-    // // if previously picked end was on a different day or before new start, clear it
-    // if (!date || !endDate || !isSameDay(date, endDate) || endDate <= date) {
-    //   setEndDate(null)
-    // }
+  // Helper function to STRICTLY enforce 15-minute intervals
+  const enforceStrict15Minutes = (date: Date | null): Date | null => {
+    if (!date) return null;
+    
+    const strictDate = new Date(date);
+    const minutes = strictDate.getMinutes();
+    const remainder = minutes % 15;
+    
+    // Reject any time that's not on a 15-minute boundary
+    if (remainder !== 0) {
+      // Always round DOWN to the previous 15-minute mark for strict enforcement
+      const validMinutes = minutes - remainder;
+      strictDate.setMinutes(validMinutes);
+      strictDate.setSeconds(0);
+      strictDate.setMilliseconds(0);
+    } else {
+      // Time is already on 15-minute boundary, just clear seconds/milliseconds
+      strictDate.setSeconds(0);
+      strictDate.setMilliseconds(0);
+    }
+    
+    return strictDate;
+  };
+
+  // Filter function to only allow 15-minute intervals in time picker
+  const filterTime = (time: Date): boolean => {
+    const minutes = time.getMinutes();
+    return minutes % 15 === 0; // Only allow :00, :15, :30, :45
+  };
+
+  const handleStartChange = (date: Date | null) => {
+    const validDate = enforceStrict15Minutes(date);
+    setStartDate(validDate)
     setEndDate(null)
   }
+
+  const handleEndChange = (date: Date | null) => {
+    const validDate = enforceStrict15Minutes(date);
+    setEndDate(validDate)
+  }
+
   const getEndDateConstraints = () => {
     if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
 
@@ -321,11 +354,13 @@ export default function BookingForm() {
                 <DatePicker
                   selected={startDate}
                   onChange={handleStartChange}
+                  onChangeRaw={(e) => e?.preventDefault()}
                   selectsStart
                   startDate={startDate}
                   endDate={endDate}
                   showTimeSelect
                   timeIntervals={15}
+                  filterTime={filterTime}
                   dateFormat="MMM d, yyyy h:mm aa"
                   placeholderText="Start"
                   className="w-48 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -341,24 +376,20 @@ export default function BookingForm() {
                 {/* For END date picker */}
                 <DatePicker
                   selected={endDate}
-                  onChange={setEndDate}
+                  onChange={handleEndChange}
+                  onChangeRaw={(e) => e?.preventDefault()}
                   selectsEnd
                   startDate={startDate}
                   endDate={endDate}
                   minDate={endMinDate}
                   maxDate={endMaxDate}
-                  // maxDate={startDate}
-                  // only allow same-day selection:
-                  // filterDate={(d) => startDate ? isSameDay(d, startDate) : true}
                   showTimeSelect
                   timeIntervals={15}
+                  filterTime={filterTime}
                   dateFormat="MMM d, yyyy h:mm aa"
                   placeholderText="End"
                   className="w-48 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
-                  // // enforce time > start
-                  // minTime={startDate || undefined}
-                  // maxTime={startDate ? endOfDay(startDate) : undefined}
-                  disabled={!startDate} // Disable until start date is selected
+                  disabled={!startDate}
                   {...endTimeConstraints}
                 />
               </div>

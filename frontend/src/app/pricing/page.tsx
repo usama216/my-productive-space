@@ -62,6 +62,11 @@ export default function PricingPage() {
     router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=all`)
   }
 
+  const handleBookWithPackage = (packageData: NewPackage) => {
+    // Navigate to booking page with package parameter for auto-selection
+    router.push(`/book-now?package=${encodeURIComponent(packageData.name)}`)
+  }
+
   if (packagesLoading) {
     return (
       <>
@@ -213,12 +218,21 @@ export default function PricingPage() {
                         <li>Valid {pkg.validityDays} days from activation</li>
                         <li>SGD {pkg.price} {pkg.originalPrice && pkg.originalPrice > pkg.price && `(UP ${pkg.originalPrice})`} + SGD {pkg.outletFee} for all outlets</li>
                       </ul>
-                      <button
-                        onClick={() => handleBuyNow(pkg)}
-                        className="mt-4 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500"
-                      >
-                        Buy Now
-                      </button>
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          onClick={() => handleBuyNow(pkg)}
+                          className="flex-1 px-4 py-2 bg-gray-800 text-white rounded transition-colors duration-200 hover:bg-orange-500"
+                        >
+                          Buy Package
+                        </button>
+                        <button
+                          onClick={() => handleBookWithPackage(pkg)}
+                          className="flex-1 px-4 py-2 bg-orange-500 text-white rounded transition-colors duration-200 hover:bg-orange-600"
+                          title="Book now with this package (you must own it first)"
+                        >
+                          Book Now
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
