@@ -9,7 +9,7 @@ interface DatabaseUser {
   name?: string
   firstName?: string
   lastName?: string
-  memberType?: 'STUDENT' | 'MEMBER' | 'TUTOR'
+  memberType?: 'STUDENT' | 'MEMBER' | 'TUTOR' | 'ADMIN'
   contactNumber?: string
   studentVerificationStatus?: 'NA' | 'PENDING' | 'VERIFIED'
   studentVerificationImageUrl?: string

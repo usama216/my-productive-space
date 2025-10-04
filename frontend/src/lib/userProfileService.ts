@@ -8,7 +8,7 @@ export interface UserProfile {
   email: string;
   firstName: string;
   lastName: string;
-  memberType: 'STUDENT' | 'MEMBER' | 'TUTOR';
+  memberType: 'STUDENT' | 'MEMBER' | 'TUTOR' | 'ADMIN';
   contactNumber: string;
   createdAt: string;
   updatedAt: string;
@@ -180,6 +180,8 @@ export function getMemberTypeDisplayName(memberType: string, studentVerification
       return 'Member';
     case 'TUTOR':
       return 'Tutor';
+    case 'ADMIN':
+      return 'Admin';
     default:
       return 'Member';
   }

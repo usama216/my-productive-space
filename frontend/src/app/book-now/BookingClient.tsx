@@ -255,13 +255,17 @@ export default function BookingClient() {
 
   // Determine if student verification is needed using fresh API data
   const isStudentAccount = freshUserProfile?.memberType === 'STUDENT'
+  const isAdminAccount = freshUserProfile?.memberType === 'ADMIN'
   const isBookingForSingleStudent = peopleBreakdown.coStudents === 1
   const isVerifiedStudent = freshUserProfile?.studentVerificationStatus === 'VERIFIED'
   
   // Calculate how many students need verification
+  // If current user is ADMIN, no verification is needed
   // If current user is a verified student, they don't need verification
   // So we only need to verify the additional students
-  const studentsNeedingVerification = isVerifiedStudent 
+  const studentsNeedingVerification = isAdminAccount
+    ? 0  // Admin accounts don't need student verification
+    : isVerifiedStudent 
     ? Math.max(0, peopleBreakdown.coStudents - 1)  // Current user is verified, so verify others
     : peopleBreakdown.coStudents  // Current user is not verified, so verify all
   
@@ -272,6 +276,7 @@ export default function BookingClient() {
     freshUserProfile: freshUserProfile,
     memberType: freshUserProfile?.memberType,
     isStudentAccount: isStudentAccount,
+    isAdminAccount: isAdminAccount,
     isVerifiedStudent: isVerifiedStudent,
     peopleBreakdown: peopleBreakdown,
     coStudents: peopleBreakdown.coStudents,
@@ -284,16 +289,20 @@ export default function BookingClient() {
     localMemberType: databaseUser?.memberType
   })
 
-  // Auto-validate if student account is booking for only themselves
+  // Auto-validate if student account is booking for only themselves or if user is admin
   useEffect(() => {
     console.log('🔄 Student validation useEffect triggered:', {
       isStudentAccount,
+      isAdminAccount,
       isVerifiedStudent,
       coStudents: peopleBreakdown.coStudents,
       studentsNeedingVerification
     })
     
-    if (isVerifiedStudent && peopleBreakdown.coStudents === 1) {
+    if (isAdminAccount) {
+      console.log('✅ Auto-validating admin account - no verification needed')
+      setStudentsValidated(true)
+    } else if (isVerifiedStudent && peopleBreakdown.coStudents === 1) {
       console.log('✅ Auto-validating verified student booking for themselves')
       setStudentsValidated(true)
     } else if (peopleBreakdown.coStudents === 0) {
@@ -306,7 +315,7 @@ export default function BookingClient() {
       console.log('🔄 Students need verification, clearing auto-validation')
       setStudentsValidated(false)
     }
-  }, [isStudentAccount, isVerifiedStudent, peopleBreakdown.coStudents, studentsNeedingVerification])
+  }, [isAdminAccount, isStudentAccount, isVerifiedStudent, peopleBreakdown.coStudents, studentsNeedingVerification])
 
   // Auto-fill customer information when fresh user profile is loaded
   useEffect(() => {

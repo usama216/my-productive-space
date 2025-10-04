@@ -245,6 +245,16 @@ export function StudentValidation({ numberOfStudents, onValidationChange, curren
       return
     }
 
+    // Check if ALL student slots are filled
+    if (emailsToValidate.length < numberOfStudents) {
+      toast({
+        title: "Incomplete Student Information",
+        description: `Please enter email addresses for all ${numberOfStudents} students. You have only entered ${emailsToValidate.length}.`,
+        variant: "destructive"
+      })
+      return
+    }
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const invalidEmails = emailsToValidate.filter(email => !emailRegex.test(email))
@@ -351,43 +361,56 @@ export function StudentValidation({ numberOfStudents, onValidationChange, curren
   if (numberOfStudents === 0) return null
 
      return (
-     <Card className="bg-orange-50 border-orange-200">
-       <CardHeader>
-         <div className="flex items-center justify-between">
-           <div>
-             <CardTitle className="flex items-center text-orange-800">
-               <GraduationCap className="h-5 w-5 mr-2" /> 
-               Validate {numberOfStudents} Student{numberOfStudents > 1 ? 's' : ''}
-             </CardTitle>
-             <p className="text-sm text-orange-600 font-normal">
-               Enter student email addresses to verify their student status
-             </p>
-           </div>
-           {numberOfStudents > 1 && (
-             <Button
-               onClick={handleValidateAll}
-               disabled={isValidatingAll || validations.every(v => !v.studentId.trim())}
-               className="bg-orange-600 hover:bg-orange-700 text-white"
-               size="sm"
-             >
-               {isValidatingAll ? (
-                 <>
-                   <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                   Validating All...
-                 </>
-               ) : (
-                 <>
-                   <Users className="h-4 w-4 mr-2" />
-                   Validate All
-                 </>
-               )}
-             </Button>
-           )}
-         </div>
-       </CardHeader>
+    <Card className="bg-orange-50 border-orange-200">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center text-orange-800">
+              <GraduationCap className="h-5 w-5 mr-2" /> 
+              Validate {numberOfStudents} Student{numberOfStudents > 1 ? 's' : ''}
+            </CardTitle>
+            <p className="text-sm text-orange-600 font-normal">
+              Enter email addresses for all {numberOfStudents} students to verify their student status
+            </p>
+            {(() => {
+              const filledCount = validations.filter(v => v.studentId.trim().length > 0).length
+              const validCount = validations.filter(v => v.isValid).length
+              return (
+                <p className="text-xs text-orange-700 font-medium mt-1">
+                  Progress: {filledCount}/{numberOfStudents} emails entered • {validCount}/{numberOfStudents} validated
+                </p>
+              )
+            })()}
+          </div>
+          {numberOfStudents > 1 && (
+            <Button
+              type="button"
+              onClick={handleValidateAll}
+              disabled={isValidatingAll || validations.every(v => !v.studentId.trim())}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              size="sm"
+            >
+              {isValidatingAll ? (
+                <>
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                  Validating All...
+                </>
+              ) : (
+                <>
+                  <Users className="h-4 w-4 mr-2" />
+                  Validate All
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
       <CardContent className="space-y-4">
         {validations.map((v, i) => (
           <div key={v.id} className="space-y-2">
+            <label className="text-sm font-medium text-orange-800">
+              Student {i + 1} <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center space-x-2">
               <Input
                 placeholder="Enter student email address"
@@ -424,6 +447,7 @@ export function StudentValidation({ numberOfStudents, onValidationChange, curren
               
                              {!v.isValid ? (
                  <Button 
+                   type="button"
                    onClick={() => handleValidate(i)} 
                    disabled={!v.studentId.trim() || v.isValidating}
                    size="sm"
@@ -437,6 +461,7 @@ export function StudentValidation({ numberOfStudents, onValidationChange, curren
                  </Button>
               ) : (
                 <Button 
+                  type="button"
                   onClick={() => clearValidation(i)} 
                   variant="outline"
                   size="sm"
