@@ -8,7 +8,6 @@ import { Package, AlertCircle, AlertTriangle, Loader2, Clock, CheckCircle } from
 import { useAuth } from '@/hooks/useAuth'
 import { usePackages } from '@/hooks/useNewPackages'
 import { NewPackage } from '@/lib/services/packageService'
-import { getUserProfile, UserProfile } from '@/lib/userProfileService'
 
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -28,7 +27,7 @@ export default function BuyNowPage() {
   const router = useRouter()
 
   // ALL HOOKS MUST BE CALLED FIRST - NO EARLY RETURNS
-  const { user, userId, loading: isLoadingAuth } = useAuth()
+  const { user, loading: isLoadingAuth } = useAuth()
 
   // Get the target role from URL params first
   const typeParam = searchParams.get('type')
@@ -65,31 +64,7 @@ export default function BuyNowPage() {
   const [orderId, setOrderId] = useState<string>('')
   const [userPackageId, setUserPackageId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
-  
-  // Fresh user profile state
-  const [freshUserProfile, setFreshUserProfile] = useState<UserProfile | null>(null)
-  const [isLoadingUserProfile, setIsLoadingUserProfile] = useState(false)
 
-  // Fetch fresh user profile data
-  const loadFreshUserProfile = async () => {
-    if (!userId) return
-    
-    setIsLoadingUserProfile(true)
-    try {
-      console.log('🔄 Fetching fresh user profile for userId:', userId)
-      const profile = await getUserProfile(userId)
-      if (profile) {
-        console.log('✅ Fresh user profile loaded:', profile)
-        setFreshUserProfile(profile)
-      } else {
-        console.log('❌ Failed to load fresh user profile')
-      }
-    } catch (error) {
-      console.error('❌ Error loading fresh user profile:', error)
-    } finally {
-      setIsLoadingUserProfile(false)
-    }
-  }
 
   useEffect(() => {
     if (!isLoadingAuth && !user) {
@@ -97,55 +72,25 @@ export default function BuyNowPage() {
     }
   }, [user, isLoadingAuth, router])
 
-  // Load fresh user profile when userId is available
   useEffect(() => {
-    if (userId) {
-      loadFreshUserProfile()
-    }
-  }, [userId])
-
-  // Fallback: Try to load from localStorage if available
-  useEffect(() => {
-    try {
-      const userString = localStorage.getItem("database_user")
-      if (userString) {
-        const userData = JSON.parse(userString)
-        const fullName = `${userData?.firstName ?? ""} ${userData?.lastName ?? ""}`.trim()
-        if (fullName && !customerName) setCustomerName(fullName)
-        if (userData.email && !customerEmail) setCustomerEmail(userData.email)
-        if (userData.phone && !customerPhone) setCustomerPhone(userData.phone)
-        console.log('📦 Loaded user data from localStorage as fallback')
-      }
-    } catch (error) {
-      console.error("Error parsing database_user from localStorage:", error)
-    }
-  }, [])
-
-  // Auto-fill customer information when fresh user profile is loaded
-  useEffect(() => {
-    if (freshUserProfile && !isLoadingUserProfile) {
-      console.log('🔄 Auto-filling customer information with fresh user profile:', freshUserProfile)
-      
-      // Auto-fill customer name
-      if (freshUserProfile.firstName && freshUserProfile.lastName) {
-        const fullName = `${freshUserProfile.firstName} ${freshUserProfile.lastName}`
-        setCustomerName(fullName)
-        console.log('✅ Auto-filled customer name:', fullName)
-      }
-      
-      // Auto-fill customer email
-      if (freshUserProfile.email) {
-        setCustomerEmail(freshUserProfile.email)
-        console.log('✅ Auto-filled customer email:', freshUserProfile.email)
-      }
-      
-      // Auto-fill customer phone
-      if (freshUserProfile.contactNumber) {
-        setCustomerPhone(freshUserProfile.contactNumber)
-        console.log('✅ Auto-filled customer phone:', freshUserProfile.contactNumber)
+    if (user) {
+      const metadata = user.user_metadata as any
+      if (metadata) {
+        // Only set name if it's currently empty
+        if (!customerName) {
+          setCustomerName(`${metadata.firstName || ''} ${metadata.lastName || ''}`.trim())
+        }
+        // Only set email if it's currently empty
+        if (!customerEmail) {
+          setCustomerEmail(user.email || '')
+        }
+        // Only set phone if it's currently empty
+        if (!customerPhone) {
+          setCustomerPhone(metadata.contactNumber || '')
+        }
       }
     }
-  }, [freshUserProfile, isLoadingUserProfile])
+  }, [user, customerName, customerEmail, customerPhone])
 
   useEffect(() => {
     const packageParam = searchParams.get('package')
@@ -156,25 +101,8 @@ export default function BuyNowPage() {
     const referenceParam = searchParams.get('reference')
     const statusParam = searchParams.get('status')
 
-    console.log('🔍 Auto-selection effect running:', {
-      packageParam,
-      typeParam,
-      packagesCount: packages.length,
-      targetRole,
-      packageType,
-      currentSelectedPackage: selectedPackage?.name
-    })
-
-    // Set packageType first if available
-    if (typeParam && targetRole) {
-      console.log('🔍 Setting packageType to:', targetRole)
-      setPackageType(targetRole)
-    }
-
     if (packageParam && packages.length > 0) {
       const decodedPackageName = decodeURIComponent(packageParam)
-      console.log('🔍 Searching for package:', decodedPackageName)
-      console.log('🔍 Available packages:', packages.map(p => ({ name: p.name, role: p.targetRole })))
 
       // Try exact match first
       let foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
@@ -195,21 +123,19 @@ export default function BuyNowPage() {
       }
 
       if (foundPackage) {
-        console.log('🎯 Auto-selecting package from URL:', foundPackage.name, 'ID:', foundPackage.id)
-        // Only update if different to avoid unnecessary re-renders
-        if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
-          setSelectedPackage(foundPackage)
-          setError(null) // Clear any previous errors
-        }
+        console.log('🎯 Auto-selecting package from URL:', foundPackage.name)
+        setSelectedPackage(foundPackage)
+        setError(null) // Clear any previous errors
       } else {
         console.error('❌ Package not found:', decodedPackageName)
-        console.error('❌ Available package names:', packages.map(p => p.name))
         setError(`Package "${decodedPackageName}" not found`)
       }
-    } else if (packageParam && packages.length === 0) {
-      console.log('⏳ Waiting for packages to load...')
     }
-  }, [searchParams, packages, targetRole, selectedPackage])
+
+    if (typeParam && targetRole) {
+      setPackageType(targetRole)
+    }
+  }, [searchParams, packages, targetRole])
 
   // Handle step 3 - payment confirmation
   useEffect(() => {
@@ -413,7 +339,6 @@ export default function BuyNowPage() {
                       <div>
                         <Label>Select Package</Label>
                         <Select
-                          key={selectedPackage?.id || 'no-selection'}
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
                             console.log('🎯 Select onValueChange:', value)
@@ -423,15 +348,12 @@ export default function BuyNowPage() {
                           }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose your package">
-                              {selectedPackage ? selectedPackage.name : 'Choose your package'}
-                            </SelectValue>
+                            <SelectValue placeholder="Choose your package" />
                           </SelectTrigger>
                           <SelectContent>
                             {(() => {
                               const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
                             
-                              console.log('🔍 Filtered packages for dropdown:', filteredPackages.map(p => p.name), 'packageType:', packageType)
 
                               if (filteredPackages.length === 0) {
                                 return <div className="p-2 text-sm text-gray-500">No packages available</div>
