@@ -17,6 +17,7 @@ import {
   MapPin, 
   Users, 
   Calendar,
+  AlertCircle,
   AlertTriangle,
   Loader2,
   CheckCircle,
@@ -30,6 +31,13 @@ import {
   RescheduleRequest 
 } from '@/lib/rescheduleService'
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
+import { 
+  toSingaporeTime,
+  formatSingaporeDate,
+  formatSingaporeDateOnly,
+  formatSingaporeTimeOnly,
+  fromDatePickerToUTC
+} from '@/lib/timezoneUtils'
 
 export default function ReschedulePage() {
   const params = useParams()
@@ -51,6 +59,26 @@ export default function ReschedulePage() {
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
+  
+  // Original values to compare for changes
+  const [originalStartDate, setOriginalStartDate] = useState<Date | null>(null)
+  const [originalEndDate, setOriginalEndDate] = useState<Date | null>(null)
+  const [originalSeats, setOriginalSeats] = useState<string[]>([])
+
+  // Check if anything has changed
+  const hasChanges = (): boolean => {
+    // Check if dates have changed
+    const startChanged = originalStartDate && startDate && 
+      originalStartDate.getTime() !== startDate.getTime()
+    
+    const endChanged = originalEndDate && endDate && 
+      originalEndDate.getTime() !== endDate.getTime()
+    
+    // Check if seats have changed
+    const seatsChanged = JSON.stringify(originalSeats.sort()) !== JSON.stringify(selectedSeats.sort())
+    
+    return !!(startChanged || endChanged || seatsChanged)
+  }
 
   // Seat layout configuration (same as book-now page)
   const DEMO_LAYOUT: SeatMeta[] = [
@@ -139,12 +167,18 @@ export default function ReschedulePage() {
           setBooking(bookingData)
           
           // Pre-fill form with current booking data
-          const startDate = new Date(bookingData.startAt)
-          const endDate = new Date(bookingData.endAt)
+          // Convert UTC time from API to Singapore time
+          const startDate = toSingaporeTime(bookingData.startAt)
+          const endDate = toSingaporeTime(bookingData.endAt)
           
           setStartDate(startDate)
           setEndDate(endDate)
           setSelectedSeats(bookingData.seatNumbers || [])
+          
+          // Store original values for comparison
+          setOriginalStartDate(startDate)
+          setOriginalEndDate(endDate)
+          setOriginalSeats(bookingData.seatNumbers || [])
           
           // Check if reschedule is allowed
           if (bookingData.rescheduleCount >= 1) {
@@ -377,8 +411,8 @@ export default function ReschedulePage() {
                 <div className="flex items-center text-sm">
                   <Clock className="h-4 w-4 mr-2 text-gray-500" />
                   <div>
-                    <div>{new Date(booking.startAt).toLocaleString()}</div>
-                    <div className="text-gray-500">to {new Date(booking.endAt).toLocaleString()}</div>
+                    <div>{formatSingaporeDate(toSingaporeTime(booking.startAt))}</div>
+                    <div className="text-gray-500">to {formatSingaporeDate(toSingaporeTime(booking.endAt))}</div>
                   </div>
                 </div>
                 
@@ -450,6 +484,11 @@ export default function ReschedulePage() {
                   </div>
                 </div>
 
+                {/* Timezone Note */}
+                <div className="flex flex-col gap-1">
+                  <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All times are displayed in Singapore timezone (GMT+8)</p>
+                </div>
+
                 {/* Seat Availability Status */}
                 {checkingSeats && (
                   <div className="flex items-center text-sm text-orange-600">
@@ -513,8 +552,18 @@ export default function ReschedulePage() {
                   </div>
                 )}
 
+                {/* No changes alert */}
+                {!hasChanges() && startDate && endDate && (
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      Please change the time or seats to reschedule your booking.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {/* Submit Button */}
-                <div className="flex justify-end space-x-4">
+                <div className="flex justify-end space-x-4 pt-4">
                   <Button 
                     variant="outline" 
                     onClick={() => router.push('/dashboard')}
@@ -525,7 +574,12 @@ export default function ReschedulePage() {
                   
                   <Button 
                     onClick={handleSubmit}
-                    disabled={submitting || checkingSeats || (requiresSeatSelection && selectedSeats.length !== booking.pax)}
+                    disabled={
+                      submitting || 
+                      checkingSeats || 
+                      (requiresSeatSelection && selectedSeats.length !== booking.pax) ||
+                      !hasChanges() // Disable if no changes
+                    }
                     className="bg-orange-600 hover:bg-orange-700"
                   >
                     {submitting ? (

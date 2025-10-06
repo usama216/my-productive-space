@@ -28,6 +28,12 @@ import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/compo
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { useAuth } from '@/hooks/useAuth'
 import { getAllPricingForLocation } from '@/lib/pricingService'
+import { 
+  toSingaporeTime,
+  formatSingaporeDate,
+  formatSingaporeDateOnly,
+  formatSingaporeTimeOnly 
+} from '@/lib/timezoneUtils'
 
 export default function ExtendBookingPage() {
   const params = useParams()
@@ -166,6 +172,29 @@ export default function ExtendBookingPage() {
     { id: 'monitor_right3', src: '/seat_booking_img/monitor_R.png', x: 380, y: 520, width: 16, height: 24 },
   ]
 
+  // Filter function to only allow 15-minute intervals and times after original end time
+  const filterTime = (time: Date): boolean => {
+    const minutes = time.getMinutes()
+    // Only allow :00, :15, :30, :45
+    if (minutes % 15 !== 0) return false
+    
+    // If original end date exists, only allow times after it
+    if (originalEndDate && newEndDate) {
+      // Check if the selected date is the same as original end date
+      const isSameDay = 
+        time.getFullYear() === originalEndDate.getFullYear() &&
+        time.getMonth() === originalEndDate.getMonth() &&
+        time.getDate() === originalEndDate.getDate()
+      
+      if (isSameDay) {
+        // Only allow times after the original end time
+        return time.getTime() > originalEndDate.getTime()
+      }
+    }
+    
+    return true
+  }
+
   // Load booking details and pricing
   useEffect(() => {
     const loadData = async () => {
@@ -193,7 +222,8 @@ export default function ExtendBookingPage() {
           }
           
           // Set original end date and pre-fill new end date
-          const originalEnd = new Date(bookingData.endAt)
+          // Convert UTC time from API to Singapore time
+          const originalEnd = toSingaporeTime(bookingData.endAt)
           setOriginalEndDate(originalEnd)
           setNewEndDate(originalEnd)
           
@@ -300,8 +330,8 @@ export default function ExtendBookingPage() {
               }
               
               // Calculate actual extension hours from booking data
-              const originalEndTime = new Date(booking.endAt)
-              const newEndTime = new Date(result.booking.endAt)
+              const originalEndTime = toSingaporeTime(booking.endAt)
+              const newEndTime = toSingaporeTime(result.booking.endAt)
               const actualExtensionHours = (newEndTime.getTime() - originalEndTime.getTime()) / (1000 * 60 * 60)
               
               console.log('Extension calculation:', {
@@ -589,8 +619,8 @@ export default function ExtendBookingPage() {
                   <div className="flex items-center text-sm">
                     <Clock className="h-4 w-4 mr-2 text-gray-500" />
                     <div>
-                      <div>{new Date(booking.startAt).toLocaleString()}</div>
-                      <div className="text-gray-500">to {new Date(booking.endAt).toLocaleString()}</div>
+                      <div>{formatSingaporeDate(toSingaporeTime(booking.startAt))}</div>
+                      <div className="text-gray-500">to {formatSingaporeDate(toSingaporeTime(booking.endAt))}</div>
                     </div>
                   </div>
                   
@@ -629,7 +659,7 @@ export default function ExtendBookingPage() {
                     <div>
                       <Label>Current End Time (Fixed)</Label>
                       <Input
-                        value={originalEndDate?.toLocaleString() || ''}
+                        value={originalEndDate ? formatSingaporeDate(originalEndDate) : ''}
                         disabled
                         className="bg-gray-50"
                       />
@@ -642,13 +672,24 @@ export default function ExtendBookingPage() {
                         onChange={setNewEndDate}
                         showTimeSelect
                         timeIntervals={15}
+                        filterTime={filterTime}
                         dateFormat="MMM d, yyyy h:mm aa"
                         placeholderText="Select new end time"
                         className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         minDate={originalEndDate || new Date()}
                         maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)}
+                        minTime={originalEndDate || new Date()}
+                        maxTime={new Date(new Date().setHours(23, 45, 0, 0))}
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        ⏰ You can only select times after the current end time
+                      </p>
                     </div>
+                  </div>
+
+                  {/* Timezone Note */}
+                  <div className="flex flex-col gap-1">
+                    <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All times are displayed in Singapore timezone (GMT+8)</p>
                   </div>
 
                   {/* Extension Summary */}
@@ -809,19 +850,19 @@ export default function ExtendBookingPage() {
                   <div className="space-y-1 text-sm text-green-700">
                     <div>Your booking has been extended by {(() => {
                       if (booking && booking.endAt && originalEndTime) {
-                        const originalEnd = new Date(originalEndTime)
-                        const newEndTime = new Date(booking.endAt)
+                        const originalEnd = toSingaporeTime(originalEndTime)
+                        const newEndTime = toSingaporeTime(booking.endAt)
                         const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
                         return actualHours.toFixed(1)
                       } else if (booking && booking.endAt && originalEndDate) {
-                        const originalEnd = new Date(originalEndDate)
-                        const newEndTime = new Date(booking.endAt)
+                        const originalEnd = originalEndDate // Already in Singapore time
+                        const newEndTime = toSingaporeTime(booking.endAt)
                         const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
                         return actualHours.toFixed(1)
                       }
                       return extendedHours.toFixed(1)
                     })()} hours</div>
-                    <div>New end time: {booking?.endAt ? new Date(booking.endAt).toLocaleString() : newEndDate?.toLocaleString()}</div>
+                    <div>New end time: {booking?.endAt ? formatSingaporeDate(toSingaporeTime(booking.endAt)) : (newEndDate ? formatSingaporeDate(newEndDate) : '')}</div>
                     <div>Extension cost: ${(() => {
                       if (booking && booking.totalAmount && originalBooking) {
                         return (booking.totalAmount - originalBooking.totalAmount).toFixed(2)
