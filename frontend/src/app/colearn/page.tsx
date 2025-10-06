@@ -116,22 +116,7 @@ export default function CoTutorPage() {
                                 </section>
 
         {/* Schedule */}
-        <section className="space-y-4">
-          <h3 className="text-2xl font-semibold">Coteaching Schedule</h3>
-          <div className="overflow-x-auto">
-            <Image
-              src="/mock_img/schedule123.png"
-              alt="Schedule"
-              width={800}
-              height={400}
-              className="rounded-lg"
-            />
-          </div>
-          <p className="text-sm text-gray-500">
-            *Full terms & conditions apply. Maximum 8 pax in meeting rooms and 5 pax in collaborative spaces.
-            All teaching activities deemed commercial must be booked under the tutor tier.
-          </p>
-        </section>
+  
 
         {/* Tabs */}
                        <Tab.Group>
