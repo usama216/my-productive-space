@@ -271,8 +271,7 @@ export function AuthForm({ type }: Props) {
         throw authError
       }
 
-      console.log('Auth user created successfully:', authData.user?.id)
-
+    
       // Step 2: Insert profile data into public.User table
       if (authData.user) {
         try {

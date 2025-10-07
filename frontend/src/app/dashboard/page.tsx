@@ -110,9 +110,6 @@ export default function Dashboard() {
     studentRejectionReason: null
   }
 
-  // Debug: Log user data
-  console.log('Auth User:', authUser)
-  console.log('Database User:', databaseUser)
 
   // Load user profile data
   const loadUserProfile = async () => {
@@ -470,11 +467,7 @@ export default function Dashboard() {
                         // ONLY show notification if there's verification history
                         if (verificationHistory.length === 0) return null;
                         
-                        // Debug logging
-                        console.log('🔔 Notification Debug:', {
-                          historyLength: verificationHistory.length,
-                          verificationHistory
-                        });
+                     
                         
                         const formatDate = (dateString: string) => {
                           const date = new Date(dateString);

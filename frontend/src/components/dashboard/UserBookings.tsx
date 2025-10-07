@@ -158,31 +158,62 @@ export function UserBookings() {
     loadUserStats()
   }, [])
 
-  // Filter bookings by status and sort them
+  // Filter bookings by status (using frontend local timezone)
+  const now = new Date()
+
   const upcomingBookings = bookings
-    .filter(booking =>
-      (booking.status === 'upcoming' || (new Date(booking.startAt) > new Date() && !booking.isCompleted && !booking.isOngoing)) &&
-      booking.status !== 'refunded' && booking.refundstatus !== 'APPROVED' // Exclude refunded bookings
-    )
+    .filter(booking => {
+      if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
+      const startAt = new Date(booking.startAt)
+      const today = startAt.toDateString() === now.toDateString()
+      // Upcoming: future date (not today)
+      return startAt > now && !today
+    })
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) // Earliest first
 
   const ongoingBookings = bookings
-    .filter(booking =>
-      (booking.status === 'ongoing' || booking.isOngoing || (() => {
-        const now = new Date()
-        const start = new Date(booking.startAt)
-        const end = new Date(booking.endAt)
-        return now >= start && now <= end && !booking.isCompleted
-      })()) &&
-      booking.status !== 'refunded' && booking.refundstatus !== 'APPROVED' // Exclude refunded bookings
-    )
-    .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime()) // Most recent first
+    .filter(booking => {
+      if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
+      const startAt = new Date(booking.startAt)
+      const endAt = new Date(booking.endAt)
+      
+      // Skip if already past (ended)
+      if (endAt < now) return false
+      
+      const isToday = startAt.toDateString() === now.toDateString()
+      const isOngoing = startAt <= now && endAt > now
+      // Show: today's date (not ended) OR currently ongoing
+      return isToday || isOngoing
+    })
+    .sort((a, b) => {
+      const aStartAt = new Date(a.startAt)
+      const aEndAt = new Date(a.endAt)
+      const bStartAt = new Date(b.startAt)
+      const bEndAt = new Date(b.endAt)
+      
+      const aIsOngoing = aStartAt <= now && aEndAt > now
+      const bIsOngoing = bStartAt <= now && bEndAt > now
+      
+      // Priority 1: Actually ongoing first
+      if (aIsOngoing && !bIsOngoing) return -1
+      if (!aIsOngoing && bIsOngoing) return 1
+      
+      // Priority 2: If both ongoing, longest remaining first
+      if (aIsOngoing && bIsOngoing) {
+        return bEndAt.getTime() - aEndAt.getTime()
+      }
+      
+      // Priority 3: Today's bookings, earliest first
+      return aStartAt.getTime() - bStartAt.getTime()
+    })
 
   const pastBookings = bookings
-    .filter(booking =>
-      (booking.status === 'completed' || booking.isCompleted || (new Date(booking.endAt) < new Date() && !booking.isOngoing)) &&
-      booking.status !== 'refunded' && booking.refundstatus !== 'APPROVED' // Exclude refunded bookings
-    )
+    .filter(booking => {
+      if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
+      const endAt = new Date(booking.endAt)
+      // Past: end time passed
+      return endAt < now
+    })
     .sort((a, b) => new Date(b.endAt).getTime() - new Date(a.endAt).getTime()) // Most recent first
 
   // Update stats when bookings change
@@ -222,22 +253,9 @@ export function UserBookings() {
     const bookingEnd = new Date(booking.endAt.includes('Z') ? booking.endAt : booking.endAt + 'Z')
     const hoursDifference = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60)
     
-    console.log('🔍 canExtendBooking check:', {
-      bookingRef: booking.bookingRef,
-      now: now.toISOString(),
-      startAt: booking.startAt,
-      endAt: booking.endAt,
-      bookingStartParsed: bookingStart.toISOString(),
-      bookingEndParsed: bookingEnd.toISOString(),
-      hoursDifference,
-      confirmedPayment: booking.confirmedPayment,
-      refundstatus: booking.refundstatus
-    })
-    
     // Check if booking is past (ended)
     const isPast = now.getTime() > bookingEnd.getTime()
     if (isPast) {
-      console.log('❌ Booking is past')
       return false
     }
     
@@ -248,14 +266,6 @@ export function UserBookings() {
     // 1. Less than 5 hours before start (hoursDifference < 5 and positive)
     // 2. Currently ongoing
     const canExtend = (hoursDifference < 5 && hoursDifference >= 0) || isOngoing
-    
-    console.log('📊 Extend decision:', {
-      isOngoing,
-      canExtend,
-      confirmedPayment: booking.confirmedPayment,
-      refundstatus: booking.refundstatus,
-      finalResult: canExtend && booking.confirmedPayment && booking.refundstatus === 'NONE'
-    })
     
     return canExtend && booking.confirmedPayment && booking.refundstatus === 'NONE'
   }
@@ -550,19 +560,17 @@ export function UserBookings() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">
-                        {booking.seatNumbers && booking.seatNumbers.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {booking.seatNumbers.map((seat, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {seat}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">---</span>
-                        )}
-                      </div>
+                      {booking.seatNumbers && booking.seatNumbers.length > 0 ? (
+                        <div className="flex flex-row flex-wrap gap-1 items-center w-[80px]">
+                          {booking.seatNumbers.map((seat, index) => (
+                            <Badge key={index} variant="outline" className="text-xs whitespace-nowrap">
+                              {seat}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">---</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -706,10 +714,7 @@ export function UserBookings() {
 
                         {activeTab === 'ongoing' && (
                           <>
-                            <div className="text-sm text-green-600 font-medium mb-2">
-                              <Clock className="h-4 w-4 inline mr-1" />
-                              In Progress
-                            </div>
+                        
                             
                             {booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && canEditBooking(booking) && (
                               <Button
