@@ -664,7 +664,7 @@ export function validateMinimumHours(promo: PromoCode, bookingDuration: BookingD
   } else {
     return { 
       isValid: false, 
-      message: `❌ Requires minimum ${minimumHours} hours. Your booking is ${durationHours.toFixed(1)} hours.` 
+      message: `❌ Requires minimum ${minimumHours} hours. Your booking is ${durationHours.toFixed(2)} hours.` 
     };
   }
 }
@@ -676,6 +676,6 @@ export function formatDurationDisplay(hours: number): string {
   } else if (hours === Math.floor(hours)) {
     return `${hours} hours`;
   } else {
-    return `${hours.toFixed(1)} hours`;
+    return `${hours.toFixed(2)} hours`;
   }
 }

@@ -1467,7 +1467,7 @@ export default function BookingClient() {
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-blue-600" />
                             <span className="text-sm font-medium text-blue-800">
-                              Booking Duration: {bookingDuration.durationHours.toFixed(1)} hours
+                              Booking Duration: {bookingDuration.durationHours.toFixed(2)} hours
                             </span>
                           </div>
                           <p className="text-xs text-blue-600 mt-1">

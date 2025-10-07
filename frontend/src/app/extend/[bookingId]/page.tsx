@@ -353,7 +353,7 @@ export default function ExtendBookingPage() {
               
               toast({
                 title: "Extension Confirmed",
-                description: `Your booking has been extended by ${actualExtensionHours.toFixed(1)} hours`,
+                description: `Your booking has been extended by ${actualExtensionHours.toFixed(2)} hours`,
               })
             } else {
               throw new Error(result.message || 'Failed to confirm extension')
@@ -697,7 +697,7 @@ export default function ExtendBookingPage() {
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <h3 className="font-medium text-blue-800 mb-2">Extension Summary</h3>
                       <div className="space-y-1 text-sm text-blue-700">
-                        <div>Extended by: {extendedHours.toFixed(1)} hours</div>
+                        <div>Extended by: {extendedHours.toFixed(2)} hours</div>
                         <div>Cost per hour: ${booking.memberType === 'STUDENT' ? '4.00' : booking.memberType === 'TUTOR' ? '6.00' : '5.00'}</div>
                         <div className="font-medium">Total extension cost: ${extensionCost.toFixed(2)}</div>
                       </div>
@@ -853,14 +853,14 @@ export default function ExtendBookingPage() {
                         const originalEnd = toSingaporeTime(originalEndTime)
                         const newEndTime = toSingaporeTime(booking.endAt)
                         const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
-                        return actualHours.toFixed(1)
+                        return actualHours.toFixed(2)
                       } else if (booking && booking.endAt && originalEndDate) {
                         const originalEnd = originalEndDate // Already in Singapore time
                         const newEndTime = toSingaporeTime(booking.endAt)
                         const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
-                        return actualHours.toFixed(1)
+                        return actualHours.toFixed(2)
                       }
-                      return extendedHours.toFixed(1)
+                      return extendedHours.toFixed(2)
                     })()} hours</div>
                     <div>New end time: {booking?.endAt ? formatSingaporeDate(toSingaporeTime(booking.endAt)) : (newEndDate ? formatSingaporeDate(newEndDate) : '')}</div>
                     <div>Extension cost: ${(() => {
