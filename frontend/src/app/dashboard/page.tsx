@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [originalMemberType, setOriginalMemberType] = useState<'STUDENT' | 'MEMBER' | 'TUTOR'>('MEMBER')
   const [upcomingBooking, setUpcomingBooking] = useState<ApiBooking | null>(null)
   const [isLoadingBookings, setIsLoadingBookings] = useState(false)
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
 
   // Sample data for testing (fallback)
   const sampleUserData = {
@@ -159,6 +160,22 @@ export default function Dashboard() {
       if (data.success) {
         setVerificationHistory(data.history || [])
         console.log('📋 Verification history loaded:', data.history)
+        
+        // Check if there are any unread notifications
+        // Show orange dot if there are status changes (VERIFIED or REJECTED)
+        const hasStatusChanges = (data.history || []).some((h: any) => h.newStatus === 'REJECTED' || h.newStatus === 'VERIFIED')
+        
+        // Check localStorage to see if user has viewed notifications
+        const lastViewedTimestamp = localStorage.getItem('notificationLastViewed')
+        if (!lastViewedTimestamp && hasStatusChanges) {
+          setHasUnreadNotifications(true)
+        } else if (lastViewedTimestamp && hasStatusChanges) {
+          // Check if there are new notifications after last viewed time
+          const hasNewNotifications = (data.history || []).some((h: any) => 
+            new Date(h.changedAt).getTime() > parseInt(lastViewedTimestamp)
+          )
+          setHasUnreadNotifications(hasNewNotifications)
+        }
       }
     } catch (error) {
       console.error('Error loading verification history:', error)
@@ -519,11 +536,19 @@ export default function Dashboard() {
                         if (!hasStatusChanges) return null;
                         
                         return (
-                          <Popover>
+                          <Popover onOpenChange={(open) => {
+                            if (open) {
+                              // Mark notifications as read when popover opens
+                              localStorage.setItem('notificationLastViewed', Date.now().toString())
+                              setHasUnreadNotifications(false)
+                            }
+                          }}>
                             <PopoverTrigger asChild>
                               <Button variant="outline" size="sm" className="relative">
                                 <Bell className="h-4 w-4" />
-                                <span className="absolute -top-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></span>
+                                {hasUnreadNotifications && (
+                                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></span>
+                                )}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80" align="end">
