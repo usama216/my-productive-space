@@ -151,13 +151,13 @@ export const AdminPackageManagement: React.FC = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDeletePackage = async () => {
+  const confirmDeletePackage = async (force: boolean = false) => {
     if (!packageToDelete) return;
 
     setIsDeleting(true);
 
     try {
-      await deletePackage(packageToDelete.id);
+      await deletePackage(packageToDelete.id, force);
       setShowDeleteModal(false);
       setPackageToDelete(null);
       
@@ -166,15 +166,30 @@ export const AdminPackageManagement: React.FC = () => {
         description: `"${packageToDelete.name}" has been successfully deleted.`,
         variant: "success",
       });
-    } catch (error) {
+      setIsDeleting(false); // Reset state on success
+    } catch (error: any) {
       console.error('Error deleting package:', error);
+      
+      // If error message says to use force=true, show option to force delete
+      if (!force && error?.message?.includes('force=true')) {
+        setIsDeleting(false); // Reset state before showing dialog
+        
+        const confirmForce = window.confirm(
+          `Package has existing purchases. Do you want to force delete it?\n\nWarning: This will delete the package even though it has purchases.`
+        );
+        
+        if (confirmForce) {
+          await confirmDeletePackage(true); // Await the force delete
+        }
+        return;
+      }
+      
       toast({
         title: "❌ Deletion Failed",
-        description: `Failed to delete "${packageToDelete.name}". Please try again.`,
+        description: error?.message || `Failed to delete "${packageToDelete.name}". Please try again.`,
         variant: "destructive",
       });
-    } finally {
-      setIsDeleting(false);
+      setIsDeleting(false); // Reset state on error
     }
   };
 

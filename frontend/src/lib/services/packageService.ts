@@ -530,9 +530,13 @@ class PackageService {
   }
 
   // Admin: Delete package
-  async deletePackage(packageId: string): Promise<{ success: boolean; error?: string }> {
+  async deletePackage(packageId: string, force: boolean = false): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/new-packages/admin/${packageId}`, {
+      const url = force 
+        ? `${API_BASE_URL}/new-packages/admin/${packageId}?force=true`
+        : `${API_BASE_URL}/new-packages/admin/${packageId}`;
+      
+      const response = await fetch(url, {
         method: 'DELETE',
       });
       if (!response.ok) {

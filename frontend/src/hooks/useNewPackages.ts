@@ -262,9 +262,9 @@ export const useAdminPackages = () => {
     }
   }, [fetchAllPackages]);
 
-  const deletePackage = useCallback(async (packageId: string) => {
+  const deletePackage = useCallback(async (packageId: string, force: boolean = false) => {
     try {
-      const response = await packageService.deletePackage(packageId);
+      const response = await packageService.deletePackage(packageId, force);
       if (response.success) {
         await fetchAllPackages(); // Refresh the list
         return response;

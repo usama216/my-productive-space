@@ -169,10 +169,14 @@ const PackageManagement: React.FC = () => {
   };
 
   // Handle delete
-  const handleDelete = async (packageId: string) => {
+  const handleDelete = async (packageId: string, force: boolean = false) => {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
-      const response = await fetch(`${API_BASE_URL}/admin/packages/${packageId}`, {
+      const url = force 
+        ? `${API_BASE_URL}/admin/packages/${packageId}?force=true`
+        : `${API_BASE_URL}/admin/packages/${packageId}`;
+      
+      const response = await fetch(url, {
         method: 'DELETE',
       });
 
@@ -183,9 +187,23 @@ const PackageManagement: React.FC = () => {
         });
         fetchPackages();
       } else {
+        const errorData = await response.json();
+        
+        // If error message says to use force=true, show option to force delete
+        if (!force && errorData?.message?.includes('force=true')) {
+          const confirmForce = window.confirm(
+            `Package has existing purchases. Do you want to force delete it?\n\nWarning: This will delete the package even though it has purchases.`
+          );
+          
+          if (confirmForce) {
+            await handleDelete(packageId, true); // Await the force delete
+          }
+          return;
+        }
+        
         toast({
           title: "Error",
-          description: "Failed to delete package",
+          description: errorData?.message || "Failed to delete package",
           variant: "destructive"
         });
       }
