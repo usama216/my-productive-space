@@ -49,13 +49,6 @@ export default function BuyNowPage() {
 
   const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
   
-  console.log('🔍 Hook debug:', {
-    typeParam,
-    targetRole,
-    packagesLoading,
-    packagesCount: packages.length,
-    packagesError
-  })
 
   const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
   const [packageType, setPackageType] = useState<string>('')
@@ -73,7 +66,6 @@ export default function BuyNowPage() {
         targetRole: selectedPackage.targetRole
       }
       localStorage.setItem('lastSelectedPackage', JSON.stringify(packageData))
-      console.log('💾 Saved package to localStorage:', packageData)
     }
   }, [selectedPackage])
   const [customerName, setCustomerName] = useState('')
@@ -101,16 +93,12 @@ export default function BuyNowPage() {
     
     setIsLoadingUserProfile(true)
     try {
-      console.log('🔄 Fetching fresh user profile for userId:', userId)
       const profile = await getUserProfile(userId)
       if (profile) {
-        console.log('✅ Fresh user profile loaded:', profile)
         setFreshUserProfile(profile)
       } else {
-        console.log('❌ Failed to load fresh user profile')
       }
     } catch (error) {
-      console.error('❌ Error loading fresh user profile:', error)
     } finally {
       setIsLoadingUserProfile(false)
     }
@@ -139,7 +127,6 @@ export default function BuyNowPage() {
         if (fullName && !customerName) setCustomerName(fullName)
         if (userData.email && !customerEmail) setCustomerEmail(userData.email)
         if (userData.phone && !customerPhone) setCustomerPhone(userData.phone)
-        console.log('📦 Loaded user data from localStorage as fallback')
       }
     } catch (error) {
       console.error("Error parsing database_user from localStorage:", error)
@@ -149,25 +136,21 @@ export default function BuyNowPage() {
   // Auto-fill customer information when fresh user profile is loaded
   useEffect(() => {
     if (freshUserProfile && !isLoadingUserProfile) {
-      console.log('🔄 Auto-filling customer information with fresh user profile:', freshUserProfile)
       
       // Auto-fill customer name
       if (freshUserProfile.firstName && freshUserProfile.lastName) {
         const fullName = `${freshUserProfile.firstName} ${freshUserProfile.lastName}`
         setCustomerName(fullName)
-        console.log('✅ Auto-filled customer name:', fullName)
       }
       
       // Auto-fill customer email
       if (freshUserProfile.email) {
         setCustomerEmail(freshUserProfile.email)
-        console.log('✅ Auto-filled customer email:', freshUserProfile.email)
       }
       
       // Auto-fill customer phone
       if (freshUserProfile.contactNumber) {
         setCustomerPhone(freshUserProfile.contactNumber)
-        console.log('✅ Auto-filled customer phone:', freshUserProfile.contactNumber)
       }
     }
   }, [freshUserProfile, isLoadingUserProfile])
@@ -181,37 +164,22 @@ export default function BuyNowPage() {
     const referenceParam = searchParams.get('reference')
     const statusParam = searchParams.get('status')
 
-    console.log('🔍 Auto-selection effect running:', {
-      packageParam,
-      typeParam,
-      packageIdParam,
-      packagesCount: packages.length,
-      targetRole,
-      packageType,
-      currentSelectedPackage: selectedPackage?.name,
-      allPackageIds: packages.map(p => p.id),
-      allPackageNames: packages.map(p => p.name)
-    })
 
     // Set packageType first if available
     if (typeParam && targetRole && packageType !== targetRole) {
-      console.log('🔍 Setting packageType to:', targetRole)
       setPackageType(targetRole)
     }
-    console.log('packageIdParam:', packageIdParam)
 
     // Priority 1: Try packageId first (most reliable)
     if (packageIdParam && packages.length > 0) {
       const foundPackage = packages.find(pkg => pkg.id === packageIdParam)
       if (foundPackage) {
-        console.log(' Auto-selecting package by ID:', foundPackage.name, 'ID:', foundPackage.id)
         if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
           setSelectedPackage(foundPackage)
           setError(null)
         }
         return // Exit early if found by ID
       } else {
-        console.error('❌ Package not found with ID:', packageIdParam)
         setError(`Package not found`)
         return
       }
@@ -220,8 +188,6 @@ export default function BuyNowPage() {
     // Priority 2: Try package name (fallback)
     if (packageParam && packages.length > 0) {
       const decodedPackageName = decodeURIComponent(packageParam)
-      console.log('🔍 Searching for package by name:', decodedPackageName)
-      console.log('🔍 Available packages:', packages.map(p => ({ name: p.name, role: p.targetRole })))
 
       // Try exact match first
       let foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
@@ -242,18 +208,14 @@ export default function BuyNowPage() {
       }
 
       if (foundPackage) {
-        console.log('🎯 Auto-selecting package from name:', foundPackage.name, 'ID:', foundPackage.id)
         if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
           setSelectedPackage(foundPackage)
           setError(null)
         }
       } else {
-        console.error('❌ Package not found:', decodedPackageName)
-        console.error('❌ Available package names:', packages.map(p => p.name))
         setError(`Package "${decodedPackageName}" not found`)
       }
     } else if (packageParam && packages.length === 0) {
-      console.log('⏳ Waiting for packages to load...')
     }
   }, [searchParams, packages, targetRole])
 
@@ -268,52 +230,34 @@ export default function BuyNowPage() {
         if (typeof window !== 'undefined') {
           try {
             const lastSelected = localStorage.getItem('lastSelectedPackage')
-            console.log('🔍 localStorage data:', lastSelected)
             
             if (lastSelected) {
               const parsedData = JSON.parse(lastSelected)
-              console.log('🔍 Parsed data:', parsedData)
               
               const { id, name, targetRole: savedRole } = parsedData
               
               // Only restore if it matches current target role
               if (savedRole === targetRole) {
-                console.log('🔍 Looking for package with ID:', id)
-                console.log('🔍 Looking for package with NAME:', name)
-                console.log('🔍 Available packages:', packages.map(p => ({ id: p.id, name: p.name })))
                 
                 // Try ID first (for same environment), then name (for cross-environment)
                 let foundPackage = packages.find(pkg => pkg.id === id)
                 if (!foundPackage && name) {
-                  console.log('🔍 ID not found, trying name match...')
                   foundPackage = packages.find(pkg => pkg.name === name)
                 }
                 
                 if (foundPackage) {
-                  console.log('🔄 Restoring last selected package:', foundPackage.name)
                   setSelectedPackage(foundPackage)
                   hasRestoredFromStorage.current = true  // Mark as restored
                 } else {
-                  console.log('⚠️ Package not found for restoration:', { 
-                    id, 
-                    name, 
-                    availableIds: packages.map(p => p.id),
-                    availableNames: packages.map(p => p.name)
-                  })
-                  
                   // Clear corrupted localStorage data
-                  console.log('🧹 Clearing corrupted localStorage data')
                   localStorage.removeItem('lastSelectedPackage')
                 }
               } else {
-                console.log('⚠️ Target role mismatch:', { savedRole, currentTargetRole: targetRole })
               }
             } else {
-              console.log('🔍 No localStorage data found')
             }
           } catch (e) {
-            console.error('❌ Error restoring package from localStorage:', e)
-            console.log('🧹 Clearing corrupted localStorage data due to parse error')
+            // Clear corrupted localStorage data due to parse error
             localStorage.removeItem('lastSelectedPackage')
           }
         }
@@ -345,7 +289,6 @@ export default function BuyNowPage() {
   // Auto-select package when selectedPackage changes from URL parameter
   useEffect(() => {
     if (selectedPackage && packages.length > 0) {
-      console.log('🎯 Package auto-selected, triggering selection logic for:', selectedPackage.name)
       // The package selection dropdown should now show the selected package
     }
   }, [selectedPackage, packages])
@@ -356,12 +299,6 @@ export default function BuyNowPage() {
   const cardFee = paymentMethod === 'card' ? subtotal * 0.05 : 0
   const total = subtotal + cardFee
   
-  console.log('Payment calculation:', {
-    paymentMethod,
-    subtotal,
-    cardFee,
-    total
-  })
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -524,22 +461,12 @@ export default function BuyNowPage() {
                       {/* Package Selection */}
                       <div>
                         <Label>Select Package</Label>
-                        {console.log('🔍 Select render debug:', {
-                          selectedPackageId: selectedPackage?.id,
-                          selectedPackageName: selectedPackage?.name,
-                          selectValue: selectedPackage?.id || '',
-                          packagesCount: packages.length,
-                          packageType,
-                          allPackageIds: packages.map(p => p.id)
-                        })}
                         <Select
                           key={selectedPackage?.id || 'empty'}
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
-                            console.log('🎯 Select onValueChange:', value)
                             if (value) {
                               const packageData = packages.find(pkg => pkg.id === value)
-                              console.log('🎯 Found package data:', packageData)
                               setSelectedPackage(packageData || null)
                             }
                           }}
@@ -556,7 +483,6 @@ export default function BuyNowPage() {
                                 filteredPackages = [selectedPackage, ...filteredPackages]
                               }
                             
-                              console.log('🔍 Filtered packages for dropdown:', filteredPackages.map(p => p.name), 'packageType:', packageType)
 
                               if (filteredPackages.length === 0) {
                                 return <div className="p-2 text-sm text-gray-500">No packages available</div>
@@ -631,12 +557,6 @@ export default function BuyNowPage() {
 
                   {purchaseStep === 2 && (
                     <>
-                      {console.log('🎯 Rendering PaymentStep with:', {
-                        userPackageId,
-                        orderId,
-                        userPackageIdType: typeof userPackageId,
-                        orderIdType: typeof orderId
-                      })}
                       <PaymentStep
                         subtotal={subtotal}
                         total={subtotal}
