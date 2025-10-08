@@ -198,12 +198,13 @@ export default function BuyNowPage() {
       console.log('🔍 Setting packageType to:', targetRole)
       setPackageType(targetRole)
     }
+    console.log('packageIdParam:', packageIdParam)
 
     // Priority 1: Try packageId first (most reliable)
     if (packageIdParam && packages.length > 0) {
       const foundPackage = packages.find(pkg => pkg.id === packageIdParam)
       if (foundPackage) {
-        console.log('🎯 Auto-selecting package by ID:', foundPackage.name, 'ID:', foundPackage.id)
+        console.log(' Auto-selecting package by ID:', foundPackage.name, 'ID:', foundPackage.id)
         if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
           setSelectedPackage(foundPackage)
           setError(null)
