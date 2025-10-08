@@ -533,12 +533,15 @@ export default function BuyNowPage() {
                           allPackageIds: packages.map(p => p.id)
                         })}
                         <Select
+                          key={selectedPackage?.id || 'empty'}
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
                             console.log('🎯 Select onValueChange:', value)
-                            const packageData = packages.find(pkg => pkg.id === value)
-                            console.log('🎯 Found package data:', packageData)
-                            setSelectedPackage(packageData || null)
+                            if (value) {
+                              const packageData = packages.find(pkg => pkg.id === value)
+                              console.log('🎯 Found package data:', packageData)
+                              setSelectedPackage(packageData || null)
+                            }
                           }}
                         >
                           <SelectTrigger>
