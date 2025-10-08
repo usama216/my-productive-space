@@ -56,7 +56,7 @@ export default function CoworkPage() {
   const coworkPackages = packages
 
   const handleBuyNow = (packageData: NewPackage) => {
-    router.push(`/buy-pass?packageId=${packageData.id}`)
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=cowork`)
   }
 
   // If URL has #packages on first load, open that tab
