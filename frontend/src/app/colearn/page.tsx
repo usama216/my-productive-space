@@ -68,7 +68,7 @@ export default function CoTutorPage() {
   const tutorPackages = packages
 
   const handleBuyNow = (packageData: NewPackage) => {
-    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=tutor`)
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=tutor&packageId=${packageData.id}`)
   }
   return (
     <>

@@ -33,6 +33,7 @@ export default function BuyNowPage() {
   // Get the target role from URL params first
   const typeParam = searchParams.get('type')
   const stepParam = searchParams.get('step')
+  const packageIdParam = searchParams.get('packageId')
   const typeMapping: { [key: string]: string } = {
     'cowork': 'MEMBER',
     'costudy': 'STUDENT',
@@ -187,9 +188,27 @@ export default function BuyNowPage() {
       setPackageType(targetRole)
     }
 
+    // Priority 1: Try packageId first (most reliable)
+    if (packageIdParam && packages.length > 0) {
+      const foundPackage = packages.find(pkg => pkg.id === packageIdParam)
+      if (foundPackage) {
+        console.log('🎯 Auto-selecting package by ID:', foundPackage.name, 'ID:', foundPackage.id)
+        if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
+          setSelectedPackage(foundPackage)
+          setError(null)
+        }
+        return // Exit early if found by ID
+      } else {
+        console.error('❌ Package not found with ID:', packageIdParam)
+        setError(`Package not found`)
+        return
+      }
+    }
+
+    // Priority 2: Try package name (fallback)
     if (packageParam && packages.length > 0) {
       const decodedPackageName = decodeURIComponent(packageParam)
-      console.log('🔍 Searching for package:', decodedPackageName)
+      console.log('🔍 Searching for package by name:', decodedPackageName)
       console.log('🔍 Available packages:', packages.map(p => ({ name: p.name, role: p.targetRole })))
 
       // Try exact match first
@@ -211,11 +230,10 @@ export default function BuyNowPage() {
       }
 
       if (foundPackage) {
-        console.log('🎯 Auto-selecting package from URL:', foundPackage.name, 'ID:', foundPackage.id)
-        // Only update if different to avoid unnecessary re-renders
+        console.log('🎯 Auto-selecting package from name:', foundPackage.name, 'ID:', foundPackage.id)
         if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
           setSelectedPackage(foundPackage)
-          setError(null) // Clear any previous errors
+          setError(null)
         }
       } else {
         console.error('❌ Package not found:', decodedPackageName)

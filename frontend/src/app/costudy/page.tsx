@@ -148,7 +148,7 @@ export default function CoLearningPage() {
       alert('Student packages are only available to verified students. Please verify your student status first.')
       return
     }
-    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=student`)
+    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=student&packageId=${packageData.id}`)
   }
 
   const reasons = [
