@@ -498,6 +498,14 @@ export default function BuyNowPage() {
                       {/* Package Selection */}
                       <div>
                         <Label>Select Package</Label>
+                        {console.log('🔍 Select render debug:', {
+                          selectedPackageId: selectedPackage?.id,
+                          selectedPackageName: selectedPackage?.name,
+                          packagesCount: packages.length,
+                          packageType,
+                          allPackageIds: packages.map(p => p.id),
+                          allPackageNames: packages.map(p => p.name)
+                        })}
                         <Select
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
@@ -512,7 +520,12 @@ export default function BuyNowPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {(() => {
-                              const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
+                              let filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
+                              
+                              // If we have a selected package but it's not in the filtered results, include it
+                              if (selectedPackage && !filteredPackages.find(p => p.id === selectedPackage.id)) {
+                                filteredPackages = [selectedPackage, ...filteredPackages]
+                              }
                             
                               console.log('🔍 Filtered packages for dropdown:', filteredPackages.map(p => p.name), 'packageType:', packageType)
 
