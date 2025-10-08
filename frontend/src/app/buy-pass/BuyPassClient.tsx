@@ -1,7 +1,7 @@
 // src/app/buy-pass/BuyPassClient.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Package, AlertCircle, AlertTriangle, Loader2, Clock, CheckCircle } from 'lucide-react'
 
@@ -51,6 +51,9 @@ export default function BuyNowPage() {
   const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
   const [packageType, setPackageType] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
+  
+  // Track if we've already restored from localStorage (to prevent re-triggering)
+  const hasRestoredFromStorage = useRef(false)
   
   // Save selected package to localStorage when it changes
   useEffect(() => {
@@ -219,8 +222,8 @@ export default function BuyNowPage() {
       }
     } else if (packageParam && packages.length === 0) {
       console.log('⏳ Waiting for packages to load...')
-    } else if (!packageParam && packages.length > 0 && !selectedPackage) {
-      // No URL param, try to restore from localStorage
+    } else if (!packageParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
+      // No URL param, try to restore from localStorage (only once)
       try {
         const lastSelected = localStorage.getItem('lastSelectedPackage')
         if (lastSelected) {
@@ -231,6 +234,7 @@ export default function BuyNowPage() {
             if (foundPackage) {
               console.log('🔄 Restoring last selected package:', foundPackage.name)
               setSelectedPackage(foundPackage)
+              hasRestoredFromStorage.current = true  // Mark as restored
             }
           }
         }
