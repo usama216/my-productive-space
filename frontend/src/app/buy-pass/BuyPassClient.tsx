@@ -234,20 +234,53 @@ export default function BuyNowPage() {
       if (typeof window !== 'undefined') {
         try {
           const lastSelected = localStorage.getItem('lastSelectedPackage')
+          console.log('🔍 localStorage data:', lastSelected)
+          
           if (lastSelected) {
-            const { id, targetRole: savedRole } = JSON.parse(lastSelected)
+            const parsedData = JSON.parse(lastSelected)
+            console.log('🔍 Parsed data:', parsedData)
+            
+            const { id, name, targetRole: savedRole } = parsedData
+            
             // Only restore if it matches current target role
             if (savedRole === targetRole) {
-              const foundPackage = packages.find(pkg => pkg.id === id)
+              console.log('🔍 Looking for package with ID:', id)
+              console.log('🔍 Looking for package with NAME:', name)
+              console.log('🔍 Available packages:', packages.map(p => ({ id: p.id, name: p.name })))
+              
+              // Try ID first (for same environment), then name (for cross-environment)
+              let foundPackage = packages.find(pkg => pkg.id === id)
+              if (!foundPackage && name) {
+                console.log('🔍 ID not found, trying name match...')
+                foundPackage = packages.find(pkg => pkg.name === name)
+              }
+              
               if (foundPackage) {
                 console.log('🔄 Restoring last selected package:', foundPackage.name)
                 setSelectedPackage(foundPackage)
                 hasRestoredFromStorage.current = true  // Mark as restored
+              } else {
+                console.log('⚠️ Package not found for restoration:', { 
+                  id, 
+                  name, 
+                  availableIds: packages.map(p => p.id),
+                  availableNames: packages.map(p => p.name)
+                })
+                
+                // Clear corrupted localStorage data
+                console.log('🧹 Clearing corrupted localStorage data')
+                localStorage.removeItem('lastSelectedPackage')
               }
+            } else {
+              console.log('⚠️ Target role mismatch:', { savedRole, currentTargetRole: targetRole })
             }
+          } else {
+            console.log('🔍 No localStorage data found')
           }
         } catch (e) {
-          console.error('Error restoring package from localStorage:', e)
+          console.error('❌ Error restoring package from localStorage:', e)
+          console.log('🧹 Clearing corrupted localStorage data due to parse error')
+          localStorage.removeItem('lastSelectedPackage')
         }
       }
     }
