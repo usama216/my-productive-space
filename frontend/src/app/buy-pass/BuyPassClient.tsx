@@ -181,8 +181,8 @@ export default function BuyNowPage() {
       currentSelectedPackage: selectedPackage?.name
     })
 
-    // Set packageType first if available
-    if (typeParam && targetRole) {
+    // Set packageType first if available - ensure it's set before package selection
+    if (typeParam && targetRole && packageType !== targetRole) {
       console.log('🔍 Setting packageType to:', targetRole)
       setPackageType(targetRole)
     }
@@ -215,6 +215,10 @@ export default function BuyNowPage() {
         // Only update if different to avoid unnecessary re-renders
         if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
           setSelectedPackage(foundPackage)
+          // Also ensure packageType matches the found package
+          if (foundPackage.targetRole !== packageType) {
+            setPackageType(foundPackage.targetRole)
+          }
           setError(null) // Clear any previous errors
         }
       } else {
