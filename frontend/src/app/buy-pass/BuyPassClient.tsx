@@ -57,7 +57,7 @@ export default function BuyNowPage() {
   
   // Save selected package to localStorage when it changes
   useEffect(() => {
-    if (selectedPackage) {
+    if (typeof window !== 'undefined' && selectedPackage) {
       localStorage.setItem('lastSelectedPackage', JSON.stringify({
         id: selectedPackage.id,
         name: selectedPackage.name,
@@ -224,22 +224,24 @@ export default function BuyNowPage() {
       console.log('⏳ Waiting for packages to load...')
     } else if (!packageParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
       // No URL param, try to restore from localStorage (only once)
-      try {
-        const lastSelected = localStorage.getItem('lastSelectedPackage')
-        if (lastSelected) {
-          const { id, targetRole: savedRole } = JSON.parse(lastSelected)
-          // Only restore if it matches current target role
-          if (savedRole === targetRole) {
-            const foundPackage = packages.find(pkg => pkg.id === id)
-            if (foundPackage) {
-              console.log('🔄 Restoring last selected package:', foundPackage.name)
-              setSelectedPackage(foundPackage)
-              hasRestoredFromStorage.current = true  // Mark as restored
+      if (typeof window !== 'undefined') {
+        try {
+          const lastSelected = localStorage.getItem('lastSelectedPackage')
+          if (lastSelected) {
+            const { id, targetRole: savedRole } = JSON.parse(lastSelected)
+            // Only restore if it matches current target role
+            if (savedRole === targetRole) {
+              const foundPackage = packages.find(pkg => pkg.id === id)
+              if (foundPackage) {
+                console.log('🔄 Restoring last selected package:', foundPackage.name)
+                setSelectedPackage(foundPackage)
+                hasRestoredFromStorage.current = true  // Mark as restored
+              }
             }
           }
+        } catch (e) {
+          console.error('Error restoring package from localStorage:', e)
         }
-      } catch (e) {
-        console.error('Error restoring package from localStorage:', e)
       }
     }
   }, [searchParams, packages, targetRole])  // ✅ Removed selectedPackage from dependencies
