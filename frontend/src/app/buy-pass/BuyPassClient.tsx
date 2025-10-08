@@ -222,8 +222,15 @@ export default function BuyNowPage() {
       }
     } else if (packageParam && packages.length === 0) {
       console.log('⏳ Waiting for packages to load...')
-    } else if (!packageParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
-      // No URL param, try to restore from localStorage (only once)
+    }
+  }, [searchParams, packages, targetRole])
+
+  // Separate effect for localStorage restoration (runs once when packages load)
+  useEffect(() => {
+    const packageParam = searchParams.get('package')
+    
+    // Only restore if: no URL param, packages loaded, nothing selected yet, and haven't restored before
+    if (!packageParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
       if (typeof window !== 'undefined') {
         try {
           const lastSelected = localStorage.getItem('lastSelectedPackage')
@@ -244,7 +251,7 @@ export default function BuyNowPage() {
         }
       }
     }
-  }, [searchParams, packages, targetRole])  // ✅ Removed selectedPackage from dependencies
+  }, [packages, targetRole, searchParams])  // Runs when packages load
 
   // Handle step 3 - payment confirmation
   useEffect(() => {
