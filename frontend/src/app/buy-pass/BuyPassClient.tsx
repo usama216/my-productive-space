@@ -48,6 +48,14 @@ export default function BuyNowPage() {
   const targetRole = stepParam === '3' ? null : (typeMapping[typeParam || ''] || 'MEMBER')
 
   const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
+  
+  console.log('🔍 Hook debug:', {
+    typeParam,
+    targetRole,
+    packagesLoading,
+    packagesCount: packages.length,
+    packagesError
+  })
 
   const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
   const [packageType, setPackageType] = useState<string>('')
@@ -176,14 +184,17 @@ export default function BuyNowPage() {
     console.log('🔍 Auto-selection effect running:', {
       packageParam,
       typeParam,
+      packageIdParam,
       packagesCount: packages.length,
       targetRole,
       packageType,
-      currentSelectedPackage: selectedPackage?.name
+      currentSelectedPackage: selectedPackage?.name,
+      allPackageIds: packages.map(p => p.id),
+      allPackageNames: packages.map(p => p.name)
     })
 
     // Set packageType first if available
-    if (typeParam && targetRole) {
+    if (typeParam && targetRole && packageType !== targetRole) {
       console.log('🔍 Setting packageType to:', targetRole)
       setPackageType(targetRole)
     }
@@ -512,6 +523,14 @@ export default function BuyNowPage() {
                       {/* Package Selection */}
                       <div>
                         <Label>Select Package</Label>
+                        {console.log('🔍 Select render debug:', {
+                          selectedPackageId: selectedPackage?.id,
+                          selectedPackageName: selectedPackage?.name,
+                          selectValue: selectedPackage?.id || '',
+                          packagesCount: packages.length,
+                          packageType,
+                          allPackageIds: packages.map(p => p.id)
+                        })}
                         <Select
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
@@ -526,7 +545,12 @@ export default function BuyNowPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {(() => {
-                              const filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
+                              let filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
+                              
+                              // If selected package is not in filtered results, include it
+                              if (selectedPackage && !filteredPackages.find(p => p.id === selectedPackage.id)) {
+                                filteredPackages = [selectedPackage, ...filteredPackages]
+                              }
                             
                               console.log('🔍 Filtered packages for dropdown:', filteredPackages.map(p => p.name), 'packageType:', packageType)
 
