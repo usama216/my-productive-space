@@ -30,21 +30,11 @@ export default function BuyNowPage() {
   // ALL HOOKS MUST BE CALLED FIRST - NO EARLY RETURNS
   const { user, userId, loading: isLoadingAuth } = useAuth()
 
-  // Get the target role from URL params first
-  const typeParam = searchParams.get('type')
   const stepParam = searchParams.get('step')
-  const typeMapping: { [key: string]: string } = {
-    'cowork': 'MEMBER',
-    'costudy': 'STUDENT',
-    'colearn': 'TUTOR',
-    'student': 'STUDENT',
-    'tutor': 'TUTOR',
-    'member': 'MEMBER'
-  }
+  const packageIdParam = searchParams.get('packageId')
   
-  // For step 3 (confirmation), don't fetch packages by role since we already have the package
-  // For other steps, use the role from URL params or default to MEMBER
-  const targetRole = stepParam === '3' ? null : (typeMapping[typeParam || ''] || 'MEMBER')
+  // Load all packages for step 3, otherwise load by role if needed
+  const targetRole = stepParam === '3' ? null : 'MEMBER' // Default to MEMBER, we'll find the right package by ID
 
   const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
 
@@ -163,73 +153,21 @@ export default function BuyNowPage() {
     }
   }, [freshUserProfile, isLoadingUserProfile])
 
+  // Simple auto-selection by package ID
   useEffect(() => {
-    const packageParam = searchParams.get('package')
-    const typeParam = searchParams.get('type')
-    const stepParam = searchParams.get('step')
-    const orderIdParam = searchParams.get('orderId')
-    const userPackageIdParam = searchParams.get('userPackageId')
-    const referenceParam = searchParams.get('reference')
-    const statusParam = searchParams.get('status')
-
-    console.log('🔍 Auto-selection effect running:', {
-      packageParam,
-      typeParam,
-      packagesCount: packages.length,
-      targetRole,
-      packageType,
-      currentSelectedPackage: selectedPackage?.name
-    })
-
-    // Set packageType first if available - ensure it's set before package selection
-    if (typeParam && targetRole && packageType !== targetRole) {
-      console.log('🔍 Setting packageType to:', targetRole)
-      setPackageType(targetRole)
-    }
-
-    if (packageParam && packages.length > 0) {
-      const decodedPackageName = decodeURIComponent(packageParam)
-      console.log('🔍 Searching for package:', decodedPackageName)
-      console.log('🔍 Available packages:', packages.map(p => ({ name: p.name, role: p.targetRole })))
-
-      // Try exact match first
-      let foundPackage = packages.find(pkg => pkg.name === decodedPackageName)
-
-      // If no exact match, try case-insensitive match
-      if (!foundPackage) {
-        foundPackage = packages.find(pkg =>
-          pkg.name.toLowerCase() === decodedPackageName.toLowerCase()
-        )
-      }
-
-      // If still no match, try partial match
-      if (!foundPackage) {
-        foundPackage = packages.find(pkg =>
-          pkg.name.toLowerCase().includes(decodedPackageName.toLowerCase()) ||
-          decodedPackageName.toLowerCase().includes(pkg.name.toLowerCase())
-        )
-      }
-
+    if (packageIdParam && packages.length > 0) {
+      const foundPackage = packages.find(pkg => pkg.id === packageIdParam)
       if (foundPackage) {
-        console.log('🎯 Auto-selecting package from URL:', foundPackage.name, 'ID:', foundPackage.id)
-        // Only update if different to avoid unnecessary re-renders
-        if (!selectedPackage || selectedPackage.id !== foundPackage.id) {
-          setSelectedPackage(foundPackage)
-          // Also ensure packageType matches the found package
-          if (foundPackage.targetRole !== packageType) {
-            setPackageType(foundPackage.targetRole)
-          }
-          setError(null) // Clear any previous errors
-        }
+        console.log('✅ Auto-selecting package by ID:', foundPackage.name)
+        setSelectedPackage(foundPackage)
+        setPackageType(foundPackage.targetRole)
+        setError(null)
       } else {
-        console.error('❌ Package not found:', decodedPackageName)
-        console.error('❌ Available package names:', packages.map(p => p.name))
-        setError(`Package "${decodedPackageName}" not found`)
+        console.error('❌ Package not found with ID:', packageIdParam)
+        setError(`Package not found`)
       }
-    } else if (packageParam && packages.length === 0) {
-      console.log('⏳ Waiting for packages to load...')
     }
-  }, [searchParams, packages, targetRole])
+  }, [packageIdParam, packages.length])
 
   // Separate effect for localStorage restoration (runs once when packages load)
   useEffect(() => {
@@ -498,14 +436,6 @@ export default function BuyNowPage() {
                       {/* Package Selection */}
                       <div>
                         <Label>Select Package</Label>
-                        {console.log('🔍 Select render debug:', {
-                          selectedPackageId: selectedPackage?.id,
-                          selectedPackageName: selectedPackage?.name,
-                          packagesCount: packages.length,
-                          packageType,
-                          allPackageIds: packages.map(p => p.id),
-                          allPackageNames: packages.map(p => p.name)
-                        })}
                         <Select
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
@@ -519,26 +449,15 @@ export default function BuyNowPage() {
                             <SelectValue placeholder="Choose your package" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(() => {
-                              let filteredPackages = packages.filter((pkg) => !packageType || pkg.targetRole === packageType)
-                              
-                              // If we have a selected package but it's not in the filtered results, include it
-                              if (selectedPackage && !filteredPackages.find(p => p.id === selectedPackage.id)) {
-                                filteredPackages = [selectedPackage, ...filteredPackages]
-                              }
-                            
-                              console.log('🔍 Filtered packages for dropdown:', filteredPackages.map(p => p.name), 'packageType:', packageType)
-
-                              if (filteredPackages.length === 0) {
-                                return <div className="p-2 text-sm text-gray-500">No packages available</div>
-                              }
-
-                              return filteredPackages.map((pkg) => (
+                            {packages.length === 0 ? (
+                              <div className="p-2 text-sm text-gray-500">No packages available</div>
+                            ) : (
+                              packages.map((pkg) => (
                                 <SelectItem key={pkg.id} value={pkg.id}>
                                   {pkg.name}
                                 </SelectItem>
                               ))
-                            })()}
+                            )}
                           </SelectContent>
                         </Select>
                       </div>

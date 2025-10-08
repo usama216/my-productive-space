@@ -59,14 +59,7 @@ export default function PricingPage() {
   }, [])
 
   const handleBuyNow = (packageData: NewPackage) => {
-    // Map targetRole to type parameter
-    const typeMap: { [key: string]: string } = {
-      'MEMBER': 'member',
-      'STUDENT': 'student',
-      'TUTOR': 'tutor'
-    }
-    const typeParam = typeMap[packageData.targetRole] || 'member'
-    router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=${typeParam}`)
+    router.push(`/buy-pass?packageId=${packageData.id}`)
   }
 
   const handleBookWithPackage = (packageData: NewPackage) => {
