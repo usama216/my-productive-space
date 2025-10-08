@@ -58,11 +58,13 @@ export default function BuyNowPage() {
   // Save selected package to localStorage when it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && selectedPackage) {
-      localStorage.setItem('lastSelectedPackage', JSON.stringify({
+      const packageData = {
         id: selectedPackage.id,
         name: selectedPackage.name,
         targetRole: selectedPackage.targetRole
-      }))
+      }
+      localStorage.setItem('lastSelectedPackage', JSON.stringify(packageData))
+      console.log('💾 Saved package to localStorage:', packageData)
     }
   }, [selectedPackage])
   const [customerName, setCustomerName] = useState('')
@@ -231,58 +233,63 @@ export default function BuyNowPage() {
     
     // Only restore if: no URL param, packages loaded, nothing selected yet, and haven't restored before
     if (!packageParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
-      if (typeof window !== 'undefined') {
-        try {
-          const lastSelected = localStorage.getItem('lastSelectedPackage')
-          console.log('🔍 localStorage data:', lastSelected)
-          
-          if (lastSelected) {
-            const parsedData = JSON.parse(lastSelected)
-            console.log('🔍 Parsed data:', parsedData)
+      // Add small delay to ensure localStorage is ready
+      const timeoutId = setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          try {
+            const lastSelected = localStorage.getItem('lastSelectedPackage')
+            console.log('🔍 localStorage data:', lastSelected)
             
-            const { id, name, targetRole: savedRole } = parsedData
-            
-            // Only restore if it matches current target role
-            if (savedRole === targetRole) {
-              console.log('🔍 Looking for package with ID:', id)
-              console.log('🔍 Looking for package with NAME:', name)
-              console.log('🔍 Available packages:', packages.map(p => ({ id: p.id, name: p.name })))
+            if (lastSelected) {
+              const parsedData = JSON.parse(lastSelected)
+              console.log('🔍 Parsed data:', parsedData)
               
-              // Try ID first (for same environment), then name (for cross-environment)
-              let foundPackage = packages.find(pkg => pkg.id === id)
-              if (!foundPackage && name) {
-                console.log('🔍 ID not found, trying name match...')
-                foundPackage = packages.find(pkg => pkg.name === name)
-              }
+              const { id, name, targetRole: savedRole } = parsedData
               
-              if (foundPackage) {
-                console.log('🔄 Restoring last selected package:', foundPackage.name)
-                setSelectedPackage(foundPackage)
-                hasRestoredFromStorage.current = true  // Mark as restored
-              } else {
-                console.log('⚠️ Package not found for restoration:', { 
-                  id, 
-                  name, 
-                  availableIds: packages.map(p => p.id),
-                  availableNames: packages.map(p => p.name)
-                })
+              // Only restore if it matches current target role
+              if (savedRole === targetRole) {
+                console.log('🔍 Looking for package with ID:', id)
+                console.log('🔍 Looking for package with NAME:', name)
+                console.log('🔍 Available packages:', packages.map(p => ({ id: p.id, name: p.name })))
                 
-                // Clear corrupted localStorage data
-                console.log('🧹 Clearing corrupted localStorage data')
-                localStorage.removeItem('lastSelectedPackage')
+                // Try ID first (for same environment), then name (for cross-environment)
+                let foundPackage = packages.find(pkg => pkg.id === id)
+                if (!foundPackage && name) {
+                  console.log('🔍 ID not found, trying name match...')
+                  foundPackage = packages.find(pkg => pkg.name === name)
+                }
+                
+                if (foundPackage) {
+                  console.log('🔄 Restoring last selected package:', foundPackage.name)
+                  setSelectedPackage(foundPackage)
+                  hasRestoredFromStorage.current = true  // Mark as restored
+                } else {
+                  console.log('⚠️ Package not found for restoration:', { 
+                    id, 
+                    name, 
+                    availableIds: packages.map(p => p.id),
+                    availableNames: packages.map(p => p.name)
+                  })
+                  
+                  // Clear corrupted localStorage data
+                  console.log('🧹 Clearing corrupted localStorage data')
+                  localStorage.removeItem('lastSelectedPackage')
+                }
+              } else {
+                console.log('⚠️ Target role mismatch:', { savedRole, currentTargetRole: targetRole })
               }
             } else {
-              console.log('⚠️ Target role mismatch:', { savedRole, currentTargetRole: targetRole })
+              console.log('🔍 No localStorage data found')
             }
-          } else {
-            console.log('🔍 No localStorage data found')
+          } catch (e) {
+            console.error('❌ Error restoring package from localStorage:', e)
+            console.log('🧹 Clearing corrupted localStorage data due to parse error')
+            localStorage.removeItem('lastSelectedPackage')
           }
-        } catch (e) {
-          console.error('❌ Error restoring package from localStorage:', e)
-          console.log('🧹 Clearing corrupted localStorage data due to parse error')
-          localStorage.removeItem('lastSelectedPackage')
         }
-      }
+      }, 100) // 100ms delay
+
+      return () => clearTimeout(timeoutId)
     }
   }, [packages, targetRole, searchParams])  // Runs when packages load
 
