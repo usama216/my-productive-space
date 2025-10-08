@@ -556,7 +556,7 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {calculateDurationSingapore(booking.startAt, booking.endAt)} hours
+                        {calculateDurationSingapore(booking.startAt, booking.endAt).toFixed(2)} hrs
                       </div>
                     </TableCell>
                     <TableCell>

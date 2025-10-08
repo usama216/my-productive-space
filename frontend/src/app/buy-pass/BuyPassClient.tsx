@@ -51,6 +51,17 @@ export default function BuyNowPage() {
   const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
   const [packageType, setPackageType] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
+  
+  // Save selected package to localStorage when it changes
+  useEffect(() => {
+    if (selectedPackage) {
+      localStorage.setItem('lastSelectedPackage', JSON.stringify({
+        id: selectedPackage.id,
+        name: selectedPackage.name,
+        targetRole: selectedPackage.targetRole
+      }))
+    }
+  }, [selectedPackage])
   const [customerName, setCustomerName] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -208,8 +219,26 @@ export default function BuyNowPage() {
       }
     } else if (packageParam && packages.length === 0) {
       console.log('⏳ Waiting for packages to load...')
+    } else if (!packageParam && packages.length > 0 && !selectedPackage) {
+      // No URL param, try to restore from localStorage
+      try {
+        const lastSelected = localStorage.getItem('lastSelectedPackage')
+        if (lastSelected) {
+          const { id, targetRole: savedRole } = JSON.parse(lastSelected)
+          // Only restore if it matches current target role
+          if (savedRole === targetRole) {
+            const foundPackage = packages.find(pkg => pkg.id === id)
+            if (foundPackage) {
+              console.log('🔄 Restoring last selected package:', foundPackage.name)
+              setSelectedPackage(foundPackage)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error restoring package from localStorage:', e)
+      }
     }
-  }, [searchParams, packages, targetRole, selectedPackage])
+  }, [searchParams, packages, targetRole])  // ✅ Removed selectedPackage from dependencies
 
   // Handle step 3 - payment confirmation
   useEffect(() => {
@@ -413,7 +442,6 @@ export default function BuyNowPage() {
                       <div>
                         <Label>Select Package</Label>
                         <Select
-                          key={selectedPackage?.id || 'no-selection'}
                           value={selectedPackage?.id || ''}
                           onValueChange={(value) => {
                             console.log('🎯 Select onValueChange:', value)
@@ -423,9 +451,7 @@ export default function BuyNowPage() {
                           }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose your package">
-                              {selectedPackage ? selectedPackage.name : 'Choose your package'}
-                            </SelectValue>
+                            <SelectValue placeholder="Choose your package" />
                           </SelectTrigger>
                           <SelectContent>
                             {(() => {

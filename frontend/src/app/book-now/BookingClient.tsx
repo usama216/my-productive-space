@@ -459,9 +459,9 @@ export default function BookingClient() {
 
   useEffect(() => {
     if (startDate && endDate) {
-      // Convert Singapore time to UTC for database storage
-      const startAt = fromDatePickerToUTC(startDate).toISOString();
-      const endAt = fromDatePickerToUTC(endDate).toISOString();
+      // Convert local time to UTC for database storage
+      const startAt = fromDatePickerToUTC(startDate);
+      const endAt = fromDatePickerToUTC(endDate);
       const durationMs = endDate.getTime() - startDate.getTime();
       const durationHours = durationMs / (1000 * 60 * 60);
 
