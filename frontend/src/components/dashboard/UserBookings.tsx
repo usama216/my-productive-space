@@ -165,9 +165,8 @@ export function UserBookings() {
     .filter(booking => {
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
-      const today = startAt.toDateString() === now.toDateString()
-      // Upcoming: future date (not today)
-      return startAt > now && !today
+      // Upcoming: all bookings that haven't started yet (future bookings)
+      return startAt > now
     })
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) // Earliest first
 
@@ -177,34 +176,16 @@ export function UserBookings() {
       const startAt = new Date(booking.startAt)
       const endAt = new Date(booking.endAt)
       
-      // Skip if already past (ended)
-      if (endAt < now) return false
-      
-      const isToday = startAt.toDateString() === now.toDateString()
+      // Ongoing: ONLY bookings that are currently in progress (between start and end time)
       const isOngoing = startAt <= now && endAt > now
-      // Show: today's date (not ended) OR currently ongoing
-      return isToday || isOngoing
+      return isOngoing
     })
     .sort((a, b) => {
-      const aStartAt = new Date(a.startAt)
       const aEndAt = new Date(a.endAt)
-      const bStartAt = new Date(b.startAt)
       const bEndAt = new Date(b.endAt)
       
-      const aIsOngoing = aStartAt <= now && aEndAt > now
-      const bIsOngoing = bStartAt <= now && bEndAt > now
-      
-      // Priority 1: Actually ongoing first
-      if (aIsOngoing && !bIsOngoing) return -1
-      if (!aIsOngoing && bIsOngoing) return 1
-      
-      // Priority 2: If both ongoing, longest remaining first
-      if (aIsOngoing && bIsOngoing) {
-        return bEndAt.getTime() - aEndAt.getTime()
-      }
-      
-      // Priority 3: Today's bookings, earliest first
-      return aStartAt.getTime() - bStartAt.getTime()
+      // Sort by longest remaining time first
+      return bEndAt.getTime() - aEndAt.getTime()
     })
 
   const pastBookings = bookings
@@ -574,7 +555,7 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                      <div className="font-medium">${booking.extensionamounts && booking.extensionamounts.length > 0 ? booking.totalactualcost : booking.totalAmount}</div>
+                      <div className="font-medium">${(booking.extensionamounts && booking.extensionamounts.length > 0 ? Number(booking.totalactualcost) : Number(booking.totalAmount)).toFixed(2)}</div>
                         {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
                           <div className="text-xs text-blue-600">
                             Total: ${(() => {
@@ -824,7 +805,7 @@ export function UserBookings() {
                   <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
                   <div><strong>Location:</strong> {selectedBooking.location}</div>
                   <div><strong>Date:</strong> {formatBookingDateRange(selectedBooking.startAt, selectedBooking.endAt)}</div>
-                  <div><strong>Amount:</strong> ${selectedBooking.totalAmount}</div>
+                  <div><strong>Amount:</strong> ${Number(selectedBooking.totalAmount).toFixed(2)}</div>
                 </div>
               </div>
               
