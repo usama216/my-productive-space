@@ -424,10 +424,10 @@ class PackageService {
         activatedAt: pkg.activatedAt,
         expiresAt: pkg.expiresAt,
         isExpired: pkg.isExpired || (pkg.expiresAt ? new Date() > new Date(pkg.expiresAt) : false),
-        totalPasses: pkg.totalPasses || pkg.Package?.passCount || 0,
-        usedPasses: pkg.usedPasses || 0,
-        remainingPasses: pkg.remainingPasses || pkg.Package?.passCount || 0,
-        expiredPasses: pkg.expiredPasses || 0,
+        totalPasses: pkg.totalPasses ?? (pkg.Package?.passCount || 0),
+        usedPasses: pkg.usedPasses ?? 0,
+        remainingPasses: pkg.remainingPasses ?? (pkg.Package?.passCount || 0),
+        expiredPasses: pkg.expiredPasses ?? 0,
         createdAt: pkg.createdAt
       }));
       
