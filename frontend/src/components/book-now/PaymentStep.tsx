@@ -31,6 +31,8 @@ type Props = {
     seatNumbers: string[]
     extensionHours: number
     extensionCost: number
+    originalEndAt?: string
+    creditAmount?: number
   }
 }
 
@@ -52,7 +54,7 @@ export default function PaymentStep({
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
-
+  
   // Calculate totals based on payment method
   const creditCardFee = selectedPaymentMethod === 'creditCard' ? total * 0.05 : 0
   const finalTotal = total + creditCardFee
@@ -114,7 +116,7 @@ export default function PaymentStep({
         payment_methods: [getPaymentMethodForAPI(selectedPaymentMethod)], // Array of strings
         bookingId: currentBookingId, // Use the created booking ID
         isExtension: isExtension, // Flag to identify extension payments
-        extensionData: extensionData, // Extension details for backend processing
+        extensionData: extensionData, // Extension details for backend processing (includes creditAmount)
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
@@ -180,8 +182,6 @@ export default function PaymentStep({
               </div>
             </div>
           )}
-
-   
         </CardContent>
       </Card>
 
@@ -215,7 +215,7 @@ export default function PaymentStep({
             </div>
           )}
           <div className="flex justify-between font-bold text-lg border-t pt-2">
-            <span>Total</span>
+            <span>Total to Pay</span>
             <span>${finalTotal.toFixed(2)}</span>
           </div>
         </CardContent>
@@ -244,7 +244,10 @@ export default function PaymentStep({
           disabled={loading}
           className="flex-1 bg-orange-500 hover:bg-orange-600"
         >
-          {loading ? 'Processing…' : isExtension ? `Pay $${finalTotal.toFixed(2)} to Extend` : `Complete your booking`}
+          {loading ? 'Processing…' : 
+           finalTotal === 0 ? 'Confirm Extension (Fully Covered)' :
+           isExtension ? `Pay $${finalTotal.toFixed(2)} to Extend` : 
+           `Complete your booking`}
         </Button>
       </div>
     </div>

@@ -26,6 +26,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
 import PaymentStep from '@/components/book-now/PaymentStep'
+import { EntitlementTabs } from '@/components/book-now-sections/EntitlementTabs'
 import { useAuth } from '@/hooks/useAuth'
 import { getAllPricingForLocation } from '@/lib/pricingService'
 import { 
@@ -89,6 +90,16 @@ export default function ExtendBookingPage() {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [extendedHours, setExtendedHours] = useState(0)
   const [extensionCost, setExtensionCost] = useState(0)
+  
+  // Credit state
+  const [creditAmount, setCreditAmount] = useState(0)
+  const [finalCost, setFinalCost] = useState(0)
+  
+  // Calculate final cost after credits
+  useEffect(() => {
+    const costAfterCredits = Math.max(0, extensionCost - creditAmount)
+    setFinalCost(costAfterCredits)
+  }, [extensionCost, creditAmount])
 
   // Pricing state
   const [pricing, setPricing] = useState({
@@ -510,7 +521,73 @@ export default function ExtendBookingPage() {
       return
     }
 
-    // Move to payment step instead of directly extending
+    // Check if fully covered by credits
+    if (finalCost === 0 && creditAmount > 0) {
+      // Extension is fully covered by credits, skip payment step and directly confirm
+      setSubmitting(true)
+      
+      try {
+        // Generate a proper UUID for payment ID
+        const paymentId = crypto.randomUUID()
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirm-extension-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookingId,
+            paymentId,
+            extensionData: {
+              newEndAt: newEndDate.toISOString(),
+              seatNumbers: requiresSeatSelection ? selectedSeats : booking.seatNumbers,
+              extensionHours: extendedHours,
+              extensionCost: extensionCost,
+              originalEndAt: originalEndTime || booking.endAt,
+              creditAmount: creditAmount
+            }
+          })
+        })
+
+        const data = await response.json()
+
+        if (response.ok && data.success) {
+          // Calculate actual extension hours for display
+          const originalEnd = originalEndTime ? toLocalTime(originalEndTime) : toLocalTime(booking.endAt)
+          const newEndTime = toLocalTime(data.booking.endAt)
+          const actualExtensionHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
+          
+          // Update booking data and set original end time
+          setBooking(data.booking)
+          if (data.originalEndTime) {
+            setOriginalEndTime(data.originalEndTime)
+          } else {
+            // Fallback to current booking endAt as original
+            setOriginalEndTime(booking.endAt)
+          }
+          
+          toast({
+            title: "Extension Confirmed!",
+            description: `Your booking has been extended by ${actualExtensionHours.toFixed(2)} hours`,
+          })
+          setExtensionConfirmed(true)
+          setCurrentStep(3)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        } else {
+          throw new Error(data.message || 'Failed to confirm extension')
+        }
+      } catch (error: any) {
+        toast({
+          title: "Extension Failed",
+          description: error.message || "Failed to confirm extension. Please try again.",
+          variant: "destructive"
+        })
+      } finally {
+        setSubmitting(false)
+      }
+      
+      return
+    }
+
+    // Move to payment step if not fully covered
     setCurrentStep(2)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -709,7 +786,36 @@ export default function ExtendBookingPage() {
                         <div>Extended by: {extendedHours.toFixed(2)} hours</div>
                         <div>Cost per hour: ${booking.memberType === 'STUDENT' ? '4.00' : booking.memberType === 'TUTOR' ? '6.00' : '5.00'}</div>
                         <div className="font-medium">Total extension cost: ${extensionCost.toFixed(2)}</div>
+                        {creditAmount > 0 && (
+                          <>
+                            <div className="text-green-700">Credits applied: -${creditAmount.toFixed(2)}</div>
+                            <div className="font-bold text-blue-800">Amount to pay: ${finalCost.toFixed(2)}</div>
+                          </>
+                        )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Credit Selection - Only show if extension cost > 0 */}
+                  {extendedHours > 0 && extensionCost > 0 && user?.id && (
+                    <div className="border-t pt-4">
+                      <EntitlementTabs
+                        mode="credit"
+                        onChange={(data) => {
+                          console.log('Credit data changed:', data)
+                          if (data && data.type === 'credit' && data.creditAmount !== undefined) {
+                            setCreditAmount(data.creditAmount)
+                          }
+                        }}
+                        onModeChange={() => {}} // Not needed for extension
+                        userId={user.id}
+                        bookingAmount={extensionCost}
+                        bookingDuration={extendedHours as any}
+                        userRole={booking.memberType || 'MEMBER'}
+                        locationPrice={booking.memberType === 'STUDENT' ? 4.00 : booking.memberType === 'TUTOR' ? 6.00 : 5.00}
+                        totalPeople={booking.pax || 1}
+                        showOnlyCredit={true}
+                      />
                     </div>
                   )}
 
@@ -796,7 +902,9 @@ export default function ExtendBookingPage() {
                       }
                       className="bg-orange-600 hover:bg-orange-700"
                     >
-                      Continue to Payment
+                      {submitting ? 'Processing...' : 
+                       finalCost === 0 && creditAmount > 0 ? 'Confirm Extension (Fully Covered)' : 
+                       'Continue to Payment'}
                     </Button>
                   </div>
                 </CardContent>
@@ -810,8 +918,8 @@ export default function ExtendBookingPage() {
           <div className="mt-6">
             <PaymentStep
               subtotal={extensionCost}
-              total={extensionCost}
-              discountAmount={0}
+              total={finalCost}
+              discountAmount={creditAmount}
               appliedVoucher={null}
               selectedPackage={null}
               customer={{
@@ -837,7 +945,8 @@ export default function ExtendBookingPage() {
                 seatNumbers: selectedSeats,
                 extensionHours: extendedHours,
                 extensionCost: extensionCost,
-                originalEndAt: originalEndTime || booking?.endAt || ''
+                originalEndAt: originalEndTime || booking?.endAt || '',
+                creditAmount: creditAmount
               }}
             />
           </div>
@@ -858,17 +967,27 @@ export default function ExtendBookingPage() {
                   <h3 className="font-medium text-green-800 mb-2">Booking Extended Successfully</h3>
                   <div className="space-y-1 text-sm text-green-700">
                     <div>Your booking has been extended by {(() => {
+                      console.log('Extension hours calculation:', {
+                        booking: booking?.endAt,
+                        originalEndTime,
+                        originalEndDate: originalEndDate?.toISOString(),
+                        extendedHours
+                      })
+                      
                       if (booking && booking.endAt && originalEndTime) {
                         const originalEnd = toLocalTime(originalEndTime)
                         const newEndTime = toLocalTime(booking.endAt)
                         const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
+                        console.log('Using originalEndTime:', { originalEnd: originalEnd.toISOString(), newEndTime: newEndTime.toISOString(), actualHours })
                         return actualHours.toFixed(2)
                       } else if (booking && booking.endAt && originalEndDate) {
                         const originalEnd = originalEndDate // Already in local time
                         const newEndTime = toLocalTime(booking.endAt)
                         const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
+                        console.log('Using originalEndDate:', { originalEnd: originalEnd.toISOString(), newEndTime: newEndTime.toISOString(), actualHours })
                         return actualHours.toFixed(2)
                       }
+                      console.log('Using extendedHours fallback:', extendedHours)
                       return extendedHours.toFixed(2)
                     })()} hours</div>
                     <div>New end time: {booking?.endAt ? formatLocalDate(toLocalTime(booking.endAt)) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>

@@ -133,6 +133,7 @@ type Props = {
   userRole?: 'STUDENT' | 'MEMBER' | 'TUTOR'
   locationPrice?: number
   totalPeople?: number // Number of people in the booking
+  showOnlyCredit?: boolean // If true, only show credit section without tabs
 }
 
 export function EntitlementTabs({
@@ -147,7 +148,8 @@ export function EntitlementTabs({
   bookingDuration,
   userRole = 'MEMBER',
   locationPrice = 0,
-  totalPeople = 1
+  totalPeople = 1,
+  showOnlyCredit = false
 }: Props) {
   const [localPromo, setLocalPromo] = useState(promoCode || '')
   const [promoFeedback, setPromoFeedback] = useState<{ isValid: boolean; message: string } | null>(null)
@@ -435,6 +437,211 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
 };
 
 
+
+  // If showOnlyCredit is true, render only credit content without tabs
+  if (showOnlyCredit) {
+    return (
+      <div className="border-t pt-6">
+        <Label className="text-base font-medium mb-4 block flex items-center gap-2">
+          <Wallet className="w-5 h-5 text-orange-600" />
+          Apply Store Credits
+        </Label>
+        
+        <div className="mt-4 space-y-4">
+          <div>
+            {/* Credit Disclaimer */}
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Important Notice</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Credits are only available for 30 days from the date they are issued. Store credits used cannot be refunded for any cancellation
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {isLoadingCredits ? (
+              // Loading state
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                <span>Loading credits...</span>
+              </div>
+            ) : totalCredit <= 0 ? (
+              // No credits available
+              <div className="text-center py-8">
+                <Wallet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Credits Available</h3>
+                <p className="text-gray-600 mb-4">
+                  You don't have any store credits available at the moment.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Credits are added to your account when refunds are approved.
+                </p>
+              </div>
+            ) : (
+              // Credits available
+              <div className="space-y-4">
+                {/* Credit Summary */}
+                <Card className="bg-orange-50 border-orange-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-orange-900">Available Credits</h3>
+                        <p className="text-2xl font-bold text-orange-600">
+                          ${totalCredit.toFixed(2)}
+                        </p>
+                      </div>
+                      <Wallet className="w-8 h-8 text-orange-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Credit Usage Toggle */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="useCredit"
+                      checked={useCredit}
+                      onChange={(e) => {
+                        setUseCredit(e.target.checked);
+                        if (!e.target.checked) {
+                          setCreditAmount(0);
+                          onChange(null);
+                        } else {
+                          // Auto-apply maximum available credit when checkbox is checked
+                          const maxAmount = parseFloat(Math.min(totalCredit, bookingAmount).toFixed(2));
+                          setCreditAmount(maxAmount);
+                          
+                          // Immediately apply the credit and update total amount
+                          const finalAmount = parseFloat(Math.max(0, bookingAmount - maxAmount).toFixed(2));
+                          onChange({
+                            type: 'credit',
+                            id: 'credit',
+                            discountAmount: maxAmount,
+                            finalAmount: finalAmount,
+                            creditAmount: maxAmount
+                          });
+                        }
+                      }}
+                      className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                    />
+                    <Label htmlFor="useCredit" className="text-sm font-medium">
+                      Use store credits for this booking
+                    </Label>
+                  </div>
+
+                  {useCredit && (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="creditAmount" className="text-sm font-medium">
+                          Credit Amount to Use
+                        </Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="text-sm text-gray-500">$</span>
+                          <Input
+                            id="creditAmount"
+                            type="number"
+                            min="0"
+                            max={Math.min(totalCredit, bookingAmount)}
+                            step="0.01"
+                            value={creditAmount}
+                            onChange={(e) => {
+                              const inputAmount = parseFloat(e.target.value) || 0;
+                              const maxAmount = Math.min(totalCredit, bookingAmount);
+                              const amount = parseFloat(Math.min(inputAmount, maxAmount).toFixed(2));
+                              
+                              if (inputAmount > totalCredit) {
+                                toast({
+                                  title: "Invalid Credit Amount",
+                                  description: `You can only use up to $${totalCredit.toFixed(2)} in credits.`,
+                                  variant: "destructive"
+                                });
+                                return;
+                              }
+                              
+                              setCreditAmount(amount);
+                              
+                              if (useCredit) {
+                                const finalAmount = parseFloat(Math.max(0, bookingAmount - amount).toFixed(2));
+                                onChange({
+                                  type: 'credit',
+                                  id: 'credit',
+                                  discountAmount: amount,
+                                  finalAmount: finalAmount,
+                                  creditAmount: amount
+                                });
+                              }
+                            }}
+                            className="flex-1"
+                            placeholder="0.00"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const maxAmount = parseFloat(Math.min(totalCredit, bookingAmount).toFixed(2));
+                              setCreditAmount(maxAmount);
+                              
+                              if (useCredit) {
+                                const finalAmount = parseFloat(Math.max(0, bookingAmount - maxAmount).toFixed(2));
+                                onChange({
+                                  type: 'credit',
+                                  id: 'credit',
+                                  discountAmount: maxAmount,
+                                  finalAmount: finalAmount,
+                                  creditAmount: maxAmount
+                                });
+                              }
+                            }}
+                          >
+                            Use Max
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Maximum: ${Math.min(totalCredit, bookingAmount).toFixed(2)}
+                        </p>
+                      </div>
+
+                      {/* Credit Usage Summary */}
+                      {creditAmount > 0 && (
+                        <Card className="bg-orange-50 border-orange-200">
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span>Booking Amount:</span>
+                                <span>${bookingAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm text-orange-600">
+                                <span>Credit Applied:</span>
+                                <span>-${creditAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between font-medium border-t border-orange-200 pt-2">
+                                <span>Amount to Pay:</span>
+                                <span>${Math.max(0, bookingAmount - creditAmount).toFixed(2)}</span>
+                              </div>
+                              {bookingAmount - creditAmount === 0 && (
+                                <div className="text-sm text-orange-700 bg-orange-100 p-2 rounded text-center">
+                                  <span className="font-medium">✅ Fully Covered</span> - No payment required
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border-t pt-6">
