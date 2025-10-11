@@ -951,9 +951,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                         <p className="text-2xl font-bold text-orange-600">
                           ${totalCredit.toFixed(2)}
                         </p>
-                        <p className="text-sm text-orange-700">
-                          {userCredits.length} credit{userCredits.length !== 1 ? 's' : ''} available
-                        </p>
+                     
                       </div>
                       <Wallet className="w-8 h-8 text-orange-500" />
                     </div>
