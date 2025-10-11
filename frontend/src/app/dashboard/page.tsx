@@ -441,7 +441,7 @@ export default function Dashboard() {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="passes">Passes</TabsTrigger>
+              <TabsTrigger value="passes">Packages</TabsTrigger>
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
               <TabsTrigger value="credits">Wallet</TabsTrigger>
               <TabsTrigger value="refunds">Refund Requests</TabsTrigger>
