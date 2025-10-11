@@ -95,7 +95,7 @@ export default function Dashboard() {
   })
   const [studentDocument, setStudentDocument] = useState<StudentDocumentData | null>(null)
   const [originalMemberType, setOriginalMemberType] = useState<'STUDENT' | 'MEMBER' | 'TUTOR'>('MEMBER')
-  const [upcomingBooking, setUpcomingBooking] = useState<ApiBooking | null>(null)
+  const [upcomingBookings, setUpcomingBookings] = useState<ApiBooking[]>([])
   const [isLoadingBookings, setIsLoadingBookings] = useState(false)
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
 
@@ -279,18 +279,18 @@ export default function Dashboard() {
       setIsLoadingBookings(true)
       const response = await getUserBookings()
       if (response.success && response.bookings) {
-        // Filter for upcoming bookings only and get the most upcoming one
+        // Filter for upcoming bookings only and get the first 2 upcoming ones
         const upcoming = response.bookings.filter(booking => 
           booking.isUpcoming && booking.status === 'upcoming'
         )
-        // Sort by startAt date and get the first (most upcoming) booking
+        // Sort by startAt date and get the first 2 (most upcoming) bookings
         const sortedUpcoming = upcoming.sort((a, b) => 
           new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
         )
-        setUpcomingBooking(sortedUpcoming[0] || null)
+        setUpcomingBookings(sortedUpcoming.slice(0, 2))
       }
     } catch (error) {
-      console.error('Error loading upcoming booking:', error)
+      console.error('Error loading upcoming bookings:', error)
     } finally {
       setIsLoadingBookings(false)
     }
@@ -433,7 +433,7 @@ export default function Dashboard() {
               </div>
              
             </div>
-          </div>
+          </div> 
 
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -442,6 +442,7 @@ export default function Dashboard() {
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="passes">Packages</TabsTrigger>
+
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
               <TabsTrigger value="credits">Wallet</TabsTrigger>
               <TabsTrigger value="refunds">Refund Requests</TabsTrigger>
@@ -458,10 +459,64 @@ export default function Dashboard() {
                       Quick Stats
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                   <div>
-                    usama
-                   </div>
+                  <CardContent className="space-y-4">
+                    <ul className="space-y-3 text-sm">
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Upcoming Bookings:</strong> View your latest bookings under Upcoming Bookings.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>My Bookings:</strong> Check, reschedule, or cancel your upcoming bookings here.
+                          <span className="text-muted-foreground italic"> (Rescheduling and cancellations must be made at least 5 hours in advance.)</span>
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Ongoing Bookings:</strong> Need more time? Click <strong>Extend</strong> on your active booking under My Bookings.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Profile:</strong> Update your member type or personal details in the Profile tab.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Packages:</strong> View your current packages and remaining sessions in the Packages tab.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Promo Codes:</strong> Check available promo codes in the Promo Code tab.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Wallet:</strong> View your remaining credits anytime in your Wallet.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Refund Requests:</strong> Track the status of your refund requests in the Refund tab.
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <div>
+                          <strong>Need Help?</strong> Click the WhatsApp button at the bottom right corner — we'll assist you as soon as possible!
+                        </div>
+                      </li>
+                    </ul>
                   </CardContent>
                 </Card>
 
@@ -579,65 +634,69 @@ export default function Dashboard() {
                     {isLoadingBookings ? (
                       <div className="text-center py-8">
                         <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
-                        <p className="text-gray-600">Loading booking...</p>
+                        <p className="text-gray-600">Loading bookings...</p>
                       </div>
-                    ) : upcomingBooking ? (
+                    ) : upcomingBookings.length > 0 ? (
                       <div className="space-y-4">
-                        {/* Show the most upcoming booking */}
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-semibold text-sm">{upcomingBooking.location}</h4>
-                              <p className="text-xs text-gray-600">Ref: {upcomingBooking.bookingRef}</p>
+                        {/* Show up to 2 upcoming bookings */}
+                        {upcomingBookings.map((booking, index) => (
+                          <div key={booking.id} className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-semibold text-sm">{booking.location}</h4>
+                                <p className="text-xs text-gray-600">Ref: {booking.bookingRef}</p>
+                              </div>
+                              <Badge className={getStatusColor(getBookingStatus(booking))}>
+                                {getBookingStatus(booking)}
+                              </Badge>
                             </div>
-                            <Badge className={getStatusColor(getBookingStatus(upcomingBooking))}>
-                              {getBookingStatus(upcomingBooking)}
-                            </Badge>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="flex items-center">
+                                <Calendar className="w-3 h-3 mr-1 text-gray-400" />
+                                <span>{formatBookingDate(booking.startAt)}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <Clock className="w-3 h-3 mr-1 text-gray-400" />
+                                <span>{calculateDuration(booking.startAt, booking.endAt)}h</span>
+                              </div>
+                              <div className="flex items-center">
+                                <Users className="w-3 h-3 mr-1 text-gray-400" />
+                                <span>{booking.pax} people</span>
+                              </div>
+                              <div className="flex items-center">
+                                <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                                <span className="text-xs">
+                                  {booking.seatNumbers && booking.seatNumbers.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {booking.seatNumbers.map((seat, seatIndex) => (
+                                        <Badge key={seatIndex} variant="outline" className="text-xs px-1 py-0">
+                                          {seat}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    'No seats'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                              <span className="font-semibold text-sm">${booking.totalAmount}</span>
+                              {index === upcomingBookings.length - 1 && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => setActiveTab('mybookings')}
+                                  className="text-xs"
+                                >
+                                  View All Bookings
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center">
-                              <Calendar className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{formatBookingDate(upcomingBooking.startAt)}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Clock className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{calculateDuration(upcomingBooking.startAt, upcomingBooking.endAt)}h</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Users className="w-3 h-3 mr-1 text-gray-400" />
-                              <span>{upcomingBooking.pax} people</span>
-                            </div>
-                            <div className="flex items-center">
-                              <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                              <span className="text-xs">
-                                {upcomingBooking.seatNumbers && upcomingBooking.seatNumbers.length > 0 ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {upcomingBooking.seatNumbers.map((seat, index) => (
-                                      <Badge key={index} variant="outline" className="text-xs px-1 py-0">
-                                        {seat}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  'No seats'
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-2 pt-2 border-t flex justify-between items-center">
-                            <span className="font-semibold text-sm">${upcomingBooking.totalAmount}</span>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => setActiveTab('mybookings')}
-                              className="text-xs"
-                            >
-                              View All Bookings
-                            </Button>
-                          </div>
-                        </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="text-center py-8">
