@@ -676,58 +676,7 @@ export default function ExtendBookingPage() {
         {/* Step 1: Extension Details */}
         {currentStep === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Current Booking Info */}
-            <div className="lg:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                    Current Booking
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center text-sm">
-                    <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="font-medium">Reference:</span>
-                    <span className="ml-2 font-mono">{booking.bookingRef}</span>
-                  </div>
-                  
-                  <div className="flex items-center text-sm">
-                    <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{booking.location}</span>
-                  </div>
-                  
-                  <div className="flex items-center text-sm">
-                    <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                    <div>
-                      <div>{formatLocalDate(toLocalTime(booking.startAt))}</div>
-                      <div className="text-gray-500">to {formatLocalDate(toLocalTime(booking.endAt))}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center text-sm">
-                    <Users className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{booking.pax} people</span>
-                  </div>
-                  
-                  {booking.seatNumbers && booking.seatNumbers.length > 0 && (
-                    <div className="text-sm">
-                      <div className="flex items-center mb-2">
-                        <span className="font-medium">Current Seats:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {booking.seatNumbers.map((seat: string, index: number) => (
-                          <Badge key={index} variant="outline">
-                            {seat}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
+          
             {/* Extension Form */}
             <div className="lg:col-span-2">
               <Card>
@@ -910,6 +859,58 @@ export default function ExtendBookingPage() {
                 </CardContent>
               </Card>
             </div>
+            {/* Current Booking Info */}
+            <div className="lg:col-span-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                    Current Booking
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center text-sm">
+                    <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                    <span className="font-medium">Reference:</span>
+                    <span className="ml-2 font-mono">{booking.bookingRef}</span>
+                  </div>
+                  
+                  <div className="flex items-center text-sm">
+                    <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                    <span>{booking.location}</span>
+                  </div>
+                  
+                  <div className="flex items-center text-sm">
+                    <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                    <div>
+                      <div>{formatLocalDate(toLocalTime(booking.startAt))}</div>
+                      <div className="text-gray-500">to {formatLocalDate(toLocalTime(booking.endAt))}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center text-sm">
+                    <Users className="h-4 w-4 mr-2 text-gray-500" />
+                    <span>{booking.pax} people</span>
+                  </div>
+                  
+                  {booking.seatNumbers && booking.seatNumbers.length > 0 && (
+                    <div className="text-sm">
+                      <div className="flex items-center mb-2">
+                        <span className="font-medium">Current Seats:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {booking.seatNumbers.map((seat: string, index: number) => (
+                          <Badge key={index} variant="outline">
+                            {seat}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
           </div>
         )}
 

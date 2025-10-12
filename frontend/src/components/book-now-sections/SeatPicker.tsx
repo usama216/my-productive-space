@@ -102,7 +102,8 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
       </div>
       <svg
         viewBox="0 0 400 600"
-        style={{ width: '100%', height: 'auto', border: '1px solid #eee' }}
+        style={{ width: '100%', height: 'auto', maxWidth: '100%', border: '1px solid #eee' }}
+        className="overflow-hidden"
       >
         {/* Overlays */}
         {overlays.map(img => (

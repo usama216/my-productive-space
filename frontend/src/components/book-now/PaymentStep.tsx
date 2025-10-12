@@ -34,6 +34,17 @@ type Props = {
     originalEndAt?: string
     creditAmount?: number
   }
+  // Reschedule specific props
+  isReschedule?: boolean
+  rescheduleData?: {
+    originalStartAt: string
+    originalEndAt: string
+    newStartAt: string
+    newEndAt: string
+    seatNumbers: string[]
+    additionalHours: number
+    additionalCost: number
+  }
 }
 
 export default function PaymentStep({
@@ -51,6 +62,8 @@ export default function PaymentStep({
   onBookingCreated,
   isExtension = false,
   extensionData,
+  isReschedule = false,
+  rescheduleData
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
@@ -100,6 +113,8 @@ export default function PaymentStep({
       // Include booking ID in the redirect URL for confirmation
       const redirectUrl = isExtension 
         ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&extension=true&extensionHours=${extensionData?.extensionHours || 0}&extensionCost=${extensionData?.extensionCost || 0}&newEndAt=${encodeURIComponent(extensionData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(extensionData?.seatNumbers || []))}&originalEndAt=${encodeURIComponent(extensionData?.originalEndAt || '')}`
+        : isReschedule
+        ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&reschedule=true&additionalHours=${rescheduleData?.additionalHours || 0}&additionalCost=${rescheduleData?.additionalCost || 0}&newStartAt=${encodeURIComponent(rescheduleData?.newStartAt || '')}&newEndAt=${encodeURIComponent(rescheduleData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(rescheduleData?.seatNumbers || []))}&originalStartAt=${encodeURIComponent(rescheduleData?.originalStartAt || '')}&originalEndAt=${encodeURIComponent(rescheduleData?.originalEndAt || '')}`
         : `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}`
 
       const body = {
@@ -107,8 +122,8 @@ export default function PaymentStep({
         currency: 'SGD',
         email: customer.email,
         name: customer.name,
-        purpose: isExtension ? 'Booking Extension Payment for My Productive Space' : 'Test Order Payment for My Productive Space',
-        reference_number: `${currentBookingId}`,
+        purpose: isExtension ? 'Booking Extension Payment for My Productive Space' : isReschedule ? 'Booking Reschedule Payment for My Productive Space' : 'Test Order Payment for My Productive Space',
+        reference_number: isReschedule ? `RESCHEDULE_${currentBookingId}` : `${currentBookingId}`,
         redirect_url: redirectUrl,
         // webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
         webhook: `https://productive-space-backend.vercel.app/hitpay/webhook`,
@@ -117,6 +132,8 @@ export default function PaymentStep({
         bookingId: currentBookingId, // Use the created booking ID
         isExtension: isExtension, // Flag to identify extension payments
         extensionData: extensionData, // Extension details for backend processing (includes creditAmount)
+        isReschedule: isReschedule, // Flag to identify reschedule payments
+        rescheduleData: rescheduleData, // Reschedule details for backend processing
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
