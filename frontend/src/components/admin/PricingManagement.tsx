@@ -78,7 +78,7 @@ export function PricingManagement() {
       location: config.location,
       memberType: config.memberType,
       oneHourRate: config.oneHourRate.toString(),
-      overOneHourRate: config.overOneHourRate.toString(),
+      overOneHourRate: config.oneHourRate.toString(),
       isActive: config.isActive
     })
     setIsDialogOpen(true)
@@ -97,7 +97,7 @@ export function PricingManagement() {
   }
 
   const handleSubmit = async () => {
-    if (!formData.location || !formData.memberType || !formData.oneHourRate || !formData.overOneHourRate) {
+    if (!formData.location || !formData.memberType || !formData.oneHourRate) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -260,7 +260,7 @@ export function PricingManagement() {
                       />
                     </div>
 
-                    <div>
+                    {/* <div>
                       <Label htmlFor="overOneHourRate">>1 Hour Rate (SGD)</Label>
                       <Input
                         id="overOneHourRate"
@@ -270,7 +270,7 @@ export function PricingManagement() {
                         onChange={(e) => setFormData(prev => ({ ...prev, overOneHourRate: e.target.value }))}
                         placeholder="e.g., 4.00"
                       />
-                    </div>
+                    </div> */}
 
 
                     <div className="flex justify-end gap-2">
@@ -314,7 +314,7 @@ export function PricingManagement() {
                   <TableHead>Location</TableHead>
                   <TableHead>Member Type</TableHead>
                   <TableHead>1 Hour Rate</TableHead>
-                  <TableHead>>1 Hour Rate</TableHead>
+                  {/* <TableHead>>1 Hour Rate</TableHead> */}
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -332,7 +332,7 @@ export function PricingManagement() {
                       <TableCell className="font-medium">{config.location}</TableCell>
                       <TableCell>{getMemberTypeBadge(config.memberType)}</TableCell>
                       <TableCell>{formatCurrency(config.oneHourRate)}</TableCell>
-                      <TableCell>{formatCurrency(config.overOneHourRate)}</TableCell>
+                      {/* <TableCell>{formatCurrency(config.overOneHourRate)}</TableCell> */}
                       <TableCell>
                         <Badge className={config.isActive ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-600"}>
                           {config.isActive ? (
