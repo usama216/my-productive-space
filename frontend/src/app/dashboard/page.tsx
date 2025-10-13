@@ -273,21 +273,22 @@ export default function Dashboard() {
     setStudentDocument(null)
   }
 
-  // Load most upcoming booking
+  // Load most recent booking (upcoming or ongoing)
   const loadUpcomingBookings = async () => {
     try {
       setIsLoadingBookings(true)
       const response = await getUserBookings()
       if (response.success && response.bookings) {
-        // Filter for upcoming bookings only and get the first 2 upcoming ones
-        const upcoming = response.bookings.filter(booking => 
-          booking.isUpcoming && booking.status === 'upcoming'
+        // Filter for upcoming and ongoing bookings
+        const upcomingAndOngoing = response.bookings.filter(booking => 
+          (booking.isUpcoming && booking.status === 'upcoming') || 
+          (booking.isOngoing && booking.status === 'ongoing')
         )
-        // Sort by startAt date and get the first 2 (most upcoming) bookings
-        const sortedUpcoming = upcoming.sort((a, b) => 
+        // Sort by startAt date (most recent first) and get the most recent 2 bookings
+        const sortedBookings = upcomingAndOngoing.sort((a, b) => 
           new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
         )
-        setUpcomingBookings(sortedUpcoming.slice(0, 2))
+        setUpcomingBookings(sortedBookings.slice(0, 2))
       }
     } catch (error) {
       console.error('Error loading upcoming bookings:', error)
@@ -455,8 +456,8 @@ export default function Dashboard() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <BarChart3 className="w-5 h-5 mr-2" />
-                      Quick Stats
+                      <FileText className="w-5 h-5 mr-2" />
+                      Quick Guide
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -526,7 +527,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center">
                         <Calendar className="w-5 h-5 mr-2" />
-                        Upcoming Bookings
+                        Upcoming/Ongoing bookings
                       </CardTitle>
                       {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' && (() => {
                         // ONLY show notification if there's verification history
@@ -638,7 +639,7 @@ export default function Dashboard() {
                       </div>
                     ) : upcomingBookings.length > 0 ? (
                       <div className="space-y-4">
-                        {/* Show up to 2 upcoming bookings */}
+                        {/* Show most recent 2 bookings */}
                         {upcomingBookings.map((booking, index) => (
                           <div key={booking.id} className="border rounded-lg p-4 bg-gray-50">
                             <div className="flex justify-between items-start mb-2">
@@ -701,8 +702,8 @@ export default function Dashboard() {
                     ) : (
                       <div className="text-center py-8">
                         <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming bookings</h3>
-                        <p className="text-gray-600 mb-4">You don't have any upcoming bookings at the moment.</p>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No upcoming or ongoing bookings</h3>
+                        <p className="text-gray-600 mb-4">You don't have any upcoming or ongoing bookings at the moment.</p>
                         <Button onClick={() => router.push('/book-now')}>
                           Book Now
                         </Button>

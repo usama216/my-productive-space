@@ -181,11 +181,8 @@ export function UserBookings() {
       return isOngoing
     })
     .sort((a, b) => {
-      const aEndAt = new Date(a.endAt)
-      const bEndAt = new Date(b.endAt)
-      
-      // Sort by longest remaining time first
-      return bEndAt.getTime() - aEndAt.getTime()
+      // Sort by earliest start time first (most recent ongoing booking)
+      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
     })
 
   const pastBookings = bookings
@@ -320,9 +317,9 @@ export function UserBookings() {
       if (activeTab === 'upcoming') {
         return new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
       }
-      // For ongoing bookings, sort by startAt (most recent first)
+      // For ongoing bookings, sort by startAt (earliest first - most recent ongoing)
       if (activeTab === 'ongoing') {
-        return new Date(b.startAt).getTime() - new Date(a.startAt).getTime()
+        return new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
       }
       // For past bookings, sort by endAt (most recent first)
       if (activeTab === 'past') {
