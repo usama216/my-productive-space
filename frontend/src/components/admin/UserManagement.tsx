@@ -559,7 +559,7 @@ export function UserManagement() {
                        </TableCell>
                        <TableCell>
                          <div className="text-sm font-medium">
-                           ${user.stats?.totalSpent || 0}
+                           ${user.stats?.totalSpent.toFixed(2) || 0}
                          </div>
                        </TableCell>
                        <TableCell>

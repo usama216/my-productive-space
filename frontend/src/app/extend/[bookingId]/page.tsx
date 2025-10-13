@@ -103,9 +103,9 @@ export default function ExtendBookingPage() {
 
   // Pricing state
   const [pricing, setPricing] = useState({
-    student: { oneHourRate: 4.00, overOneHourRate: 3.00 },
-    member: { oneHourRate: 5.00, overOneHourRate: 4.00 },
-    tutor: { oneHourRate: 6.00, overOneHourRate: 5.00 }
+    student: { oneHourRate: 3.00, overOneHourRate: 3.00 },
+    member: { oneHourRate: 4.00, overOneHourRate: 4.00 },
+    tutor: { oneHourRate: 5.00, overOneHourRate: 5.00 }
   })
 
   // Seat layout configuration (same as book-now page)
@@ -213,6 +213,7 @@ export default function ExtendBookingPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('🚀 Extension page loading started')
         setLoading(true)
         
         // Load booking details
@@ -264,7 +265,9 @@ export default function ExtendBookingPage() {
         }
         
         // Load pricing
+        console.log('🔍 About to call getAllPricingForLocation for Kovan')
         const allPricing = await getAllPricingForLocation('Kovan')
+        console.log('🔍 Loaded pricing from API:', allPricing)
         setPricing(allPricing)
         
       } catch (error) {
@@ -410,13 +413,18 @@ export default function ExtendBookingPage() {
       setExtendedHours(Math.max(0, hoursDiff))
       
       if (hoursDiff > 0) {
-        // Determine member type for pricing
-        const memberType = booking.memberType || 'MEMBER'
-        const rate = hoursDiff === 1 ? 
-          pricing[memberType.toLowerCase() as keyof typeof pricing]?.oneHourRate || 5.00 :
-          pricing[memberType.toLowerCase() as keyof typeof pricing]?.overOneHourRate || 4.00
+        // Use the same formula as booking invoice: (Members × memberRate) + (Tutors × tutorRate) + (Students × studentRate)
+        const members = booking.members || 0;
+        const tutors = booking.tutors || 0;
+        const students = booking.students || 0;
         
-        setExtensionCost(hoursDiff * rate * booking.pax)
+        const memberRate = pricing.member?.oneHourRate || 4.00;
+        const tutorRate = pricing.tutor?.oneHourRate || 5.00;
+        const studentRate = pricing.student?.oneHourRate || 3.00;
+        
+        const hourlyRate = (members * memberRate) + (tutors * tutorRate) + (students * studentRate);
+        
+        setExtensionCost(hoursDiff * hourlyRate)
       } else {
         setExtensionCost(0)
       }
@@ -733,7 +741,14 @@ export default function ExtendBookingPage() {
                       <h3 className="font-medium text-blue-800 mb-2">Extension Summary</h3>
                       <div className="space-y-1 text-sm text-blue-700">
                         <div>Extended by: {extendedHours.toFixed(2)} hours</div>
-                        <div>Cost per hour: ${booking.memberType === 'STUDENT' ? '4.00' : booking.memberType === 'TUTOR' ? '6.00' : '5.00'}</div>
+                        <div>Cost per person: ${(() => {
+                          // Calculate per person rate: total extension cost ÷ total people
+                          const totalPeople = (booking.members || 0) + (booking.tutors || 0) + (booking.students || 0);
+                          if (totalPeople === 0) return '0.00';
+                          
+                          const perPersonCost = extensionCost / totalPeople;
+                          return perPersonCost.toFixed(2);
+                        })()}</div>
                         <div className="font-medium">Total extension cost: ${extensionCost.toFixed(2)}</div>
                         {creditAmount > 0 && (
                           <>
@@ -993,18 +1008,22 @@ export default function ExtendBookingPage() {
                     })()} hours</div>
                     <div>New end time: {booking?.endAt ? formatLocalDate(toLocalTime(booking.endAt)) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>
                     <div>Extension cost: ${(() => {
-                      if (booking && booking.totalAmount && originalBooking) {
-                        return (booking.totalAmount - originalBooking.totalAmount).toFixed(2)
+                      // Use the latest extension amount from extensionamounts array
+                      if (booking?.extensionamounts && booking.extensionamounts.length > 0) {
+                        return booking.extensionamounts[booking.extensionamounts.length - 1].toFixed(2)
                       }
                       return extensionCost.toFixed(2)
                     })()}</div>
-                    {booking?.extensionamounts && booking.extensionamounts.length > 0 && (
-                      <div>Total actual cost: ${(() => {
-                        const originalCost = originalBooking?.totalCost || 0
-                        const extensionTotal = booking.extensionamounts.reduce((sum: number, amount: number) => sum + amount, 0)
-                        return (originalCost + extensionTotal).toFixed(2)
-                      })()}</div>
-                    )}
+                    <div>Total actual cost: ${(() => {
+                      // Use the totalactualcost from the API response
+                      if (booking?.totalactualcost) {
+                        return booking.totalactualcost.toFixed(2)
+                      }
+                      // Fallback calculation
+                      const originalCost = booking?.totalAmount || 0
+                      const extensionTotal = booking?.extensionamounts?.reduce((sum: number, amount: number) => sum + amount, 0) || 0
+                      return (originalCost + extensionTotal).toFixed(2)
+                    })()}</div>
                     {paymentId && (
                       <div>Payment ID: {paymentId}</div>
                     )}

@@ -108,19 +108,22 @@ export const getAllPricingForLocation = async (
   tutor: { oneHourRate: number; overOneHourRate: number };
 }> => {
   try {
+    console.log('🔍 Making API call to:', `${API_BASE_URL}/pricing/${location}`)
     const response = await fetch(`${API_BASE_URL}/pricing/${location}`);
+    console.log('🔍 API response status:', response.status, response.ok)
     if (!response.ok) {
       throw new Error(`Failed to fetch pricing for ${location}`);
     }
     const result = await response.json();
+    console.log('🔍 API response data:', result)
     return result.data;
   } catch (error) {
     console.error('Error getting all pricing for location:', error);
     // Fallback to Kovan default pricing if database fetch fails
     return {
-      student: { oneHourRate: 4.00, overOneHourRate: 3.00 },
-      member: { oneHourRate: 5.00, overOneHourRate: 4.00 },
-      tutor: { oneHourRate: 6.00, overOneHourRate: 5.00 },
+      student: { oneHourRate: 3.00, overOneHourRate: 3.00 },
+      member: { oneHourRate: 4.00, overOneHourRate: 4.00 },
+      tutor: { oneHourRate: 5.00, overOneHourRate: 5.00 },
     };
   }
 };
@@ -143,9 +146,9 @@ export const getPricingForBooking = async (
     console.error('Error getting pricing for booking:', error);
     // Fallback to Kovan default pricing if database fetch fails
     const kovanDefaultPricing = {
-      'STUDENT': { oneHourRate: 4.00, overOneHourRate: 3.00 },
-      'MEMBER': { oneHourRate: 5.00, overOneHourRate: 4.00 },
-      'TUTOR': { oneHourRate: 6.00, overOneHourRate: 5.00 },
+      'STUDENT': { oneHourRate: 3.00, overOneHourRate: 3.00 },
+      'MEMBER': { oneHourRate: 4.00, overOneHourRate: 4.00 },
+      'TUTOR': { oneHourRate: 5.00, overOneHourRate: 5.00 },
     };
     
     return kovanDefaultPricing[memberType] || kovanDefaultPricing['MEMBER'];
