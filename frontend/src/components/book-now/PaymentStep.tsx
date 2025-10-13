@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { CreditCard, QrCode, AlertTriangle } from 'lucide-react'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 type PaymentMethod = 'payNow' | 'creditCard'
 
@@ -69,8 +70,7 @@ export default function PaymentStep({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
   
   // Calculate totals based on payment method
-  const creditCardFee = selectedPaymentMethod === 'creditCard' ? total * 0.05 : 0
-  const finalTotal = total + creditCardFee
+  const { fee: creditCardFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
 
   // Map payment methods to API values
   const getPaymentMethodForAPI = (method: PaymentMethod): string => {
@@ -79,7 +79,7 @@ export default function PaymentStep({
 
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setSelectedPaymentMethod(method)
-    const newTotal = method === 'creditCard' ? total + (total * 0.05) : total
+    const { total: newTotal } = calculatePaymentTotal(total, method)
     console.log(`Payment method changed to: ${method} (API value: ${getPaymentMethodForAPI(method)})`)
     onPaymentMethodChange(method, newTotal)
   }
@@ -228,12 +228,12 @@ export default function PaymentStep({
           {creditCardFee > 0 && (
             <div className="flex justify-between text-amber-600">
               <span>Credit Card Fee (5%)</span>
-              <span>${creditCardFee.toFixed(2)}</span>
+              <span>${formatCurrency(creditCardFee)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-lg border-t pt-2">
             <span>Total to Pay</span>
-            <span>${finalTotal.toFixed(2)}</span>
+            <span>${formatCurrency(finalTotal)}</span>
           </div>
         </CardContent>
       </Card>

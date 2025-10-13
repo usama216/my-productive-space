@@ -22,6 +22,7 @@ import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import PaymentStep from '@/components/buy-pass/PaymentStep'
 import ConfirmationStep from '@/components/buy-pass/ConfirmationStep'
 import { formatSingaporeDateOnly, getCurrentSingaporeTime } from '@/lib/timezoneUtils'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 export default function BuyNowPage() {
   const searchParams = useSearchParams()
@@ -296,8 +297,7 @@ export default function BuyNowPage() {
   // Helper functions
   const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user
   const subtotal = selectedPackage ? (selectedPackage.price + selectedPackage.outletFee) * quantity : 0
-  const cardFee = paymentMethod === 'card' ? subtotal * 0.05 : 0
-  const total = subtotal + cardFee
+  const { fee: cardFee, total } = calculatePaymentTotal(subtotal, paymentMethod === 'card' ? 'creditCard' : 'payNow')
   
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
@@ -663,12 +663,12 @@ export default function BuyNowPage() {
                               {isCardPayment && (
                                 <div className="flex justify-between text-sm text-orange-600">
                                   <span>Credit Card Fee (5%)</span>
-                                  <span>SGD ${cardFee.toFixed(2)}</span>
+                                  <span>SGD ${formatCurrency(cardFee)}</span>
                                 </div>
                               )}
                               <div className="flex justify-between font-bold text-lg">
                                 <span>Total Paid</span>
-                                <span>SGD ${finalTotal.toFixed(2)}</span>
+                                <span>SGD ${formatCurrency(finalTotal)}</span>
                               </div>
                             </>
                           )
@@ -778,13 +778,13 @@ export default function BuyNowPage() {
                         {cardFee > 0 && (
                           <div className="flex justify-between text-orange-600">
                             <span>Credit Card Fee (5%)</span>
-                            <span>${cardFee.toFixed(2)}</span>
+                            <span>${formatCurrency(cardFee)}</span>
                           </div>
                         )}
 
                         <div className="flex justify-between font-bold border-t pt-2">
                           <span>Total</span>
-                          <span>${total.toFixed(2)}</span>
+                          <span>${formatCurrency(total)}</span>
                         </div>
                       </div>
                     </div>

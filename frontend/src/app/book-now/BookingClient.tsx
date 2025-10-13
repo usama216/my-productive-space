@@ -50,6 +50,7 @@ import {
   formatBookingDateRange,
   toSingaporeTime
 } from '@/lib/timezoneUtils'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 
 const locations = [
@@ -2178,18 +2179,7 @@ export default function BookingClient() {
                               <span className='text-sm'>Package Discount</span>
                               <span className='text-sm'>-${packageDiscount.toFixed(2)}</span>
                             </div>
-                            {people > 1 && (
-                              <div className="flex justify-between text-gray-600">
-                                <span className='text-sm'>Other {people - 1} person{people - 1 > 1 ? 's' : ''}</span>
-                                <span className='text-sm'>${((people - 1) * pricePerHour * bookingDuration.durationHours).toFixed(2)}</span>
-                              </div>
-                            )}
-                            {remainingAmount > 0 && (
-                              <div className="flex justify-between text-orange-600">
-                                <span className='text-sm'>Remaining Amount</span>
-                                <span className='text-sm'>${remainingAmount.toFixed(2)}</span>
-                              </div>
-                            )}
+                          
                             {remainingAmount === 0 && people === 1 && (
                               <div className="flex justify-between text-green-600 font-medium">
                                 <span className='text-sm'>Fully Covered!</span>
@@ -2205,12 +2195,15 @@ export default function BookingClient() {
                         <span>${subtotal.toFixed(2)}</span>
                       </div>
 
-                      {selectedPaymentMethod === 'creditCard' && (
-                        <div className="flex justify-between text-amber-600">
-                          <span>Credit Card Fee (5%)</span>
-                          <span>${(subtotal * 0.05).toFixed(2)}</span>
-                        </div>
-                      )}
+                      {selectedPaymentMethod === 'creditCard' && (() => {
+                        const { fee } = calculatePaymentTotal(subtotal, 'creditCard')
+                        return (
+                          <div className="flex justify-between text-amber-600">
+                            <span>Credit Card Fee (5%)</span>
+                            <span>${formatCurrency(fee)}</span>
+                          </div>
+                        )
+                      })()}
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total</span>
                         <span className={total <= 0 ? "text-green-600" : ""}>

@@ -40,6 +40,7 @@ import {
   toLocalTime
 } from '@/lib/timezoneUtils'
 import { supabase } from '@/lib/supabaseClient'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 // Layout and seat configuration (same as extend page)
 const DEMO_LAYOUT: SeatMeta[] = [
@@ -127,6 +128,7 @@ export default function ReschedulePage() {
   // State
   const [booking, setBooking] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [apiLoading, setApiLoading] = useState(false)
   const [currentStep, setCurrentStep] = useState(() => {
     const step = searchParams.get('step')
     return step ? parseInt(step) : 1
@@ -619,16 +621,31 @@ export default function ReschedulePage() {
       setCurrentStep(2)
       updateStepInURL(2)
     } else {
-      // No payment needed, go directly to confirmation
-      setCurrentStep(3)
-      updateStepInURL(3)
+      // No payment needed, update booking directly and go to confirmation
+      console.log('🔄 No payment needed, calling handlePaymentSuccess directly...')
+      handlePaymentSuccess(undefined, {
+        newStartAt: newStartDate!.toISOString(),
+        newEndAt: newEndDate!.toISOString(),
+        seatNumbers: selectedSeats,
+        originalStartAt: originalStartDate!.toISOString(),
+        originalEndAt: originalEndDate!.toISOString(),
+        additionalCost: costDifference,
+        additionalHours: newDuration - originalDuration,
+        newDuration,
+        originalDuration,
+        costDifference,
+        needsPayment
+      })
     }
   }
 
-  const handlePaymentSuccess = async (paymentId?: string) => {
+  const handlePaymentSuccess = async (paymentId?: string, customRescheduleData?: any) => {
     // Payment completed - now update booking with new schedule
-    if (paymentId && rescheduleData) {
-      try {
+    const dataToUse = customRescheduleData || rescheduleData
+    setApiLoading(true)
+    
+    try {
+      if (paymentId && dataToUse) {
         console.log('🔍 Payment completed, updating booking with new schedule...')
 
         // Update booking with new dates/times/seats AFTER payment confirmation
@@ -655,6 +672,15 @@ export default function ReschedulePage() {
           // Update local booking state with confirmed changes
           if (result.booking) {
             setBooking(result.booking)
+            
+            // Set confirmation data for display
+            setConfirmationData({
+              booking: result.booking,
+              originalTimes: {
+                startAt: result.originalTimes?.startAt || originalStartDate!.toISOString(),
+                endAt: result.originalTimes?.endAt || originalEndDate!.toISOString()
+              }
+            })
           }
 
           toast({
@@ -664,41 +690,54 @@ export default function ReschedulePage() {
         } else {
           throw new Error(result.error || 'Failed to confirm reschedule')
         }
-      } catch (error: any) {
-        console.error('❌ Error confirming reschedule:', error)
-        toast({
-          title: "Reschedule Failed",
-          description: error.message || "Payment was processed but booking update failed. Please contact support.",
-          variant: "destructive"
+      } else {
+        // No payment needed case - update booking directly
+        console.log('✅ No payment needed, updating booking...')
+        console.log('📤 Sending reschedule data:', {
+          startAt: dataToUse?.newStartAt,
+          endAt: dataToUse?.newEndAt,
+          seatNumbers: dataToUse?.seatNumbers,
+          rescheduleCost: 0
         })
-        return
-      }
-    } else {
-      // No payment needed case - update booking directly
-      console.log('✅ No payment needed, updating booking...')
-      try {
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/booking/${bookingId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            startAt: rescheduleData?.newStartAt,
-            endAt: rescheduleData?.newEndAt,
-            seatNumbers: rescheduleData?.seatNumbers,
+            startAt: dataToUse?.newStartAt,
+            endAt: dataToUse?.newEndAt,
+            seatNumbers: dataToUse?.seatNumbers,
             rescheduleCost: 0
           })
         })
 
         const result = await response.json()
+        console.log('📥 Backend response:', result)
+        console.log('📊 Response status:', response.status, response.ok)
 
         if (response.ok && result.success) {
+          console.log('✅ Booking updated successfully:', result.booking)
           setPaymentConfirmed(true)
           setCurrentStep(3)
           updateStepInURL(3)
 
           if (result.booking) {
             setBooking(result.booking)
+            console.log('📅 Updated booking times:', {
+              startAt: result.booking.startAt,
+              endAt: result.booking.endAt
+            })
+            
+            // Set confirmation data for display
+            setConfirmationData({
+              booking: result.booking,
+              originalTimes: {
+                startAt: originalStartDate!.toISOString(),
+                endAt: originalEndDate!.toISOString()
+              }
+            })
           }
 
           toast({
@@ -708,14 +747,16 @@ export default function ReschedulePage() {
         } else {
           throw new Error(result.error || 'Failed to reschedule booking')
         }
-      } catch (error: any) {
-        console.error('❌ Error rescheduling:', error)
-        toast({
-          title: "Reschedule Failed",
-          description: error.message || "Failed to reschedule booking.",
-          variant: "destructive"
-        })
       }
+    } catch (error: any) {
+      console.error('❌ Error in handlePaymentSuccess:', error)
+      toast({
+        title: "Reschedule Failed",
+        description: error.message || "Failed to reschedule booking.",
+        variant: "destructive"
+      })
+    } finally {
+      setApiLoading(false)
     }
   }
 
@@ -927,7 +968,7 @@ export default function ReschedulePage() {
                     <Alert>
                       <Clock className="h-4 w-4" />
                       <AlertDescription>
-                        New duration: {((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)).toFixed(1)} hours
+                        Duration: {((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)).toFixed(1)} hours
                         {costDifference > 0 && (
                           <span className="block mt-1 text-orange-600">
                             Additional cost: SGD ${costDifference.toFixed(2)}
@@ -935,7 +976,7 @@ export default function ReschedulePage() {
                         )}
                         {costDifference < 0 && (
                           <span className="block mt-1 text-red-600">
-                            Cannot decrease time by SGD ${Math.abs(costDifference).toFixed(2)}
+                           New duration cannot be lesser than original duration. Please cancel and rebook
                           </span>
                         )}
                       </AlertDescription>
@@ -949,7 +990,12 @@ export default function ReschedulePage() {
                       Checking seat availability...
                     </div>
                   )}
-
+   <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                      Reschedule can only be done once.
+                      </AlertDescription>
+                    </Alert>
                   {requiresSeatSelection && !checkingSeats && (
                     <Alert>
                       <AlertTriangle className="h-4 w-4" />
@@ -1205,22 +1251,23 @@ export default function ReschedulePage() {
                         <span className="text-orange-700 text-sm font-medium">Subtotal:</span>
                         <span className="text-orange-700 text-sm font-medium">SGD ${costDifference.toFixed(2)}</span>
                       </div>
-                      {paymentTotal > costDifference && (
-                        <div className="flex justify-between">
-                          <span className="text-orange-700 text-sm font-medium">Credit Card Fee (5%):</span>
-                          <span className="text-orange-700 text-sm font-medium">SGD ${(paymentTotal - costDifference).toFixed(2)}</span>
-                        </div>
-                      )}
+                      {selectedPaymentMethod === 'creditCard' && (() => {
+                        const { fee } = calculatePaymentTotal(costDifference, 'creditCard')
+                        return (
+                          <div className="flex justify-between">
+                            <span className="text-orange-700 text-sm font-medium">Credit Card Fee (5%):</span>
+                            <span className="text-orange-700 text-sm font-medium">SGD ${formatCurrency(fee)}</span>
+                          </div>
+                        )
+                      })()}
                       <div className="flex justify-between font-medium border-t border-orange-200 pt-1 mt-2">
                         <span className="text-orange-800 text-sm font-medium">Total payable:</span>
                         <span className="text-orange-900 text-sm font-medium">
-                          SGD ${(
-                            selectedPaymentMethod === 'creditCard'
-                              ? paymentTotal + costDifference * 0.05
-                              : paymentTotal
-                          ).toFixed(2)}
+                          SGD ${(() => {
+                            const { total } = calculatePaymentTotal(costDifference, selectedPaymentMethod)
+                            return formatCurrency(total)
+                          })()}
                         </span>
-
                       </div>
 
                     </div>
@@ -1234,25 +1281,42 @@ export default function ReschedulePage() {
         )}
 
         {/* Step 3: Confirmation */}
-        {currentStep === 3 && confirmationData && (
+        {currentStep === 3 && (
           <div className="max-w-2xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                  Reschedule Confirmed
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            {apiLoading ? (
+              <Card>
+                <CardContent className="space-y-6 py-8">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-orange-600" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Updating Booking...</h3>
+                    <p className="text-gray-600">Please wait while we update your booking details.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (confirmationData || booking) ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                    Reschedule Confirmed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h3 className="font-medium text-green-800 mb-2">Booking Rescheduled Successfully</h3>
                   <div className="space-y-1 text-sm text-green-700">
-                    <div>Reference: {confirmationData.booking.bookingRef}</div>
-                    <div>Location: {confirmationData.booking.location}</div>
-                    <div>Original: {formatSingaporeDate(confirmationData.originalTimes.startAt)} - {formatSingaporeDate(confirmationData.originalTimes.endAt)}</div>
-                    <div>New: {formatSingaporeDate(confirmationData.booking.startAt)} - {formatSingaporeDate(confirmationData.booking.endAt)}</div>
-
-
+                    <div>Reference: {(confirmationData?.booking || booking)?.bookingRef}</div>
+                    <div>Location: {(confirmationData?.booking || booking)?.location}</div>
+                    <div>Original: {formatSingaporeDate(
+                      confirmationData?.originalTimes?.startAt || originalStartDate?.toISOString() || ''
+                    )} - {formatSingaporeDate(
+                      confirmationData?.originalTimes?.endAt || originalEndDate?.toISOString() || ''
+                    )}</div>
+                    <div>New: {formatSingaporeDate(
+                      confirmationData?.booking?.startAt || booking?.startAt || newStartDate?.toISOString() || ''
+                    )} - {formatSingaporeDate(
+                      confirmationData?.booking?.endAt || booking?.endAt || newEndDate?.toISOString() || ''
+                    )}</div>
                   </div>
                 </div>
 
@@ -1269,6 +1333,7 @@ export default function ReschedulePage() {
                 </div>
               </CardContent>
             </Card>
+            ) : null}
           </div>
         )}
       </div>

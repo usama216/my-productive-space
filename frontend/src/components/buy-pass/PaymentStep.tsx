@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 type PaymentMethod = 'payNow' | 'creditCard'
 
@@ -43,14 +44,13 @@ export default function PaymentStep({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
 
   // Calculate totals based on payment method
-  const creditCardFee = selectedPaymentMethod === 'creditCard' ? total * 0.05 : 0
-  const finalTotal = total + creditCardFee
+  const { fee: creditCardFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
 
 
 
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setSelectedPaymentMethod(method)
-    const newTotal = method === 'creditCard' ? total + (total * 0.05) : total
+    const { total: newTotal } = calculatePaymentTotal(total, method)
     console.log(`Payment method changed to: ${method}`)
     // Update the parent component's payment method
     onPaymentMethodChange(method === 'creditCard' ? 'card' : 'paynow')
@@ -170,12 +170,12 @@ export default function PaymentStep({
           {creditCardFee > 0 && (
             <div className="flex justify-between text-orange-600">
               <span>Credit Card Fee:</span>
-              <span>${creditCardFee.toFixed(2)}</span>
+              <span>${formatCurrency(creditCardFee)}</span>
             </div>
           )}
           <div className="flex justify-between font-medium border-t pt-2">
             <span>Total:</span>
-            <span>${finalTotal.toFixed(2)}</span>
+            <span>${formatCurrency(finalTotal)}</span>
           </div>
         </div>
       </div>

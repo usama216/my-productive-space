@@ -13,6 +13,7 @@ import { Package, Clock, Calendar, CheckCircle, XCircle, Loader2, AlertTriangle,
 import { useToast } from '@/hooks/use-toast'
 import { getUserPackages, UserPackage, completePackagePayment, CustomerInfo } from '@/lib/services/packageService'
 import { useAuth } from '@/hooks/useAuth'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 interface UserPackagesProps {
   userId: string
@@ -86,8 +87,10 @@ export function UserPackages({ userId }: UserPackagesProps) {
       }
 
       // Calculate total with credit card fee if applicable
-      const creditCardFee = selectedPaymentMethod === 'card' ? selectedPackage.totalAmount * 0.05 : 0
-      const finalAmount = selectedPackage.totalAmount + creditCardFee
+      const { fee: creditCardFee, total: finalAmount } = calculatePaymentTotal(
+        selectedPackage.totalAmount, 
+        selectedPaymentMethod === 'card' ? 'creditCard' : 'payNow'
+      )
 
       console.log('Completing payment for package:', selectedPackage.id)
       const result = await completePackagePayment(selectedPackage.id, selectedPackage.orderId, customerInfo, finalAmount, selectedPaymentMethod)
@@ -472,15 +475,21 @@ export function UserPackages({ userId }: UserPackagesProps) {
                     <span>Package Price:</span>
                     <span>SGD ${selectedPackage.totalAmount}</span>
                   </div>
-                  {selectedPaymentMethod === 'card' && (
-                    <div className="flex justify-between text-orange-600">
-                      <span>Credit Card Fee (5%):</span>
-                      <span>SGD ${(selectedPackage.totalAmount * 0.05).toFixed(2)}</span>
-                    </div>
-                  )}
+                  {selectedPaymentMethod === 'card' && (() => {
+                    const { fee } = calculatePaymentTotal(selectedPackage.totalAmount, 'creditCard')
+                    return (
+                      <div className="flex justify-between text-orange-600">
+                        <span>Credit Card Fee (5%):</span>
+                        <span>SGD ${formatCurrency(fee)}</span>
+                      </div>
+                    )
+                  })()}
                   <div className="flex justify-between font-medium border-t pt-2">
                     <span>Total:</span>
-                    <span>SGD ${(selectedPackage.totalAmount + (selectedPaymentMethod === 'card' ? selectedPackage.totalAmount * 0.05 : 0)).toFixed(2)}</span>
+                    <span>SGD ${(() => {
+                      const { total } = calculatePaymentTotal(selectedPackage.totalAmount, selectedPaymentMethod === 'card' ? 'creditCard' : 'payNow')
+                      return formatCurrency(total)
+                    })()}</span>
                   </div>
                 </div>
               </div>

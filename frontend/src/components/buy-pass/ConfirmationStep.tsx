@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, CheckCircle, XCircle, AlertTriangle, RefreshCw, Package, Clock, Calendar } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 type ConfirmationStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -234,11 +235,11 @@ export default function ConfirmationStep({
                           </div>
                           <div className="flex justify-between items-center text-orange-600">
                             <span>Credit Card Fee (5%)</span>
-                            <span>SGD ${cardFee.toFixed(2)}</span>
+                            <span>SGD ${formatCurrency(cardFee)}</span>
                           </div>
                           <div className="flex justify-between items-center font-bold border-t pt-3">
                             <span>Total Paid</span>
-                            <span>SGD ${total.toFixed(2)}</span>
+                            <span>SGD ${formatCurrency(total)}</span>
                           </div>
                         </>
                       )

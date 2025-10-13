@@ -35,6 +35,7 @@ import {
   formatLocalDateOnly,
   formatLocalTimeOnly 
 } from '@/lib/timezoneUtils'
+import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
 
 export default function ExtendBookingPage() {
   const params = useParams()
@@ -725,7 +726,7 @@ export default function ExtendBookingPage() {
                         maxTime={new Date(new Date().setHours(23, 45, 0, 0))}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        ⏰ You can only select times after the current end time
+                        You can only select times after the current end time
                       </p>
                     </div>
                   </div>

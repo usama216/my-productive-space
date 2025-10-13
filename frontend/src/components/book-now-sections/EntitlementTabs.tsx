@@ -645,7 +645,8 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
 
   return (
     <div className="border-t pt-6">
-      <Label className="text-base font-medium mb-4 block">Apply Discount</Label>
+      <Label className="text-base font-medium block">Apply Discount</Label>
+      <p className="text-sm text-gray-600  mb-4">Please note that all packages, promo codes, credit applied are not refundable.</p>
       <Tabs
         value={mode}
         onValueChange={(newMode) => {
@@ -1067,12 +1068,12 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                            <div className="text-right text-xs text-gray-500">
+                            {/* <div className="text-right text-xs text-gray-500">
                               <p>Uses: {promo.userUsageCount || 0}/{promo.maxUsagePerUser || 1}</p>
                               <p className="text-green-600 font-medium">
                                 {promo.remainingUses || 0} uses left
                               </p>
-                            </div>
+                            </div> */}
                             <Button
                               type="button"
                               size="sm"

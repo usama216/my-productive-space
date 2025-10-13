@@ -197,7 +197,7 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
             )
           }
         })}
-        {/* 5) Labels */}
+        {/* 5) Labels - Only show seat labels, hide table labels */}
         {labels.map(lbl => {
           // Check if this is a seat label (starts with 'S' followed by numbers)
           const isSeatLabel = lbl.text.match(/^S\d+$/)
@@ -228,22 +228,9 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
                 {lbl.text}
               </text>
             )
-          } else {
-            // For non-seat labels (table labels, etc.), keep them non-clickable
-            return (
-              <text
-                key={lbl.id}
-                x={lbl.x}
-                y={lbl.y}
-                fontSize={lbl.fontSize || 14}
-                fill={lbl.fill || '#000'}
-                textAnchor="middle"
-                alignmentBaseline="middle"
-              >
-                {lbl.text}
-              </text>
-            )
           }
+          // Don't render table labels (T1, T2, T3, etc.) - return null
+          return null
         })}
       </svg>
     </div>
