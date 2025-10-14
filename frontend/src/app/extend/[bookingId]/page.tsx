@@ -31,6 +31,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { getAllPricingForLocation } from '@/lib/pricingService'
 import { 
   toLocalTime,
+  toSingaporeTime,
   formatLocalDate,
   formatLocalDateOnly,
   formatLocalTimeOnly 
@@ -45,30 +46,37 @@ export default function ExtendBookingPage() {
   
   const bookingId = params.bookingId as string
   
-  // Check for payment confirmation from URL
-  const [searchParams] = useState(() => {
+  // URL parameters state
+  const [urlParams, setUrlParams] = useState(() => {
     if (typeof window !== 'undefined') {
       return new URLSearchParams(window.location.search)
     }
     return new URLSearchParams()
   })
   
+  // Update URL params when location changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUrlParams(new URLSearchParams(window.location.search))
+    }
+  }, [])
+  
   // Check if this is a payment confirmation
-  const isPaymentConfirmation = searchParams.get('step') === '3' && searchParams.get('extension') === 'true'
-  const paymentId = searchParams.get('paymentId') || searchParams.get('reference')
-  const status = searchParams.get('status')
+  const isPaymentConfirmation = urlParams.get('step') === '3' && urlParams.get('extension') === 'true'
+  const paymentId = urlParams.get('paymentId') || urlParams.get('reference')
+  const status = urlParams.get('status')
   
   // Get extension data from URL parameters
-  const urlExtensionHours = searchParams.get('extensionHours')
-  const urlExtensionCost = searchParams.get('extensionCost')
-  const urlNewEndAt = searchParams.get('newEndAt')
-  const urlSeatNumbers = searchParams.get('seatNumbers')
-  const urlOriginalEndAt = searchParams.get('originalEndAt')
+  const urlExtensionHours = urlParams.get('extensionHours')
+  const urlExtensionCost = urlParams.get('extensionCost')
+  const urlNewEndAt = urlParams.get('newEndAt')
+  const urlSeatNumbers = urlParams.get('seatNumbers')
+  const urlOriginalEndAt = urlParams.get('originalEndAt')
   
   // Debug URL parameters
   console.log('URL params:', { isPaymentConfirmation, paymentId, status })
   console.log('Extension params:', { urlExtensionHours, urlExtensionCost, urlNewEndAt, urlSeatNumbers })
-  console.log('All search params:', Object.fromEntries(searchParams.entries()))
+  console.log('All search params:', Object.fromEntries(urlParams.entries()))
   
   // State
   const [booking, setBooking] = useState<any>(null)
@@ -292,7 +300,7 @@ export default function ExtendBookingPage() {
   // Handle payment confirmation
   useEffect(() => {
     const handlePaymentConfirmation = async () => {
-      if (isPaymentConfirmation && paymentId && status === 'completed' && booking && !extensionConfirmed) {
+      if (isPaymentConfirmation  && status === 'completed') {
         try {
           console.log('Processing payment confirmation for extension:', { paymentId, status, bookingId })
           console.log('Extension data:', { newEndDate, selectedSeats, extendedHours, extensionCost })
@@ -347,15 +355,15 @@ export default function ExtendBookingPage() {
                 return
               }
               
-              // Calculate actual extension hours from booking data
+              // Calculate actual extension hours from booking data (in UTC to avoid timezone issues)
               // Use the stored originalEndTime (before extension) or fall back to current booking endAt
-              const originalEnd = originalEndTime ? toLocalTime(originalEndTime) : toLocalTime(booking.endAt)
-              const newEndTime = toLocalTime(result.booking.endAt)
-              const actualExtensionHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
+              const originalEndUTC = originalEndTime ? new Date(originalEndTime) : (urlOriginalEndAt ? new Date(urlOriginalEndAt) : new Date(booking.endAt))
+              const newEndTimeUTC = new Date(result.booking.endAt)
+              const actualExtensionHours = (newEndTimeUTC.getTime() - originalEndUTC.getTime()) / (1000 * 60 * 60)
               
               console.log('Extension calculation:', {
-                originalEndTime: originalEnd.toISOString(),
-                newEndTime: newEndTime.toISOString(),
+                originalEndTime: originalEndUTC.toISOString(),
+                newEndTime: newEndTimeUTC.toISOString(),
                 actualExtensionHours: actualExtensionHours
               })
               
@@ -405,7 +413,7 @@ export default function ExtendBookingPage() {
     }
 
     handlePaymentConfirmation()
-  }, [isPaymentConfirmation, paymentId, status, booking, extensionConfirmed, bookingId, newEndDate, selectedSeats, extendedHours, extensionCost, toast, urlExtensionHours, urlExtensionCost, urlNewEndAt, urlSeatNumbers, urlOriginalEndAt, originalEndTime])
+  }, [isPaymentConfirmation, paymentId, status])
 
   // Calculate extension cost when end date changes
   useEffect(() => {
@@ -559,10 +567,10 @@ export default function ExtendBookingPage() {
         const data = await response.json()
 
         if (response.ok && data.success) {
-          // Calculate actual extension hours for display
-          const originalEnd = originalEndTime ? toLocalTime(originalEndTime) : toLocalTime(booking.endAt)
-          const newEndTime = toLocalTime(data.booking.endAt)
-          const actualExtensionHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
+          // Calculate actual extension hours for display (in UTC to avoid timezone issues)
+          const originalEndUTC = originalEndTime ? new Date(originalEndTime) : (urlOriginalEndAt ? new Date(urlOriginalEndAt) : new Date(booking.endAt))
+          const newEndTimeUTC = new Date(data.booking.endAt)
+          const actualExtensionHours = (newEndTimeUTC.getTime() - originalEndUTC.getTime()) / (1000 * 60 * 60)
           
           // Update booking data and set original end time
           setBooking(data.booking)
@@ -983,31 +991,8 @@ export default function ExtendBookingPage() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h3 className="font-medium text-green-800 mb-2">Booking Extended Successfully</h3>
                   <div className="space-y-1 text-sm text-green-700">
-                    <div>Your booking has been extended by {(() => {
-                      console.log('Extension hours calculation:', {
-                        booking: booking?.endAt,
-                        originalEndTime,
-                        originalEndDate: originalEndDate?.toISOString(),
-                        extendedHours
-                      })
-                      
-                      if (booking && booking.endAt && originalEndTime) {
-                        const originalEnd = toLocalTime(originalEndTime)
-                        const newEndTime = toLocalTime(booking.endAt)
-                        const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
-                        console.log('Using originalEndTime:', { originalEnd: originalEnd.toISOString(), newEndTime: newEndTime.toISOString(), actualHours })
-                        return actualHours.toFixed(2)
-                      } else if (booking && booking.endAt && originalEndDate) {
-                        const originalEnd = originalEndDate // Already in local time
-                        const newEndTime = toLocalTime(booking.endAt)
-                        const actualHours = (newEndTime.getTime() - originalEnd.getTime()) / (1000 * 60 * 60)
-                        console.log('Using originalEndDate:', { originalEnd: originalEnd.toISOString(), newEndTime: newEndTime.toISOString(), actualHours })
-                        return actualHours.toFixed(2)
-                      }
-                      console.log('Using extendedHours fallback:', extendedHours)
-                      return extendedHours.toFixed(2)
-                    })()} hours</div>
-                    <div>New end time: {booking?.endAt ? formatLocalDate(toLocalTime(booking.endAt)) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>
+                    <div>Your booking has been extended by {urlExtensionHours || '0.00'} hours</div>
+                    <div>New end time: {booking?.endAt ? formatLocalDate(booking.endAt) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>
                     <div>Extension cost: ${(() => {
                       // Use the latest extension amount from extensionamounts array
                       if (booking?.extensionamounts && booking.extensionamounts.length > 0) {

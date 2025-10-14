@@ -28,6 +28,20 @@ export function toLocalTime(utcDate: string | Date): Date {
 }
 
 /**
+ * Convert UTC time to Singapore time (GMT+8)
+ * @param utcDate - UTC date string or Date object
+ * @returns Date object adjusted to Singapore timezone
+ */
+export function toSingaporeTime(utcDate: string | Date): Date {
+  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate
+  
+  // Use Intl.DateTimeFormat to properly convert to Singapore timezone
+  const singaporeTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Singapore"}))
+  
+  return singaporeTime
+}
+
+/**
  * Convert local time to UTC for database storage
  * @param localDate - Date object or string in local time
  * @returns Date object in UTC
@@ -256,7 +270,7 @@ export function getLocalTimeConstraints() {
 export const formatSingaporeDate = formatLocalDate
 export const formatSingaporeDateOnly = formatLocalDateOnly
 export const formatSingaporeTimeOnly = formatLocalTimeOnly
-export const toSingaporeTime = toLocalTime
+// toSingaporeTime is now a proper function above
 export const isPastInSingapore = isPastInLocal
 export const isFutureInSingapore = isFutureInLocal
 export const calculateDurationSingapore = calculateDurationLocal

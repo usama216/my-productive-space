@@ -123,7 +123,7 @@ export default function PaymentStep({
         email: customer.email,
         name: customer.name,
         purpose: isExtension ? 'Booking Extension Payment for My Productive Space' : isReschedule ? 'Booking Reschedule Payment for My Productive Space' : 'Test Order Payment for My Productive Space',
-        reference_number: isReschedule ? `RESCHEDULE_${currentBookingId}` : `${currentBookingId}`,
+        reference_number: isReschedule ? `RESCHEDULE_${currentBookingId}` : isExtension ? `EXTEND_${currentBookingId}` : `${currentBookingId}`,
         redirect_url: redirectUrl,
         // webhook: `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/webhook`,
         webhook: `https://productive-space-backend.vercel.app/hitpay/webhook`,
