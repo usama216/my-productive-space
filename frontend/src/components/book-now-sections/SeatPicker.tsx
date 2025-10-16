@@ -48,6 +48,7 @@ export interface SeatPickerProps {
   overlays?: OverlayMeta[]
   maxSeats?: number  // maximum num of seats that can be selected
   onSelectionChange?: (selectedIds: string[]) => void
+  initialSelectedSeats?: string[]  // pre-selected seats for reschedule/extend
 }
 
 export const SeatPicker: React.FC<SeatPickerProps> = ({
@@ -59,8 +60,9 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
   // maxSeats = 15,  // Default to 15 if not specified 
   maxSeats = Infinity,  // Default to unlimited if not specified
   onSelectionChange,
+  initialSelectedSeats = [],  // pre-selected seats for reschedule/extend
 }) => {
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialSelectedSeats))
 
   const toggleSeat = (id: string) => {
     if (bookedSeats.includes(id)) return
@@ -172,7 +174,7 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
                   cursor: isDisabled ? 'not-allowed' : 'pointer',
                   transition: 'opacity 0.2s ease, fill 0.2s ease'
                 }}
-                onClick={() => toggleSeat(seat.id)}
+                onClick={() => !isDisabled && toggleSeat(seat.id)}
               />
             )
           } else {
@@ -192,7 +194,7 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({
                   cursor: isDisabled ? 'not-allowed' : 'pointer',
                   transition: 'opacity 0.2s ease, fill 0.2s ease'
                 }}
-                onClick={() => toggleSeat(seat.id)}
+                onClick={() => !isDisabled && toggleSeat(seat.id)}
               />
             )
           }

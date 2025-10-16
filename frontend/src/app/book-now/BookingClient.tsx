@@ -119,10 +119,10 @@ export default function BookingClient() {
     
     setIsLoadingUserProfile(true)
     try {
-      console.log('🔄 Fetching fresh user profile for userId:', userId)
+    
       const profile = await getUserProfile(userId)
       if (profile) {
-        console.log('✅ Fresh user profile loaded:', profile)
+      
         setFreshUserProfile(profile)
       } else {
         console.log('❌ Failed to load fresh user profile')
@@ -273,47 +273,26 @@ export default function BookingClient() {
   const needsStudentVerification = studentsNeedingVerification > 0
 
   // Debug console logs
-  console.log('🔍 Student Verification Debug (Fresh API Data):', {
-    freshUserProfile: freshUserProfile,
-    memberType: freshUserProfile?.memberType,
-    isStudentAccount: isStudentAccount,
-    isAdminAccount: isAdminAccount,
-    isVerifiedStudent: isVerifiedStudent,
-    peopleBreakdown: peopleBreakdown,
-    coStudents: peopleBreakdown.coStudents,
-    studentsNeedingVerification: studentsNeedingVerification,
-    needsStudentVerification: needsStudentVerification,
-    studentsValidated: studentsValidated,
-    isLoadingUserProfile: isLoadingUserProfile,
-    // Also show local storage data for comparison
-    localDatabaseUser: databaseUser,
-    localMemberType: databaseUser?.memberType
-  })
+
 
   // Auto-validate if student account is booking for only themselves or if user is admin
   useEffect(() => {
-    console.log('🔄 Student validation useEffect triggered:', {
-      isStudentAccount,
-      isAdminAccount,
-      isVerifiedStudent,
-      coStudents: peopleBreakdown.coStudents,
-      studentsNeedingVerification
-    })
+   
     
     if (isAdminAccount) {
-      console.log('✅ Auto-validating admin account - no verification needed')
+     
       setStudentsValidated(true)
     } else if (isVerifiedStudent && peopleBreakdown.coStudents === 1) {
-      console.log('✅ Auto-validating verified student booking for themselves')
+     
       setStudentsValidated(true)
     } else if (peopleBreakdown.coStudents === 0) {
-      console.log('🔄 No students, clearing validation')
+    
       setStudentsValidated(false)
     } else if (studentsNeedingVerification === 0) {
-      console.log('✅ All students are verified, auto-validating')
+    
       setStudentsValidated(true)
     } else {
-      console.log('🔄 Students need verification, clearing auto-validation')
+    
       setStudentsValidated(false)
     }
   }, [isAdminAccount, isStudentAccount, isVerifiedStudent, peopleBreakdown.coStudents, studentsNeedingVerification])
@@ -327,19 +306,19 @@ export default function BookingClient() {
       if (freshUserProfile.firstName && freshUserProfile.lastName) {
         const fullName = `${freshUserProfile.firstName} ${freshUserProfile.lastName}`
         setCustomerName(fullName)
-        console.log('✅ Auto-filled customer name:', fullName)
+       
       }
       
       // Auto-fill customer email
       if (freshUserProfile.email) {
         setCustomerEmail(freshUserProfile.email)
-        console.log('✅ Auto-filled customer email:', freshUserProfile.email)
+      
       }
       
       // Auto-fill customer phone
       if (freshUserProfile.contactNumber) {
         setCustomerPhone(freshUserProfile.contactNumber)
-        console.log('✅ Auto-filled customer phone:', freshUserProfile.contactNumber)
+      
       }
     }
   }, [freshUserProfile, isLoadingUserProfile])
@@ -448,7 +427,7 @@ export default function BookingClient() {
           description: `${foundPackage.packageName} has been automatically selected for your booking.`,
         })
       } else {
-        console.log('⚠️ Package not found in user packages:', decodedPackageName)
+      
         toast({
           title: "Package Not Found",
           description: `You don't have the "${decodedPackageName}" package. Please purchase it first or select a different package.`,
@@ -625,7 +604,7 @@ export default function BookingClient() {
 
     // Auto-select package if package parameter is in URL
     if (packageParam) {
-      console.log('🎯 Package parameter detected in URL:', packageParam)
+    
       setEntitlementMode('package')
     }
   }, [searchParams])
@@ -866,6 +845,17 @@ export default function BookingClient() {
         if (data.summary?.pending > 0) {
           console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
         }
+
+        // Check if all seats are booked
+        const availableSeats = DEMO_LAYOUT.length - (data.bookedSeats || []).length
+        console.log('availableSeats', availableSeats)
+        if (availableSeats === 0) {
+          toast({
+            title: "No seats available",
+            description: "Please choose another time.",
+            variant: "destructive",
+          })
+        }
       } else {
         console.error('Failed to fetch booked seats')
         setBookedSeats([])
@@ -977,26 +967,7 @@ export default function BookingClient() {
     }
 
     // Debug logging
-    console.log('🔍 Package Discount Calculation Debug:', {
-      packageId: pkg.id,
-      packageName: pkg.packageName,
-      hoursAllowed: pkg.hoursAllowed,
-      individualPersonHours,
-      appliedHours,
-      remainingHours,
-      memberType,
-      pricePerHour,
-      discountAmount,
-      baseSubtotal,
-      finalAmount,
-      peopleBreakdown,
-      people,
-      comparison: {
-        'appliedHours >= individualPersonHours': appliedHours >= individualPersonHours,
-        'individualPersonHours > 0': individualPersonHours > 0,
-        'fullCoverage': appliedHours >= individualPersonHours && individualPersonHours > 0
-      }
-    });
+   
 
     return {
       discountAmount: discountAmount,
@@ -1060,6 +1031,15 @@ export default function BookingClient() {
 
     // Check if there are enough available seats
     const availableSeats = DEMO_LAYOUT.length - bookedSeats.length
+    console.log('availableSeats', availableSeats)
+    if (availableSeats === 0) {
+      toast({
+        title: "No seats available",
+        description: "Please choose another time.",
+        variant: "destructive",
+      })
+      return
+    }
     if (availableSeats < people) {
       toast({
         title: "Not enough seats available",
@@ -1261,23 +1241,7 @@ export default function BookingClient() {
     user;
 
   // Debug form validation
-  console.log('📝 Form Validation Debug:', {
-    location: !!location,
-    peopleCount: people,
-    people: !!people,
-    startDate: !!startDate,
-    endDate: !!endDate,
-    customerName: !!customerName,
-    customerEmail: !!customerEmail,
-    customerPhone: !!customerPhone,
-    needsStudentVerification,
-    studentsValidated,
-    studentValidationPassed: !needsStudentVerification || studentsValidated,
-    selectedSeats: selectedSeats.length,
-    seatsMatch: selectedSeats.length === people,
-    user: !!user,
-    isFormValid
-  })
+
 
   // Show loading state while checking auth
   if (isLoadingAuth) {
@@ -1504,10 +1468,7 @@ export default function BookingClient() {
 
                       {needsStudentVerification && user && !isLoadingUserProfile && (
                         <div>
-                          {(() => {
-                            console.log('🔧 Rendering StudentValidation component for', studentsNeedingVerification, 'students')
-                            return null
-                          })()}
+                         
                           <StudentValidation
                             numberOfStudents={studentsNeedingVerification}
                             onValidationChange={handleStudentValidationChange}
@@ -1613,6 +1574,18 @@ export default function BookingClient() {
                             </div>
                           ) : (
                             <>
+                              {/* Show message if no seats available */}
+                              {DEMO_LAYOUT.length - bookedSeats.length === 0 && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                  <div className="flex items-center">
+                                    <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                                    <div>
+                                      <h3 className="text-sm font-medium text-red-800">No seats available</h3>
+                                      <p className="text-sm text-red-700">Please choose another time.</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                               <SeatPicker
                                 layout={DEMO_LAYOUT}
                                 tables={DEMO_TABLES}
@@ -2151,11 +2124,10 @@ export default function BookingClient() {
 
                         // Use dynamic hoursAllowed from package configuration instead of hardcoded values
                         const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
-                        console.log('discountHours', discountHours)
+                      
                         const appliedHours = Math.min(bookingDuration.durationHours, discountHours || 4);
                         const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
-                        console.log( 'remainingHours', remainingHours)
-                        console.log( 'appliedHours', appliedHours)
+                       
 
                         // Get the appropriate hourly rate based on user role and booking duration
                         const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'

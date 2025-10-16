@@ -547,12 +547,18 @@ export default function ReschedulePage() {
         if (response.ok) {
           const data = await response.json()
           setAvailableSeats(data.availableSeats || [])
+          
+          // Filter out current booking's seats from occupied seats
+          // Backend should exclude them, but double-check here
+          const otherBookedSeats = (data.bookedSeats || []).filter(
+            (seat: string) => !(booking.seatNumbers || []).includes(seat)
+          )
           setOccupiedSeats(data.bookedSeats || [])
 
-          // Check if original seats are still available
+          // Check if original seats conflict with OTHER bookings (not current booking)
           const originalSeats = booking.seatNumbers || []
           const conflictingSeats = originalSeats.filter((seat: string) =>
-            data.bookedSeats?.includes(seat)
+            otherBookedSeats.includes(seat)
           )
 
           if (conflictingSeats.length > 0) {
@@ -1032,10 +1038,11 @@ export default function ReschedulePage() {
                             layout={DEMO_LAYOUT}
                             tables={DEMO_TABLES}
                             labels={DEMO_LABELS}
-                            bookedSeats={occupiedSeats}
+                            bookedSeats={occupiedSeats.filter((seat: string) => !booking.seatNumbers?.includes(seat))}
                             overlays={OVERLAYS}
                             maxSeats={booking.pax}
                             onSelectionChange={handleSeatSelectionChange}
+                            initialSelectedSeats={booking.seatNumbers || []}
                           />
                         </div>
                       </div>
@@ -1074,7 +1081,10 @@ export default function ReschedulePage() {
                         !newStartDate ||
                         !newEndDate ||
                         (requiresSeatSelection && selectedSeats.length !== booking.pax) ||
-                        costDifference < 0
+                        costDifference < 0 ||
+                        // Disable if times haven't changed from original
+                        (newStartDate?.getTime() === originalStartDate?.getTime() && 
+                         newEndDate?.getTime() === originalEndDate?.getTime())
                       }
                       className="bg-orange-600 hover:bg-orange-700"
                     >
