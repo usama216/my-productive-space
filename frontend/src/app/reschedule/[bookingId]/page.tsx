@@ -591,6 +591,19 @@ export default function ReschedulePage() {
       return
     }
 
+    // Check minimum increase of 1 hour (new duration must be at least 1 hour more than original)
+    const newDuration = (newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)
+    const durationIncrease = newDuration - originalDuration
+    
+    if (durationIncrease < 1) {
+      toast({
+        title: "Minimum Duration Required",
+        description: "Rescheduling requires at least 1 hour increase.",
+        variant: "destructive"
+      })
+      return
+    }
+
     if (requiresSeatSelection && selectedSeats.length !== booking.pax) {
       toast({
         title: "Seat Selection Required",
@@ -601,7 +614,6 @@ export default function ReschedulePage() {
     }
 
     // Check if duration decreased
-    const newDuration = (newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)
     if (newDuration < originalDuration) {
       toast({
         title: "Cannot Decrease Time",
@@ -969,12 +981,27 @@ export default function ReschedulePage() {
                     </div>
                   </div>
 
+                  {/* Minimum Duration Increase Notice */}
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                    Rescheduling requires at least 1 hour.
+                       </AlertDescription>
+                  </Alert>
+
                   {/* Duration Info */}
                   {newStartDate && newEndDate && (
-                    <Alert>
+                    <Alert className={
+                      (((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration) < 1 
+                        ? "border-red-500 bg-red-50" 
+                        : ""
+                    }>
                       <Clock className="h-4 w-4" />
                       <AlertDescription>
-                        Duration: {((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)).toFixed(1)} hours
+                        New Duration: {((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)).toFixed(2)} hours
+                        <span className="block mt-1 text-gray-600 text-sm">
+                          Original: {originalDuration.toFixed(2)} hours | Increase: {(((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration).toFixed(2)} hours
+                        </span>
                         {costDifference > 0 && (
                           <span className="block mt-1 text-orange-600">
                             Additional cost: SGD ${costDifference.toFixed(2)}
@@ -1084,7 +1111,10 @@ export default function ReschedulePage() {
                         costDifference < 0 ||
                         // Disable if times haven't changed from original
                         (newStartDate?.getTime() === originalStartDate?.getTime() && 
-                         newEndDate?.getTime() === originalEndDate?.getTime())
+                         newEndDate?.getTime() === originalEndDate?.getTime()) ||
+                        // Disable if increase is less than 1 hour
+                        (newStartDate && newEndDate && 
+                         ((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration < 1)
                       }
                       className="bg-orange-600 hover:bg-orange-700"
                     >

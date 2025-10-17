@@ -1586,6 +1586,21 @@ export default function BookingClient() {
                                   </div>
                                 </div>
                               )}
+
+                              {/* Show message if not enough seats for requested people */}
+                              {DEMO_LAYOUT.length - bookedSeats.length > 0 && people > (DEMO_LAYOUT.length - bookedSeats.length) && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                  <div className="flex items-center">
+                                    <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                                    <div>
+                                      <h3 className="text-sm font-medium text-red-800">Not enough seats available</h3>
+                                      <p className="text-sm text-red-700">
+                                        There are only {DEMO_LAYOUT.length - bookedSeats.length} seats available. Please select another timeslot.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                               <SeatPicker
                                 layout={DEMO_LAYOUT}
                                 tables={DEMO_TABLES}

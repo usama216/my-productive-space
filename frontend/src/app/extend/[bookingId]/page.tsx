@@ -17,6 +17,7 @@ import {
   Users, 
   Calendar,
   AlertTriangle,
+  AlertCircle,
   Loader2,
   CheckCircle,
   XCircle,
@@ -520,6 +521,16 @@ export default function ExtendBookingPage() {
       return
     }
 
+    // Check minimum extension of 1 hour
+    if (extendedHours < 1) {
+      toast({
+        title: "Minimum Duration Required",
+        description: "Extension requires at least 1 hour.",
+        variant: "destructive"
+      })
+      return
+    }
+
     if (requiresSeatSelection && selectedSeats.length !== booking.pax) {
       toast({
         title: "Seat Selection Required",
@@ -744,8 +755,25 @@ export default function ExtendBookingPage() {
                     <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All times are displayed in Singapore timezone (GMT+8)</p>
                   </div>
 
+                  {/* Minimum Extension Notice */}
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                    Extension requires at least 1 hour.
+                    </AlertDescription>
+                  </Alert>
+
                   {/* Extension Summary */}
-                  {extendedHours > 0 && (
+                  {extendedHours > 0 && extendedHours < 1 && (
+                    <Alert className="border-red-500 bg-red-50">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-800">
+                        Extension duration ({extendedHours.toFixed(2)} hours) is less than the minimum required 1 hour.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {extendedHours >= 1 && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <h3 className="font-medium text-blue-800 mb-2">Extension Summary</h3>
                       <div className="space-y-1 text-sm text-blue-700">
@@ -870,7 +898,7 @@ export default function ExtendBookingPage() {
                       disabled={
                         submitting || 
                         checkingSeats || 
-                        extendedHours <= 0 || 
+                        extendedHours < 1 || 
                         (requiresSeatSelection && selectedSeats.length !== booking.pax)
                       }
                       className="bg-orange-600 hover:bg-orange-700"
