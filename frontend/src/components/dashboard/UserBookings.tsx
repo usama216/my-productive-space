@@ -47,6 +47,8 @@ export function UserBookings() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [refundReason, setRefundReason] = useState('')
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false)
+  const [actualRefundAmount, setActualRefundAmount] = useState<number | null>(null)
+  const [isCardPayment, setIsCardPayment] = useState(false)
 
 
 
@@ -95,10 +97,50 @@ export function UserBookings() {
   }
 
   // Handle cancel booking (refund request)
-  const handleCancelBooking = (booking: Booking) => {
+  const handleCancelBooking = async (booking: Booking) => {
     setSelectedBooking(booking)
     setRefundReason('')
     setIsRefundDialogOpen(true)
+    
+    // Calculate actual refund amount
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookingPaymentDetails`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId: booking.id
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const paidAmount = parseFloat(data.paymentAmount || booking.totalAmount)
+        const isCard = data.paymentMethod && 
+          (data.paymentMethod.toLowerCase().includes('card') || 
+           data.paymentMethod.toLowerCase().includes('credit'))
+        
+        setIsCardPayment(isCard)
+        
+        if (isCard) {
+          // Deduct 5% card fee
+          const actualAmount = paidAmount / 1.05
+          setActualRefundAmount(actualAmount)
+        } else {
+          setActualRefundAmount(paidAmount)
+        }
+      } else {
+        // Fallback to booking amount
+        setActualRefundAmount(parseFloat(booking.totalAmount))
+        setIsCardPayment(false)
+      }
+    } catch (error) {
+      console.error('Error fetching payment details:', error)
+      // Fallback to booking amount
+      setActualRefundAmount(parseFloat(booking.totalAmount))
+      setIsCardPayment(false)
+    }
   }
 
   // Submit refund request
@@ -789,20 +831,29 @@ export function UserBookings() {
           
           {selectedBooking && (
             <div className="space-y-4">
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Note:</strong> Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation
-                </AlertDescription>
-              </Alert>
+             
               
               <div className="space-y-2">
-                <Label>Booking Details</Label>
-                <div className="p-3 bg-gray-50 rounded-md text-sm">
+            
+                <div className="p-3 bg-gray-50 rounded-md text-sm space-y-2">
                   <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
                   <div><strong>Location:</strong> {selectedBooking.location}</div>
                   <div><strong>Date:</strong> {formatBookingDateRange(selectedBooking.startAt, selectedBooking.endAt)}</div>
-                  <div><strong>Amount:</strong> ${Number(selectedBooking.totalAmount).toFixed(2)}</div>
+                  <div><strong>Amount Paid:</strong> ${Number(selectedBooking.totalAmount).toFixed(2)}</div>
+                  
+                  {actualRefundAmount !== null && (
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span><strong>Refund Amount:</strong></span>
+                        <span className="text-green-600 font-semibold">${actualRefundAmount.toFixed(2)}</span>
+                      </div>
+                      {isCardPayment && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          (Exclude 5% card processing fee)
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -817,6 +868,14 @@ export function UserBookings() {
                   rows={4}
                 />
               </div>
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                   Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation.
+                  <br />
+                  Any discounts, promo codes, packages, or credit card fees cannot be refunded.
+                </AlertDescription>
+              </Alert>
               
               <div className="flex justify-end gap-2">
                 <Button 
