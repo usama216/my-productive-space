@@ -849,7 +849,7 @@ export function UserBookings() {
                       </div>
                       {isCardPayment && (
                         <div className="text-xs text-gray-500 mt-1">
-                          (Exclude 5% card processing fee)
+                          (Exclude the 5% card processing fee)
                         </div>
                       )}
                     </div>
