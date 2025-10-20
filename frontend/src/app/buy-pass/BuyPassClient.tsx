@@ -659,7 +659,7 @@ export default function BuyNowPage() {
                           if (isCardPayment) {
                             fee = baseAmount * 0.05
                             feeLabel = 'Credit Card Fee (5%)'
-                          } else if (isPayNowPayment && baseAmount > 10) {
+                          } else if (isPayNowPayment && baseAmount < 10) {
                             fee = 0.20
                             feeLabel = 'PayNow Transaction Fee'
                           }
@@ -731,7 +731,9 @@ export default function BuyNowPage() {
                           {/* Package Type */}
                           <div className="flex items-center space-x-2 mb-2">
                             <Package className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm text-orange-900">{selectedPackage.packageType.replace('_', ' ')}</span>
+                            <span className="text-sm text-orange-900">
+                              {selectedPackage.packageType.replace('_', ' ')} ({selectedPackage.hoursAllowed || 4} hours allowed)
+                            </span>
                           </div>
                           
                           {/* Validity Days */}

@@ -15,6 +15,7 @@ export interface NewPackage {
   outletFee: number;
   passCount: number;
   validityDays: number;
+  hoursAllowed?: number;
   isActive: boolean;
   discount?: number;
   createdAt: string;

@@ -79,7 +79,14 @@ export default function Dashboard() {
   const { toast } = useToast()
   const { user: authUser, databaseUser, refreshDatabaseUser, refreshAuthUser } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    // Initialize from URL hash if available
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '')
+      return hash || 'overview'
+    }
+    return 'overview'
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
@@ -303,8 +310,25 @@ export default function Dashboard() {
     loadUpcomingBookings()
   }, [authUser?.id])
 
+  // Listen for hash changes (browser back/forward navigation)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '')
+      if (hash) {
+        setActiveTab(hash)
+      }
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
   const handleTabChange = (value: string) => {
     setActiveTab(value)
+    // Update URL hash to persist tab selection
+    if (typeof window !== 'undefined') {
+      window.location.hash = value
+    }
   }
 
   // Handle booking cancellation
@@ -438,15 +462,15 @@ export default function Dashboard() {
 
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="passes">Packages</TabsTrigger>
 
               <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
-              <TabsTrigger value="credits">Wallet</TabsTrigger>
-              <TabsTrigger value="refunds">Refund Requests</TabsTrigger>
+              <TabsTrigger value="credits">Credits</TabsTrigger>
+              {/* <TabsTrigger value="refunds">Refund Requests</TabsTrigger> */}
             </TabsList>
 
        
@@ -502,15 +526,15 @@ export default function Dashboard() {
                       <li className="flex gap-2">
                         <span className="text-primary font-bold">•</span>
                         <div>
-                          <strong>Wallet:</strong> View your remaining credits anytime in your Wallet.
+                          <strong>Credits:</strong> View your remaining credits anytime in your credits tab.
                         </div>
                       </li>
-                      <li className="flex gap-2">
+                      {/* <li className="flex gap-2">
                         <span className="text-primary font-bold">•</span>
                         <div>
                           <strong>Refund Requests:</strong> Track the status of your refund requests in the Refund tab.
                         </div>
-                      </li>
+                      </li> */}
                       <li className="flex gap-2">
                         <span className="text-primary font-bold">•</span>
                         <div>
@@ -906,36 +930,43 @@ export default function Dashboard() {
                               </p>
                             </div>
 
-                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                    <FileText className="w-5 h-5 text-orange-600" />
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-orange-800">Student Verification Document</p>
-                                    <p className="text-sm text-orange-600">
-                                      Status: {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
-                                        (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
-                                          (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
-                                            (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'REJECTED' ? 'Verification Rejected' :
-                                              'Not Verified'}
-                                    </p>
+                            {(() => {
+                              const verificationStatus = userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus
+                              const isVerified = verificationStatus === 'VERIFIED'
+                              
+                              return (
+                                <div className={`${isVerified ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-100 text-orange-800 border-orange-200'} border rounded-lg p-4`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-10 h-10 ${isVerified ? 'bg-green-100' : 'bg-orange-100'} rounded-lg flex items-center justify-center`}>
+                                        <FileText className={`w-5 h-5 ${isVerified ? 'text-green-600' : 'text-orange-600'}`} />
+                                      </div>
+                                      <div>
+                                        <p className={`font-medium ${isVerified ? 'text-green-800' : 'text-orange-800'}`}>Student Verification Document</p>
+                                        <p className={`text-sm ${isVerified ? 'text-green-600' : 'text-orange-600'}`}>
+                                          Status: {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
+                                            (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
+                                              (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
+                                                (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'REJECTED' ? 'Verification Rejected' :
+                                                  'Not Verified'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => window.open(userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl, '_blank')}
+                                        className={`bg-white ${isVerified ? 'hover:bg-green-50 border-green-300 text-green-700 hover:text-green-800' : 'hover:bg-orange-50 border-orange-300 text-orange-700 hover:text-orange-800'}`}
+                                      >
+                                        <Eye className="w-4 h-4 mr-2" />
+                                        View Document
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl, '_blank')}
-                                    className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 hover:text-orange-800"
-                                  >
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    View Document
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
+                              )
+                            })()}
                           </div>
                         </div>
                       )}
@@ -1016,10 +1047,10 @@ export default function Dashboard() {
             </TabsContent>
 
             {/* Refund Requests Tab */}
-            <TabsContent value="refunds" className="space-y-6">
+            {/* <TabsContent value="refunds" className="space-y-6">
               <RefundRequests userId={authUser?.id || ''} />
               
-            </TabsContent>
+            </TabsContent> */}
 
             {/* My Bookings Tab */}
             <TabsContent value="mybookings" className="space-y-6">

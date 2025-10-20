@@ -30,6 +30,27 @@ export function UserPackages({ userId }: UserPackagesProps) {
   const { toast } = useToast()
   const { user, databaseUser } = useAuth()
 
+  // Map targetRole to type parameter
+  const getTypeFromRole = (targetRole: string): string => {
+    const roleMapping: { [key: string]: string } = {
+      'MEMBER': 'cowork',
+      'STUDENT': 'costudy',
+      'TUTOR': 'colearn'
+    }
+    return roleMapping[targetRole] || 'cowork'
+  }
+
+  // Build URL for buy-pass page with package info
+  const getBuyPassUrl = (pkg: UserPackage): string => {
+    const type = getTypeFromRole(pkg.targetRole)
+    const params = new URLSearchParams({
+      package: pkg.packageName,
+      type: type,
+      packageId: pkg.packageId
+    })
+    return `/buy-pass?${params.toString()}`
+  }
+
   const loadUserPackages = async () => {
     if (!userId) return
 
@@ -241,9 +262,15 @@ export function UserPackages({ userId }: UserPackagesProps) {
               const isExpired = remainingDays <= 0 || pkg.isExpired
               const isPending = pkg.paymentStatus === 'PENDING'
               const isCompleted = pkg.paymentStatus === 'COMPLETED'
+              
+              // Check if all passes are used (remaining passes = 0)
+              const allPassesUsed = (pkg.remainingPasses || 0) === 0 && (pkg.totalPasses || 0) > 0
+              
+              // Package is considered expired if time expired OR all passes used
+              const isPackageExpired = isExpired || allPassesUsed
 
               return (
-                <Card key={pkg.id} className={`${isExpiringSoon ? 'border-orange-200 bg-orange-50' : isExpired ? 'border-red-200 bg-red-50' : isPending ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200'}`}>
+                <Card key={pkg.id} className={`${isExpiringSoon && !isPackageExpired ? 'border-orange-200 bg-orange-50' : isPackageExpired ? 'border-red-200 bg-red-50' : isPending ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200'}`}>
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -253,9 +280,19 @@ export function UserPackages({ userId }: UserPackagesProps) {
                       </div>
                       <div className="flex items-center space-x-2">
                         {getStatusBadge(pkg.paymentStatus)}
-                        {isExpiringSoon && !isExpired && isCompleted && (
+                        {isCompleted && !isPackageExpired && !isExpiringSoon && (
+                          <Badge variant="outline" className="border-green-300 text-green-700">
+                            Active
+                          </Badge>
+                        )}
+                        {isExpiringSoon && !isPackageExpired && isCompleted && (
                           <Badge variant="outline" className="border-orange-300 text-orange-700">
                             Expires Soon
+                          </Badge>
+                        )}
+                        {isPackageExpired && isCompleted && (
+                          <Badge variant="outline" className="border-red-300 text-red-700">
+                            {allPassesUsed ? 'Fully Used' : 'Expired'}
                           </Badge>
                         )}
                         {isPending && (
@@ -373,8 +410,10 @@ export function UserPackages({ userId }: UserPackagesProps) {
                       <div className="text-sm text-gray-600">
                         {isPending ? (
                           <span className="text-yellow-600 font-medium">Payment pending - package not activated</span>
-                        ) : isExpired ? (
-                          <span className="text-red-600 font-medium">Package has expired</span>
+                        ) : isPackageExpired ? (
+                          <span className="text-red-600 font-medium">
+                            {allPassesUsed ? 'All passes used - package fully consumed' : 'Package has expired'}
+                          </span>
                         ) : isExpiringSoon ? (
                           <span className="text-orange-600 font-medium">
                             Expires in {remainingDays} day{remainingDays !== 1 ? 's' : ''}
@@ -388,12 +427,23 @@ export function UserPackages({ userId }: UserPackagesProps) {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        {isCompleted && !isExpired && pkg.expiresAt && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => window.location.href = getBuyPassUrl(pkg)} 
+                          className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                        >
+                          <Package className="w-4 h-4 mr-2" />
+                          Buy Package
+                        </Button>
+                        
+                        {isCompleted && !isPackageExpired && pkg.expiresAt && (
                           <Button size="sm" onClick={() => window.location.href = '/book-now'} className="bg-orange-500 hover:bg-orange-600 text-white">
                             Book Now
                           </Button>
                         )}
-                        {isPending && (
+                        
+                        {/* {isPending && (
                           <Button 
                             size="sm" 
                             variant="outline" 
@@ -409,7 +459,7 @@ export function UserPackages({ userId }: UserPackagesProps) {
                               'Complete Payment'
                             )}
                           </Button>
-                        )}
+                        )} */}
                       
                       </div>
                     </div>

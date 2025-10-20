@@ -199,7 +199,7 @@ export default function PaymentStep({
                   <p>
                     {selectedPaymentMethod === 'creditCard' 
                       ? 'A 5% processing fee will be added to your total amount when paying with credit card.'
-                      : 'A $0.20 transaction fee will be added for PayNow payments over $10.'
+                      : 'A $0.20 transaction fee will be added for PayNow payments under $10.'
                     }
                   </p>
                 </div>

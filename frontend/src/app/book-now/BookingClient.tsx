@@ -2159,7 +2159,7 @@ export default function BookingClient() {
                           <>
                           
                             <div className="flex justify-between text-green-600">
-                              <span className='text-sm'>Hours Covered</span>
+                              <span className='text-sm'>Package Applied</span>
                               <span className='text-sm'>{appliedHours?.toFixed(2)}h free</span>
                             </div>
                             <div className="flex justify-between text-green-600">

@@ -125,7 +125,14 @@ const mockUsers: UserAccount[] = [
 
 export default function AdminDashboard() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    // Initialize from URL hash if available
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '')
+      return hash || 'overview'
+    }
+    return 'overview'
+  })
   const [refundRequests, setRefundRequests] = useState<RefundTransaction[]>([])
   const [users, setUsers] = useState<UserAccount[]>(mockUsers)
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null)
@@ -193,6 +200,18 @@ export default function AdminDashboard() {
     fetchRecentRefundRequests()
   }, [])
 
+  // Listen for hash changes (browser back/forward navigation)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '')
+      if (hash) {
+        setActiveTab(hash)
+      }
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
 
   const handleUserVerification = async (user: UserAccount, action: 'verify' | 'reject', rejectionReason?: string) => {
     setIsLoading(true)
@@ -284,6 +303,14 @@ export default function AdminDashboard() {
     return matchesSearch && matchesFilter
   })
 
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    // Update URL hash to persist tab selection
+    if (typeof window !== 'undefined') {
+      window.location.hash = value
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -293,7 +320,7 @@ export default function AdminDashboard() {
 
         <AdminTabs
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleTabChange}
           refundRequests={refundRequests}
           users={users}
           pendingStudents={pendingStudents}

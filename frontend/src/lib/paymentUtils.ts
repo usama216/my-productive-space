@@ -19,12 +19,12 @@ export function calculateCreditCardFee(amount: number): number {
 }
 
 /**
- * Calculate PayNow transaction fee for amounts over $10
+ * Calculate PayNow transaction fee for amounts less than $10
  * @param amount - The base amount
- * @returns The PayNow fee (0.20 for amounts > $10, 0 otherwise)
+ * @returns The PayNow fee (0.20 for amounts < $10, 0 otherwise)
  */
 export function calculatePayNowFee(amount: number): number {
-  return amount > 10 ? 0.20 : 0
+  return amount < 10 ? 0.20 : 0
 }
 
 /**
