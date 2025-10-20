@@ -44,7 +44,7 @@ export default function PaymentStep({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
 
   // Calculate totals based on payment method
-  const { fee: creditCardFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
+  const { fee: transactionFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
 
 
 
@@ -145,6 +145,9 @@ export default function PaymentStep({
                 {selectedPaymentMethod === 'creditCard' && (
                   <span className="ml-2 text-sm text-gray-500">(+5% fee)</span>
                 )}
+                {selectedPaymentMethod === 'payNow' && total > 10 && (
+                  <span className="ml-2 text-sm text-gray-500">(+$0.20 fee)</span>
+                )}
               </div>
             </label>
           </div>
@@ -167,10 +170,12 @@ export default function PaymentStep({
             <span>${subtotal.toFixed(2)}</span>
           </div>
 
-          {creditCardFee > 0 && (
+          {transactionFee > 0 && (
             <div className="flex justify-between text-orange-600">
-              <span>Credit Card Fee:</span>
-              <span>${formatCurrency(creditCardFee)}</span>
+              <span>
+                {selectedPaymentMethod === 'creditCard' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+              </span>
+              <span>${formatCurrency(transactionFee)}</span>
             </div>
           )}
           <div className="flex justify-between font-medium border-t pt-2">

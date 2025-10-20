@@ -1291,14 +1291,19 @@ export default function ReschedulePage() {
                         <span className="text-orange-700 text-sm font-medium">Subtotal:</span>
                         <span className="text-orange-700 text-sm font-medium">SGD ${costDifference.toFixed(2)}</span>
                       </div>
-                      {selectedPaymentMethod === 'creditCard' && (() => {
-                        const { fee } = calculatePaymentTotal(costDifference, 'creditCard')
-                        return (
-                          <div className="flex justify-between">
-                            <span className="text-orange-700 text-sm font-medium">Credit Card Fee (5%):</span>
-                            <span className="text-orange-700 text-sm font-medium">SGD ${formatCurrency(fee)}</span>
-                          </div>
-                        )
+                      {(() => {
+                        const { fee } = calculatePaymentTotal(costDifference, selectedPaymentMethod)
+                        if (fee > 0) {
+                          return (
+                            <div className="flex justify-between">
+                              <span className="text-orange-700 text-sm font-medium">
+                                {selectedPaymentMethod === 'creditCard' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+                              </span>
+                              <span className="text-orange-700 text-sm font-medium">SGD ${formatCurrency(fee)}</span>
+                            </div>
+                          )
+                        }
+                        return null
                       })()}
                       <div className="flex justify-between font-medium border-t border-orange-200 pt-1 mt-2">
                         <span className="text-orange-800 text-sm font-medium">Total payable:</span>

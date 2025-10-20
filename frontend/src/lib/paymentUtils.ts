@@ -19,7 +19,16 @@ export function calculateCreditCardFee(amount: number): number {
 }
 
 /**
- * Calculate total amount including credit card fee
+ * Calculate PayNow transaction fee for amounts over $10
+ * @param amount - The base amount
+ * @returns The PayNow fee (0.20 for amounts > $10, 0 otherwise)
+ */
+export function calculatePayNowFee(amount: number): number {
+  return amount > 10 ? 0.20 : 0
+}
+
+/**
+ * Calculate total amount including fees based on payment method
  * @param baseAmount - The base amount
  * @param paymentMethod - The payment method ('creditCard' or 'payNow')
  * @returns Object containing fee and total
@@ -28,7 +37,14 @@ export function calculatePaymentTotal(baseAmount: number, paymentMethod: 'credit
   fee: number
   total: number
 } {
-  const fee = paymentMethod === 'creditCard' ? calculateCreditCardFee(baseAmount) : 0
+  let fee = 0
+  
+  if (paymentMethod === 'creditCard') {
+    fee = calculateCreditCardFee(baseAmount)
+  } else if (paymentMethod === 'payNow') {
+    fee = calculatePayNowFee(baseAmount)
+  }
+  
   const total = baseAmount + fee
   
   return {

@@ -762,7 +762,14 @@ export default function ExtendBookingPage() {
                     Extension requires at least 1 hour.
                     </AlertDescription>
                   </Alert>
-
+                  {!requiresSeatSelection && !checkingSeats && extendedHours > 0 && (
+                    <Alert>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Your original seats are available for the extended time.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   {/* Extension Summary */}
                   {extendedHours > 0 && extendedHours < 1 && (
                     <Alert className="border-red-500 bg-red-50">
@@ -837,14 +844,7 @@ export default function ExtendBookingPage() {
                     </Alert>
                   )}
 
-                  {!requiresSeatSelection && !checkingSeats && extendedHours > 0 && (
-                    <Alert>
-                      <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Your original seats are available for the extended time.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+               
 
                   {/* Seat Selection */}
                   {requiresSeatSelection && !checkingSeats && extendedHours > 0 && (

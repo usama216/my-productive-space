@@ -49,6 +49,13 @@ export function UserBookings() {
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false)
   const [actualRefundAmount, setActualRefundAmount] = useState<number | null>(null)
   const [isCardPayment, setIsCardPayment] = useState(false)
+  const [promoDiscountAmount, setPromoDiscountAmount] = useState<number>(0)
+  const [packageDiscountAmount, setPackageDiscountAmount] = useState<number>(0)
+  const [creditAmount, setCreditAmount] = useState<number>(0)
+  const [totalDiscountAmount, setTotalDiscountAmount] = useState<number>(0)
+  const [cardFee, setCardFee] = useState<number>(0)
+  const [payNowFee, setPayNowFee] = useState<number>(0)
+  const [totalCost, setTotalCost] = useState<number>(0)
 
 
 
@@ -117,11 +124,25 @@ export function UserBookings() {
       if (response.ok) {
         const data = await response.json()
         const paidAmount = parseFloat(data.paymentAmount || booking.totalAmount)
+        const promoDiscount = parseFloat(data.promoDiscountAmount || 0)
+        const packageDiscount = parseFloat(data.packageDiscountAmount || 0)
+        const credit = parseFloat(data.creditAmount || 0)
+        const totalDiscount = parseFloat(data.totalDiscountAmount || 0)
+        const cardFee = parseFloat(data.cardFee || 0)
+        const payNowFee = parseFloat(data.payNowFee || 0)
+        const originalCost = parseFloat(data.totalCost || booking.totalAmount)
         const isCard = data.paymentMethod && 
           (data.paymentMethod.toLowerCase().includes('card') || 
            data.paymentMethod.toLowerCase().includes('credit'))
         
         setIsCardPayment(isCard)
+        setPromoDiscountAmount(promoDiscount)
+        setPackageDiscountAmount(packageDiscount)
+        setCreditAmount(credit)
+        setTotalDiscountAmount(totalDiscount)
+        setCardFee(cardFee)
+        setPayNowFee(payNowFee)
+        setTotalCost(originalCost)
         
         if (isCard) {
           // Deduct 5% card fee
@@ -132,14 +153,28 @@ export function UserBookings() {
         }
       } else {
         // Fallback to booking amount
-        setActualRefundAmount(parseFloat(booking.totalAmount))
+        setActualRefundAmount(Number(booking.totalAmount))
         setIsCardPayment(false)
+        setPromoDiscountAmount(0)
+        setPackageDiscountAmount(0)
+        setCreditAmount(0)
+        setTotalDiscountAmount(0)
+        setCardFee(0)
+        setPayNowFee(0)
+        setTotalCost(Number(booking.totalAmount))
       }
     } catch (error) {
       console.error('Error fetching payment details:', error)
       // Fallback to booking amount
-      setActualRefundAmount(parseFloat(booking.totalAmount))
+      setActualRefundAmount(Number(booking.totalAmount))
       setIsCardPayment(false)
+      setPromoDiscountAmount(0)
+      setPackageDiscountAmount(0)
+      setCreditAmount(0)
+      setTotalDiscountAmount(0)
+      setCardFee(0)
+      setPayNowFee(0)
+      setTotalCost(Number(booking.totalAmount))
     }
   }
 
@@ -839,17 +874,67 @@ export function UserBookings() {
                   <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
                   <div><strong>Location:</strong> {selectedBooking.location}</div>
                   <div><strong>Date:</strong> {formatBookingDateRange(selectedBooking.startAt, selectedBooking.endAt)}</div>
-                  <div><strong>Amount Paid:</strong> ${Number(selectedBooking.totalAmount).toFixed(2)}</div>
+                  
+                  <div className="border-t pt-2 mt-2 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span>Original Cost:</span>
+                      <span>${totalCost.toFixed(2)}</span>
+                    </div>
+                    {promoDiscountAmount > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span>Promo Code Discount:</span>
+                        <span>-${promoDiscountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {packageDiscountAmount > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span>Package Discount:</span>
+                        <span>-${packageDiscountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {creditAmount > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span>Store Credit Applied:</span>
+                        <span>-${creditAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {cardFee > 0 && (
+                      <div className="flex justify-between items-center text-blue-600">
+                        <span>Credit Card Fee (5%):</span>
+                        <span>+${cardFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {payNowFee > 0 && (
+                      <div className="flex justify-between items-center text-blue-600">
+                        <span>PayNow Transaction Fee:</span>
+                        <span>+${payNowFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center font-medium border-t pt-1">
+                      <span>Amount Paid:</span>
+                      <span>${Number(selectedBooking.totalAmount).toFixed(2)}</span>
+                    </div>
+                  </div>
                   
                   {actualRefundAmount !== null && (
-                    <div className="border-t pt-2 mt-2">
+                    <div className="border-t pt-2 mt-2 bg-green-50 p-2 rounded">
                       <div className="flex justify-between items-center">
                         <span><strong>Refund Amount:</strong></span>
-                        <span className="text-green-600 font-semibold">${actualRefundAmount.toFixed(2)}</span>
+                        <span className="text-green-600 font-semibold text-lg">${actualRefundAmount.toFixed(2)}</span>
                       </div>
                       {isCardPayment && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          (Exclude the 5% card processing fee)
+                        <div className="text-xs text-gray-600 mt-1">
+                          * Credit card fee (${cardFee.toFixed(2)}) is non-refundable
+                        </div>
+                      )}
+                      {payNowFee > 0 && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          * PayNow transaction fee (${payNowFee.toFixed(2)}) is non-refundable
+                        </div>
+                      )}
+                      {totalDiscountAmount > 0 && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          * All discounts (${totalDiscountAmount.toFixed(2)}) are non-refundable
                         </div>
                       )}
                     </div>

@@ -78,7 +78,7 @@ export function PricingManagement() {
       location: config.location,
       memberType: config.memberType,
       oneHourRate: config.oneHourRate.toString(),
-      overOneHourRate: config.oneHourRate.toString(),
+      overOneHourRate: config.overOneHourRate.toString(),
       isActive: config.isActive
     })
     setIsDialogOpen(true)
@@ -94,6 +94,15 @@ export function PricingManagement() {
       isActive: true
     })
     setIsDialogOpen(true)
+  }
+
+  // Auto-update overOneHourRate when oneHourRate changes - same value
+  const handleOneHourRateChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      oneHourRate: value,
+      overOneHourRate: value // Same value for both
+    }))
   }
 
   const handleSubmit = async () => {
@@ -114,7 +123,7 @@ export function PricingManagement() {
         oneHourRate: parseFloat(formData.oneHourRate),
         overOneHourRate: parseFloat(formData.overOneHourRate),
         isActive: formData.isActive
-      })
+      } as any)
 
       toast({
         title: "Success",
@@ -255,22 +264,26 @@ export function PricingManagement() {
                         type="number"
                         step="0.01"
                         value={formData.oneHourRate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, oneHourRate: e.target.value }))}
+                        onChange={(e) => handleOneHourRateChange(e.target.value)}
                         placeholder="e.g., 5.00"
                       />
                     </div>
 
-                    {/* <div>
-                      <Label htmlFor="overOneHourRate">>1 Hour Rate (SGD)</Label>
+                    {/* TODO: Uncomment when project is complete - Auto-update overOneHourRate field
+                    <div>
+                      <Label htmlFor="overOneHourRate">&gt;1 Hour Rate (SGD) <span className="text-sm text-gray-500">(Auto-updated)</span></Label>
                       <Input
                         id="overOneHourRate"
                         type="number"
                         step="0.01"
                         value={formData.overOneHourRate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, overOneHourRate: e.target.value }))}
                         placeholder="e.g., 4.00"
+                        className="bg-gray-50"
+                        readOnly
                       />
-                    </div> */}
+                      <p className="text-xs text-gray-500 mt-1">Automatically set to same value as 1 Hour Rate</p>
+                    </div>
+                    */}
 
 
                     <div className="flex justify-end gap-2">

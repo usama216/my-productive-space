@@ -54,13 +54,12 @@ export const getPricingByLocationAndMemberType = async (
   }
 };
 
-// Admin functions
+// Admin functions - Updated interface to match backend API
 export const upsertPricingConfiguration = async (pricingData: {
   location: string;
   memberType: 'STUDENT' | 'MEMBER' | 'TUTOR';
-  hourlyRate: number;
-  halfDayRate: number;
-  fullDayRate: number;
+  oneHourRate: number;
+  overOneHourRate: number;
   isActive?: boolean;
 }): Promise<PricingConfiguration> => {
   try {

@@ -70,7 +70,7 @@ export default function PaymentStep({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
   
   // Calculate totals based on payment method
-  const { fee: creditCardFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
+  const { fee: transactionFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
 
   // Map payment methods to API values
   const getPaymentMethodForAPI = (method: PaymentMethod): string => {
@@ -187,14 +187,21 @@ export default function PaymentStep({
             </div>
           </RadioGroup>
 
-          {/* Credit Card Fee Disclaimer */}
-          {selectedPaymentMethod === 'creditCard' && (
+          {/* Transaction Fee Disclaimer */}
+          {transactionFee > 0 && (
             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="flex items-start space-x-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-amber-800">
-                  <p className="font-medium">Credit Card Processing Fee</p>
-                  <p>A 5% processing fee will be added to your total amount when paying with credit card.</p>
+                  <p className="font-medium">
+                    {selectedPaymentMethod === 'creditCard' ? 'Credit Card Processing Fee' : 'PayNow Transaction Fee'}
+                  </p>
+                  <p>
+                    {selectedPaymentMethod === 'creditCard' 
+                      ? 'A 5% processing fee will be added to your total amount when paying with credit card.'
+                      : 'A $0.20 transaction fee will be added for PayNow payments over $10.'
+                    }
+                  </p>
                 </div>
               </div>
             </div>
@@ -214,7 +221,10 @@ export default function PaymentStep({
           </div>
           {discountAmount > 0 && (
             <div className="flex justify-between text-green-600">
-              <span>Discount {appliedVoucher ? `(${appliedVoucher.code})` : ''}</span>
+              <span>
+                {isExtension ? 'Credits Applied' : 'Discount'} 
+                {appliedVoucher ? ` (${appliedVoucher.code})` : ''}
+              </span>
               <span>- ${discountAmount.toFixed(2)}</span>
             </div>
           )}
@@ -225,10 +235,12 @@ export default function PaymentStep({
             </div>
           )}
 
-          {creditCardFee > 0 && (
+          {transactionFee > 0 && (
             <div className="flex justify-between text-amber-600">
-              <span>Credit Card Fee (5%)</span>
-              <span>${formatCurrency(creditCardFee)}</span>
+              <span>
+                {selectedPaymentMethod === 'creditCard' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+              </span>
+              <span>${formatCurrency(transactionFee)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-lg border-t pt-2">

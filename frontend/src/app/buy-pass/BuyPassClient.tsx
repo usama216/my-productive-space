@@ -650,9 +650,21 @@ export default function BuyNowPage() {
                       <div className="space-y-2 border-t pt-3">
                         {(() => {
                           const isCardPayment = confirmationData.paymentMethod === 'card'
+                          const isPayNowPayment = confirmationData.paymentMethod === 'paynow'
                           const baseAmount = confirmationData.totalAmount
-                          const cardFee = isCardPayment ? baseAmount * 0.05 : 0
-                          const finalTotal = baseAmount + cardFee
+                          
+                          let fee = 0
+                          let feeLabel = ''
+                          
+                          if (isCardPayment) {
+                            fee = baseAmount * 0.05
+                            feeLabel = 'Credit Card Fee (5%)'
+                          } else if (isPayNowPayment && baseAmount > 10) {
+                            fee = 0.20
+                            feeLabel = 'PayNow Transaction Fee'
+                          }
+                          
+                          const finalTotal = baseAmount + fee
                           
                           return (
                             <>
@@ -660,10 +672,10 @@ export default function BuyNowPage() {
                                 <span>Package Amount</span>
                                 <span>SGD ${baseAmount.toFixed(2)}</span>
                               </div>
-                              {isCardPayment && (
+                              {fee > 0 && (
                                 <div className="flex justify-between text-sm text-orange-600">
-                                  <span>Credit Card Fee (5%)</span>
-                                  <span>SGD ${formatCurrency(cardFee)}</span>
+                                  <span>{feeLabel}</span>
+                                  <span>SGD ${formatCurrency(fee)}</span>
                                 </div>
                               )}
                               <div className="flex justify-between font-bold text-lg">
@@ -777,7 +789,9 @@ export default function BuyNowPage() {
 
                         {cardFee > 0 && (
                           <div className="flex justify-between text-orange-600">
-                            <span>Credit Card Fee (5%)</span>
+                            <span>
+                              {paymentMethod === 'card' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+                            </span>
                             <span>${formatCurrency(cardFee)}</span>
                           </div>
                         )}
