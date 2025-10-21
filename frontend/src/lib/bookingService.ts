@@ -20,6 +20,11 @@ export interface Booking {
   bookedForEmails: string[]
   promoCodeId?: string
   discountAmount?: number
+  discountamount?: number
+  packageId?: string
+  packageUsed?: boolean
+  paymentMethod?: string
+  paymentId?: string
   confirmedPayment: boolean
   isUpcoming?: boolean
   isOngoing?: boolean
@@ -35,6 +40,10 @@ export interface Booking {
   status?: string
   rescheduleCount?: number
   rescheduledAt?: string
+  extensionamounts?: number[]
+  totalactualcost?: number
+  createdAt?: string
+  updatedAt?: string
   User?: {
     name: string
     email: string

@@ -586,8 +586,12 @@ export function UserBookings() {
                   <TableHead>Date & Time</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Seats</TableHead>
+                  <TableHead>Booked For</TableHead>
+                  <TableHead>Discount Type</TableHead>
+                  <TableHead>Discount Amount</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Payment Method</TableHead>
+                  {/* <TableHead>Status</TableHead> */}
                   <TableHead>Payment</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -629,6 +633,42 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
+                        {(() => {
+                          const bookedFor = [];
+                        
+                          if (booking.students > 0) bookedFor.push(`Students: ${booking.students}`);
+                          if (booking.members > 0) bookedFor.push(`Members: ${booking.members}`);
+                          if (booking.tutors > 0) bookedFor.push(`Tutors: ${booking.tutors}`);
+                          return bookedFor.length > 0 ? bookedFor.join(', ') : '---';
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {(() => {
+                          if (booking.packageUsed && booking.packageId) {
+                            return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Package</Badge>;
+                          }
+                          if (booking.promoCodeId || booking.PromoCode) {
+                            return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Promo Code</Badge>;
+                          }
+                          if ((booking.discountamount || booking.discountAmount || 0) > 0) {
+                            return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Credits</Badge>;
+                          }
+                          return <span className="text-gray-400 text-xs">---</span>;
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium">
+                        {(booking.discountamount || booking.discountAmount || 0) > 0 
+                          ? `$${(booking.discountamount || booking.discountAmount || 0).toFixed(2)}`
+                          : <span className="text-gray-400 text-xs">$0.00</span>
+                        }
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
                       <div className="font-medium">${(booking.extensionamounts && booking.extensionamounts.length > 0 ? Number(booking.totalactualcost) : Number(booking.totalAmount)).toFixed(2)}</div>
                         {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
                           <div className="text-xs text-blue-600">
@@ -656,10 +696,27 @@ export function UserBookings() {
                       </div> */}
                     </TableCell>
                     <TableCell>
+                      <div className="text-sm">
+                        {(() => {
+                          // If payment method exists from backend, only show Card or PayNow
+                          if (booking.paymentMethod) {
+                            const method = booking.paymentMethod.toLowerCase();
+                            if (method.includes('card') || method.includes('credit')) {
+                              return <span className="font-medium">Card</span>;
+                            } else if (method.includes('paynow') || method.includes('pay_now')) {
+                              return <span className="font-medium">PayNow</span>;
+                            }
+                          }
+                          // Default for all other cases
+                          return <span className="text-gray-400 text-xs">---</span>;
+                        })()}
+                      </div>
+                    </TableCell>
+                    {/* <TableCell>
                       <Badge className={getStatusColor(getBookingStatus(booking))}>
                         {getBookingStatus(booking)}
                       </Badge>
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell>
                       {booking.confirmedPayment ? (
                         <div className="flex items-center space-x-1 text-green-600">

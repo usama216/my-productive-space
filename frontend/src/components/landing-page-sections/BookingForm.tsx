@@ -113,13 +113,13 @@ export default function BookingForm() {
       }
     }
 
-    // Minimum end time is start time + 30 minutes
-    const minEndTime = new Date(startDate.getTime() + 30 * 60 * 1000)
+    // Minimum end time is start time + 1 hour (60 minutes)
+    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000)
 
     // If end date is same day as start date
     if (isSameDay(startDate, endDate)) {
       return {
-        minTime: minEndTime, // Must be at least 30 minutes after start time
+        minTime: minEndTime, // Must be at least 1 hour after start time
         maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
       }
     }
@@ -168,10 +168,10 @@ export default function BookingForm() {
       }
     }
 
-    // Minimum end time is start time + 30 minutes
-    const minEndTime = new Date(startDate.getTime() + 30 * 60 * 1000)
+    // Minimum end time is start time + 1 hour (60 minutes)
+    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000)
 
-    // For today's date, start from the start time + 30 min
+    // For today's date, start from the start time + 1 hour
     const today = new Date()
     if (isSameDay(startDate, today)) {
       return {
@@ -180,7 +180,7 @@ export default function BookingForm() {
       }
     }
 
-    // For future dates, still need 30 min minimum
+    // For future dates, still need 1 hour minimum
     return {
       minTime: minEndTime,
       maxTime: setHours(setMinutes(new Date(), 59), 23)
@@ -198,6 +198,14 @@ export default function BookingForm() {
       alert('End time must be after start time')
       return
     }
+    
+    // Validate minimum booking duration of 1 hour
+    const timeDifferenceMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
+    if (timeDifferenceMinutes < 60) {
+      alert('Minimum booking duration is 1 hour')
+      return
+    }
+    
     // Check if it is a valid cross-day booking
     const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
     const daysDifference = Math.floor(timeDifferenceHours / 24)

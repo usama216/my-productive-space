@@ -530,14 +530,26 @@ export default function ReschedulePage() {
       return
     }
 
-    // Check minimum increase of 1 hour (new duration must be at least 1 hour more than original)
+    // Check duration constraints
     const newDuration = (newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)
     const durationIncrease = newDuration - originalDuration
     
-    if (durationIncrease < 1) {
+    // Check if duration decreased
+    if (newDuration < originalDuration) {
       toast({
-        title: "Minimum Duration Required",
-        description: "Rescheduling requires at least 1 hour increase.",
+        title: "Cannot Decrease Time",
+        description: "You cannot reschedule to a shorter duration. Please select a longer or equal duration.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // If duration increased, it must be at least 1 hour increase
+    // If duration is same (0 change), that's allowed (just date/time change)
+    if (durationIncrease > 0 && durationIncrease < 1) {
+      toast({
+        title: "Minimum Duration Increase",
+        description: "If increasing duration, minimum increase is 1 hour. You can keep the same duration and just change date/time.",
         variant: "destructive"
       })
       return
@@ -547,16 +559,6 @@ export default function ReschedulePage() {
       toast({
         title: "Seat Selection Required",
         description: `Please select ${booking.pax} seat${booking.pax > 1 ? 's' : ''} for the new time`,
-        variant: "destructive"
-      })
-      return
-    }
-
-    // Check if duration decreased
-    if (newDuration < originalDuration) {
-      toast({
-        title: "Cannot Decrease Time",
-        description: "You cannot reschedule to a shorter duration. Please select a longer or equal duration.",
         variant: "destructive"
       })
       return
@@ -947,26 +949,58 @@ export default function ReschedulePage() {
                   {/* Duration Info usama*/}
                   {newStartDate && newEndDate && (
                     <Alert className={
-                      (((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration) < 1 
-                        ? "border-red-500 bg-red-50" 
-                        : ""
+                      (() => {
+                        const durationIncrease = ((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration;
+                        // Red if duration decreased OR if increased but less than 1 hour (partial increase)
+                        if (durationIncrease < 0 || (durationIncrease > 0 && durationIncrease < 1)) {
+                          return "border-red-500 bg-red-50";
+                        }
+                        // Green if duration is exactly same (just date/time change)
+                        if (durationIncrease === 0) {
+                          return "border-green-500 bg-green-50";
+                        }
+                        // Normal if duration increased by 1 hour or more
+                        return "";
+                      })()
                     }>
                       <Clock className="h-4 w-4" />
                       <AlertDescription>
                         New Duration: {((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)).toFixed(2)} hours
                         <span className="block mt-1 text-gray-600 text-sm">
-                          Original: {originalDuration.toFixed(2)} hours | Increase: {(((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration).toFixed(2)} hours
+                          Original: {originalDuration.toFixed(2)} hours | Change: {(((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration).toFixed(2)} hours
                         </span>
-                        {costDifference > 0 && (
-                          <span className="block mt-1 text-orange-600">
-                            Additional cost: SGD ${costDifference.toFixed(2)}
-                          </span>
-                        )}
-                        {costDifference < 0 && (
-                          <span className="block mt-1 text-red-600">
-                           New duration cannot be lesser than original duration. Please cancel and rebook
-                          </span>
-                        )}
+                        {(() => {
+                          const durationIncrease = ((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration;
+                          if (durationIncrease === 0) {
+                            return (
+                              <span className="block mt-1 text-green-600">
+                                ✓ Same duration - No additional cost
+                              </span>
+                            );
+                          }
+                          if (durationIncrease > 0 && durationIncrease < 1) {
+                            return (
+                              <span className="block mt-1 text-red-600">
+                                ⚠ Minimum increase is 1 hour. Keep same duration or increase by at least 1 hour.
+                              </span>
+                            );
+                          }
+                          if (costDifference > 0) {
+                            return (
+                              <span className="block mt-1 text-orange-600">
+                                Additional cost: SGD ${costDifference.toFixed(2)}
+                              </span>
+                            );
+                          }
+                          if (costDifference < 0) {
+                            return (
+                              <span className="block mt-1 text-red-600">
+                                New duration cannot be lesser than original duration. Please cancel and rebook
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -975,7 +1009,7 @@ export default function ReschedulePage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
                     Rescheduling requires at least 1 hour.
-                       </AlertDescription>
+                      </AlertDescription>
                   </Alert>
                   {/* Seat Availability Status */}
                   {checkingSeats && (
@@ -1125,9 +1159,16 @@ export default function ReschedulePage() {
                         // Disable if times haven't changed from original
                         (newStartDate?.getTime() === originalStartDate?.getTime() && 
                          newEndDate?.getTime() === originalEndDate?.getTime()) ||
-                        // Disable if increase is less than 1 hour
+                        // Disable if duration decreased
                         (newStartDate && newEndDate && 
-                         ((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration < 1)
+                         ((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) < originalDuration) ||
+                        // Disable if increased but less than 1 hour (partial increase not allowed)
+                        // Allow if duration is same (0 increase) - just date/time change
+                        (newStartDate && newEndDate && 
+                         (() => {
+                           const durationIncrease = ((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration;
+                           return durationIncrease > 0 && durationIncrease < 1;
+                         })())
                       }
                       className="bg-orange-600 hover:bg-orange-700"
                     >
