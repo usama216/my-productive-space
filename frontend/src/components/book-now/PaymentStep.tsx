@@ -45,7 +45,10 @@ type Props = {
     seatNumbers: string[]
     additionalHours: number
     additionalCost: number
+    creditAmount?: number
   }
+  // Loading state
+  isLoading?: boolean
 }
 
 export default function PaymentStep({
@@ -64,7 +67,8 @@ export default function PaymentStep({
   isExtension = false,
   extensionData,
   isReschedule = false,
-  rescheduleData
+  rescheduleData,
+  isLoading = false
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
@@ -222,7 +226,7 @@ export default function PaymentStep({
           {discountAmount > 0 && (
             <div className="flex justify-between text-green-600">
               <span>
-                {isExtension ? 'Credits Applied' : 'Discount'} 
+                {isExtension || isReschedule ? 'Credits Applied' : 'Discount'} 
                 {appliedVoucher ? ` (${appliedVoucher.code})` : ''}
               </span>
               <span>- ${discountAmount.toFixed(2)}</span>
@@ -265,15 +269,15 @@ export default function PaymentStep({
         </div>
       </div>
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={loading} className="flex-1">
+        <Button variant="outline" onClick={onBack} disabled={loading || isLoading} className="flex-1">
           Back
         </Button>
         <Button
           onClick={handlePay}
-          disabled={loading}
+          disabled={loading || isLoading}
           className="flex-1 bg-orange-500 hover:bg-orange-600"
         >
-          {loading ? 'Processing…' : 
+          {(loading || isLoading) ? 'Processing…' : 
            finalTotal === 0 ? 'Confirm Extension (Fully Covered)' :
            isExtension ? `Pay $${finalTotal.toFixed(2)} to Extend` : 
            `Complete your booking`}

@@ -26,11 +26,13 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/useAuth'
 import {
   getBookingForReschedule
 } from '@/lib/rescheduleService'
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
 import PaymentStep from '@/components/book-now/PaymentStep'
+import { EntitlementTabs } from '@/components/book-now-sections/EntitlementTabs'
 import {
   toSingaporeTime,
   formatSingaporeDate,
@@ -122,13 +124,27 @@ export default function ReschedulePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const bookingId = params.bookingId as string
+
+  // URL Parameters (for payment confirmation flow)
+  const isRescheduleReturn = searchParams.get('reschedule') === 'true'
+  const paymentReference = searchParams.get('reference')
+  const status = searchParams.get('status')
+  const urlNewStartAt = searchParams.get('newStartAt')
+  const urlNewEndAt = searchParams.get('newEndAt')
+  const urlSeatNumbers = searchParams.get('seatNumbers')
+  const urlAdditionalCost = searchParams.get('additionalCost')
+  const urlOriginalStartAt = searchParams.get('originalStartAt')
+  const urlOriginalEndAt = searchParams.get('originalEndAt')
+  // Note: creditAmount is NOT in URL - it will be fetched from Payment record or passed from rescheduleData state
 
   // State
   const [booking, setBooking] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [apiLoading, setApiLoading] = useState(false)
+  const [rescheduleConfirmed, setRescheduleConfirmed] = useState(false)
   const [currentStep, setCurrentStep] = useState(() => {
     const step = searchParams.get('step')
     return step ? parseInt(step) : 1
@@ -174,10 +190,20 @@ export default function ReschedulePage() {
   const [needsPayment, setNeedsPayment] = useState(false)
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
   const [paymentTotal, setPaymentTotal] = useState(0)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('creditCard')
-
-  // Step 3: Confirmation
-  const [rescheduleConfirmed, setRescheduleConfirmed] = useState(false)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
+  
+  // Credits state
+  const [creditAmount, setCreditAmount] = useState(() => {
+    // Only restore from localStorage if coming from payment return
+    if (isRescheduleReturn && status === 'completed' && paymentReference) {
+      const saved = localStorage.getItem(`reschedule_credit_${bookingId}`)
+      return saved ? parseFloat(saved) : 0
+    }
+    // Otherwise start fresh (and clear any old data)
+    localStorage.removeItem(`reschedule_credit_${bookingId}`)
+    return 0
+  })
+  const [finalCost, setFinalCost] = useState(0)
 
   // Pricing
   const pricing = {
@@ -269,204 +295,111 @@ export default function ReschedulePage() {
     }
   }, [bookingId, router, toast])
 
-  // Handle payment return from gateway
+  // Handle payment confirmation (same pattern as extend booking)
   useEffect(() => {
-    const handlePaymentReturn = async () => {
-      const step = searchParams.get('step')
-      const isReschedule = searchParams.get('reschedule')
-      const paymentReference = searchParams.get('reference')
-      const paymentStatus = searchParams.get('status')
-
-      console.log('🔍 Checking payment return:', { step, isReschedule, paymentReference, paymentStatus })
-
-      // Check if this payment was already processed (from localStorage)
-      const storedPaymentKey = localStorage.getItem(`reschedule_processed_${bookingId}`)
-      if (storedPaymentKey && step === '3' && isReschedule === 'true' && paymentReference && paymentStatus === 'completed') {
-        console.log('✅ Found stored payment key, setting processed state')
-        processedPaymentRef.current = storedPaymentKey
-      }
-
-      const paymentKey = `${bookingId}-${paymentReference}-${paymentStatus}`
-
-      // Check if this is a payment return (step=3, reschedule=true, completed)
-      if (step === '3' && isReschedule === 'true' && paymentReference && paymentStatus === 'completed') {
-
-        // If already processed, just show success without calling API again
-        if (processedPaymentRef.current === paymentKey) {
-          console.log('✅ Payment already processed, showing success state')
-          setPaymentConfirmed(true)
+    const handlePaymentConfirmation = async () => {
+      if (isRescheduleReturn && status === 'completed' && paymentReference) {
+        // Check if already processed (prevent double API calls)
+        const processedKey = `reschedule_processed_${bookingId}_${paymentReference}`
+        if (localStorage.getItem(processedKey)) {
+          console.log('✅ Payment already processed, skipping duplicate call')
           setRescheduleConfirmed(true)
+          setPaymentConfirmed(true)
           setCurrentStep(3)
-
-          // Set the data from URL parameters for display
-          const newStartAt = searchParams.get('newStartAt')
-          const newEndAt = searchParams.get('newEndAt')
-          const seatNumbers = searchParams.get('seatNumbers')
-          const additionalCost = searchParams.get('additionalCost')
-          const originalStartAt = searchParams.get('originalStartAt')
-          const originalEndAt = searchParams.get('originalEndAt')
-
-          if (newStartAt && newEndAt && seatNumbers && originalStartAt && originalEndAt && booking) {
-            // Update states with URL data for display
-            setNewStartDate(toLocalTime(newStartAt))
-            setNewEndDate(toLocalTime(newEndAt))
-            setSelectedSeats(JSON.parse(decodeURIComponent(seatNumbers)))
-            setOriginalStartDate(toLocalTime(originalStartAt))
-            setOriginalEndDate(toLocalTime(originalEndAt))
-            setCostDifference(parseFloat(additionalCost || '0'))
-
-            // Set confirmation data from URL + current booking
-            setConfirmationData({
-              booking: booking,
-              originalTimes: {
-                startAt: originalStartAt,
-                endAt: originalEndAt
-              }
-            })
-          }
-
-          toast({
-            title: "Reschedule Already Completed",
-            description: "Your booking has been successfully rescheduled.",
-          })
           return
         }
-
-        // Process new payment
-        if (!paymentProcessing) {
-          setPaymentProcessing(true)
-          processedPaymentRef.current = paymentKey
-
-          // Store in localStorage to persist across refreshes
-          localStorage.setItem(`reschedule_processed_${bookingId}`, paymentKey)
-
-          console.log('✅ Payment completed, processing reschedule...', paymentKey)
-
-          // Get reschedule data from URL
-          const newStartAt = searchParams.get('newStartAt')
-          const newEndAt = searchParams.get('newEndAt')
-          const seatNumbers = searchParams.get('seatNumbers')
-          const additionalCost = searchParams.get('additionalCost')
-          const originalStartAt = searchParams.get('originalStartAt')
-          const originalEndAt = searchParams.get('originalEndAt')
-
-          if (newStartAt && newEndAt && seatNumbers) {
-            const rescheduleDataFromUrl = {
-              newStartAt,
-              newEndAt,
-              seatNumbers: JSON.parse(decodeURIComponent(seatNumbers)),
-              additionalCost: parseFloat(additionalCost || '0'),
-              originalStartAt,
-              originalEndAt
-            }
-
-            console.log('📝 Reschedule data from URL:', rescheduleDataFromUrl)
-
-            try {
-              // Call confirm payment endpoint to update booking
-              // Use bookingId as paymentId since we store bookingId in payment.bookingRef
-              const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  bookingId,
-                  paymentId: bookingId, // Use bookingId to lookup payment by bookingRef
-                  rescheduleData: rescheduleDataFromUrl
-                })
-              })
-
-              const result = await response.json()
-
-              if (response.ok && result.success) {
-                console.log('✅ Booking updated successfully after payment', result.alreadyCompleted ? '(already completed)' : '')
-                setPaymentConfirmed(true)
-                setRescheduleConfirmed(true)
-
-                // Store confirmation data from API response
-                if (result.booking && result.originalTimes) {
-                  setConfirmationData({
-                    booking: result.booking,
-                    originalTimes: result.originalTimes
-                  })
-
-                  // Update booking state with NEW reschedule data
-                  setBooking(result.booking)
-
-                  // Update the dates to show the NEW rescheduled times
-                  const newStart = toLocalTime(result.booking.startAt)
-                  const newEnd = toLocalTime(result.booking.endAt)
-                  setNewStartDate(newStart)
-                  setNewEndDate(newEnd)
-
-                  // Keep the original times from the response for display
-                  const origStart = toLocalTime(result.originalTimes.startAt)
-                  const origEnd = toLocalTime(result.originalTimes.endAt)
-                  setOriginalStartDate(origStart)
-                  setOriginalEndDate(origEnd)
-                }
-
-                toast({
-                  title: result.alreadyCompleted ? "Reschedule Already Completed" : "Reschedule Completed!",
-                  description: result.alreadyCompleted
-                    ? "Your booking was already rescheduled successfully."
-                    : "Your booking has been rescheduled and payment confirmed.",
-                })
-              } else {
-                console.error('❌ Failed to update booking:', result)
-                toast({
-                  title: "Update Failed",
-                  description: result.error || "Failed to update booking after payment",
-                  variant: "destructive"
-                })
-              }
-            } catch (error) {
-              console.error('❌ Error processing payment return:', error)
-
-              // Even if API fails, show success state with URL data
-              console.log('⚠️ API failed but showing success with URL data')
-              setPaymentConfirmed(true)
-              setRescheduleConfirmed(true)
-              setCurrentStep(3)
-
-              // Set data from URL parameters as fallback
-              if (newStartAt && newEndAt && seatNumbers && originalStartAt && originalEndAt) {
-                setNewStartDate(toLocalTime(newStartAt))
-                setNewEndDate(toLocalTime(newEndAt))
-                setSelectedSeats(JSON.parse(decodeURIComponent(seatNumbers)))
-                setOriginalStartDate(toLocalTime(originalStartAt))
-                setOriginalEndDate(toLocalTime(originalEndAt))
-                setCostDifference(parseFloat(additionalCost || '0'))
-
-                // Set confirmation data from URL + current booking as fallback
-                if (booking) {
-                  setConfirmationData({
-                    booking: booking,
-                    originalTimes: {
-                      startAt: originalStartAt,
-                      endAt: originalEndAt
-                    }
-                  })
-                }
-              }
-
-              toast({
-                title: "Reschedule Completed",
-                description: "Your booking has been rescheduled successfully.",
-              })
-            } finally {
-              setPaymentProcessing(false) // Reset the flag
-            }
+        
+        try {
+          setApiLoading(true) // Show loading during confirmation
+          console.log('🔄 Processing payment confirmation for reschedule:', { paymentReference, status, bookingId })
+          
+          // Get creditAmount from localStorage (saved before payment)
+          const savedCreditAmount = parseFloat(localStorage.getItem(`reschedule_credit_${bookingId}`) || '0')
+          console.log('💳 Retrieved credit amount from localStorage:', savedCreditAmount)
+          
+          // Get reschedule data from URL parameters + creditAmount from localStorage
+          const rescheduleDataFromUrl = {
+            newStartAt: urlNewStartAt!,
+            newEndAt: urlNewEndAt!,
+            seatNumbers: urlSeatNumbers ? JSON.parse(urlSeatNumbers) : [],
+            additionalCost: parseFloat(urlAdditionalCost || '0'),
+            originalStartAt: urlOriginalStartAt!,
+            originalEndAt: urlOriginalEndAt!,
+            creditAmount: savedCreditAmount // Use creditAmount from localStorage!
           }
+          
+          console.log('💳 Sending reschedule data with credits:', rescheduleDataFromUrl)
+          
+          // Call backend to confirm reschedule payment
+          // Use bookingId to lookup payment by bookingRef (same as extend)
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              bookingId: bookingId,
+              paymentId: bookingId, // Use bookingId to lookup payment by bookingRef
+              rescheduleData: rescheduleDataFromUrl
+            })
+          })
+
+          if (response.ok) {
+            const result = await response.json()
+            if (result.success) {
+              console.log('✅ Reschedule confirmed successfully:', result)
+              
+              // Mark as processed (prevent duplicate calls)
+              localStorage.setItem(processedKey, 'true')
+              // Clean up credit amount from localStorage
+              localStorage.removeItem(`reschedule_credit_${bookingId}`)
+              
+              setRescheduleConfirmed(true)
+              setPaymentConfirmed(true)
+              setCurrentStep(3)
+              
+              // Update booking with confirmed data
+              if (result.booking) {
+                setBooking(result.booking)
+                setConfirmationData({
+                  booking: result.booking,
+                  originalTimes: result.originalTimes || {
+                    startAt: urlOriginalStartAt!,
+                    endAt: urlOriginalEndAt!
+                  }
+                })
+              }
+              
+              toast({
+                title: "Reschedule Confirmed",
+                description: "Your booking has been rescheduled successfully",
+              })
+            } else {
+              throw new Error(result.message || 'Failed to confirm reschedule')
+            }
+          } else {
+            const errorData = await response.json()
+            throw new Error(errorData.message || 'Failed to confirm reschedule payment')
+          }
+        } catch (error) {
+          console.error('❌ Error confirming reschedule payment:', error)
+          toast({
+            title: "Confirmation Error",
+            description: error instanceof Error ? error.message : "Failed to confirm your reschedule",
+            variant: "destructive"
+          })
+        } finally {
+          setApiLoading(false) // Hide loading
         }
       }
     }
 
+    // Only run if booking is loaded
     if (booking && !loading) {
-      handlePaymentReturn()
+      handlePaymentConfirmation()
     }
-  }, [searchParams, booking, loading, bookingId, toast])
+  }, [isRescheduleReturn, status, paymentReference, urlNewStartAt, urlNewEndAt, urlSeatNumbers, urlAdditionalCost, urlOriginalStartAt, urlOriginalEndAt, booking, loading, bookingId, toast])
+  // Note: creditAmount NOT in dependency array - we get it from localStorage instead
 
   // Calculate new end date when start date changes
   useEffect(() => {
@@ -520,6 +453,12 @@ export default function ReschedulePage() {
       setPaymentTotal(totalWithFee)
     }
   }, [costDifference, paymentTotal])
+
+  // Calculate final cost after credits
+  useEffect(() => {
+    const finalAmount = Math.max(0, costDifference - creditAmount)
+    setFinalCost(finalAmount)
+  }, [costDifference, creditAmount])
 
   // Check seat availability when dates change
   useEffect(() => {
@@ -632,15 +571,21 @@ export default function ReschedulePage() {
       originalDuration,
       newDuration,
       costDifference,
-      needsPayment
+      needsPayment,
+      creditAmount: creditAmount
     })
 
-    if (needsPayment) {
+    // Check if payment is needed (after credits)
+    const paymentRequired = finalCost > 0
+    console.log('💰 Payment check:', { costDifference, creditAmount, finalCost, paymentRequired })
+
+    if (paymentRequired) {
+      // Payment needed - go to payment step
       setCurrentStep(2)
       updateStepInURL(2)
     } else {
-      // No payment needed, update booking directly and go to confirmation
-      console.log('🔄 No payment needed, calling handlePaymentSuccess directly...')
+      // No payment needed (credits cover full cost) - update booking directly and go to confirmation
+      console.log('✅ Credits cover full cost, no payment needed. Confirming reschedule directly...')
       handlePaymentSuccess(undefined, {
         newStartAt: newStartDate!.toISOString(),
         newEndAt: newEndDate!.toISOString(),
@@ -652,9 +597,16 @@ export default function ReschedulePage() {
         newDuration,
         originalDuration,
         costDifference,
-        needsPayment
+        needsPayment: false, // Force false since credits cover it
+        creditAmount: creditAmount
       })
     }
+  }
+
+  const handlePaymentComplete = async () => {
+    // This function is no longer needed as payment confirmation is handled by useEffect
+    // when user returns from payment gateway
+    console.log('Payment completed, waiting for confirmation...')
   }
 
   const handlePaymentSuccess = async (paymentId?: string, customRescheduleData?: any) => {
@@ -667,6 +619,13 @@ export default function ReschedulePage() {
         console.log('🔍 Payment completed, updating booking with new schedule...')
 
         // Update booking with new dates/times/seats AFTER payment confirmation
+        const rescheduleDataWithCredits = {
+          ...dataToUse,
+          creditAmount: creditAmount // Make sure creditAmount is included
+        };
+        
+        console.log('💳 Sending reschedule data with credits:', rescheduleDataWithCredits);
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
           method: 'POST',
           headers: {
@@ -675,7 +634,7 @@ export default function ReschedulePage() {
           body: JSON.stringify({
             bookingId,
             paymentId,
-            rescheduleData
+            rescheduleData: rescheduleDataWithCredits
           })
         })
 
@@ -709,13 +668,14 @@ export default function ReschedulePage() {
           throw new Error(result.error || 'Failed to confirm reschedule')
         }
       } else {
-        // No payment needed case - update booking directly
+        // No payment needed case - update booking directly (credits may cover full cost)
         console.log('✅ No payment needed, updating booking...')
         console.log('📤 Sending reschedule data:', {
           startAt: dataToUse?.newStartAt,
           endAt: dataToUse?.newEndAt,
           seatNumbers: dataToUse?.seatNumbers,
-          rescheduleCost: 0
+          rescheduleCost: dataToUse?.additionalCost || dataToUse?.costDifference || 0,
+          creditAmount: dataToUse?.creditAmount || 0
         })
         
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/booking/${bookingId}`, {
@@ -727,7 +687,8 @@ export default function ReschedulePage() {
             startAt: dataToUse?.newStartAt,
             endAt: dataToUse?.newEndAt,
             seatNumbers: dataToUse?.seatNumbers,
-            rescheduleCost: 0
+            rescheduleCost: dataToUse?.additionalCost || dataToUse?.costDifference || 0,  // Send actual cost!
+            creditAmount: dataToUse?.creditAmount || 0  // Include credits!
           })
         })
 
@@ -981,15 +942,9 @@ export default function ReschedulePage() {
                     </div>
                   </div>
 
-                  {/* Minimum Duration Increase Notice */}
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                    Rescheduling requires at least 1 hour.
-                       </AlertDescription>
-                  </Alert>
+                
 
-                  {/* Duration Info */}
+                  {/* Duration Info usama*/}
                   {newStartDate && newEndDate && (
                     <Alert className={
                       (((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)) - originalDuration) < 1 
@@ -1015,7 +970,13 @@ export default function ReschedulePage() {
                       </AlertDescription>
                     </Alert>
                   )}
-
+  {/* Minimum Duration Increase Notice */}
+  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                    Rescheduling requires at least 1 hour.
+                       </AlertDescription>
+                  </Alert>
                   {/* Seat Availability Status */}
                   {checkingSeats && (
                     <div className="flex items-center text-sm text-orange-600">
@@ -1090,6 +1051,57 @@ export default function ReschedulePage() {
                     </div>
                   )}
 
+                  {/* Credit Selection - Show in Step 1 if there's additional cost */}
+                  {costDifference > 0 && user?.id && (
+                    <div className="border-t pt-4 mt-6">
+                      <h3 className="font-medium text-gray-900 mb-3">Apply Store Credits (Optional)</h3>
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                        <div className="space-y-1 text-sm text-orange-700">
+                          <div className="flex justify-between">
+                            <span>Additional cost:</span>
+                            <span className="font-medium">${costDifference.toFixed(2)}</span>
+                          </div>
+                          {creditAmount > 0 && (
+                            <>
+                              <div className="flex justify-between text-green-700">
+                                <span>Credits applied:</span>
+                                <span className="font-medium">-${creditAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between font-bold text-orange-800 pt-2 border-t border-orange-300">
+                                <span>Amount to pay:</span>
+                                <span>${finalCost.toFixed(2)}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <EntitlementTabs
+                        mode="credit"
+                        onChange={(data) => {
+                          console.log('Credit data changed:', data)
+                          if (data && data.type === 'credit' && data.creditAmount !== undefined) {
+                            setCreditAmount(data.creditAmount)
+                            // Save to localStorage for payment return
+                            localStorage.setItem(`reschedule_credit_${bookingId}`, data.creditAmount.toString())
+                            console.log('💾 Saved credit amount to localStorage:', data.creditAmount)
+                          }
+                        }}
+                        onModeChange={() => {}} // Not needed for reschedule
+                        userId={user.id}
+                        bookingAmount={costDifference}
+                        bookingDuration={newStartDate && newEndDate ? {
+                          startAt: newStartDate.toISOString(),
+                          endAt: newEndDate.toISOString(),
+                          durationHours: (newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60)
+                        } : undefined}
+                        userRole={booking?.memberType || 'MEMBER'}
+                        locationPrice={booking?.memberType === 'STUDENT' ? 4.00 : booking?.memberType === 'TUTOR' ? 6.00 : 5.00}
+                        totalPeople={booking?.pax || 1}
+                        showOnlyCredit={true}
+                      />
+                    </div>
+                  )}
+
                   {/* Submit Button */}
                   <div className="flex justify-end space-x-4">
                     <Button
@@ -1104,6 +1116,7 @@ export default function ReschedulePage() {
                       onClick={handleStep1Submit}
                       disabled={
                         submitting ||
+                        apiLoading ||
                         checkingSeats ||
                         !newStartDate ||
                         !newEndDate ||
@@ -1118,7 +1131,14 @@ export default function ReschedulePage() {
                       }
                       className="bg-orange-600 hover:bg-orange-700"
                     >
-                      {costDifference > 0 ? 'Continue to Payment' : 'Continue to Confirmation'}
+                      {submitting || apiLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {finalCost > 0 ? 'Processing...' : 'Confirming Reschedule...'}
+                        </>
+                      ) : (
+                        finalCost > 0 ? 'Continue to Payment' : 'Confirm Reschedule'
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -1170,10 +1190,11 @@ export default function ReschedulePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+
                   <PaymentStep
                     subtotal={costDifference}
-                    total={paymentTotal || costDifference}
-                    discountAmount={0}
+                    total={finalCost}
+                    discountAmount={creditAmount}
                     appliedVoucher={null}
                     selectedPackage={undefined}
                     customer={{
@@ -1186,7 +1207,7 @@ export default function ReschedulePage() {
                       setCurrentStep(1)
                       updateStepInURL(1)
                     }}
-                    onComplete={handlePaymentSuccess}
+                    onComplete={handlePaymentComplete}
                     onPaymentMethodChange={handlePaymentMethodChange}
                     onCreateBooking={async () => {
                       // For reschedule, don't update booking before payment
@@ -1206,8 +1227,10 @@ export default function ReschedulePage() {
                       newEndAt: rescheduleData.newEndAt,
                       seatNumbers: rescheduleData.seatNumbers,
                       additionalHours: (rescheduleData.newDuration - rescheduleData.originalDuration),
-                      additionalCost: costDifference
+                      additionalCost: costDifference,
+                      creditAmount: creditAmount
                     } : undefined}
+                    isLoading={apiLoading}
                   />
                 </CardContent>
               </Card>
@@ -1291,8 +1314,14 @@ export default function ReschedulePage() {
                         <span className="text-orange-700 text-sm font-medium">Subtotal:</span>
                         <span className="text-orange-700 text-sm font-medium">SGD ${costDifference.toFixed(2)}</span>
                       </div>
+                      {creditAmount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-green-700 text-sm font-medium">Credits Applied:</span>
+                          <span className="text-green-700 text-sm font-medium">- SGD ${creditAmount.toFixed(2)}</span>
+                        </div>
+                      )}
                       {(() => {
-                        const { fee } = calculatePaymentTotal(costDifference, selectedPaymentMethod)
+                        const { fee } = calculatePaymentTotal(finalCost, selectedPaymentMethod)
                         if (fee > 0) {
                           return (
                             <div className="flex justify-between">
@@ -1309,7 +1338,7 @@ export default function ReschedulePage() {
                         <span className="text-orange-800 text-sm font-medium">Total payable:</span>
                         <span className="text-orange-900 text-sm font-medium">
                           SGD ${(() => {
-                            const { total } = calculatePaymentTotal(costDifference, selectedPaymentMethod)
+                            const { total } = calculatePaymentTotal(finalCost, selectedPaymentMethod)
                             return formatCurrency(total)
                           })()}
                         </span>
