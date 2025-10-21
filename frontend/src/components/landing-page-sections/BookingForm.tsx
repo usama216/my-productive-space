@@ -89,6 +89,31 @@ export default function BookingForm() {
 
   const handleEndChange = (date: Date | null) => {
     const validDate = enforceStrict15Minutes(date);
+    
+    // Prevent selecting past end times
+    if (validDate && startDate) {
+      const now = new Date();
+      const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000); // Start + 1 hour
+      
+      // If selecting today and end time is before current time + 1 hour from start
+      if (isSameDay(validDate, now) && validDate < minEndTime && minEndTime > now) {
+        // Don't allow past times
+        alert('End time cannot be in the past. Please select a future time.');
+        return;
+      }
+      
+      // Ensure end time is at least 1 hour after start time
+      if (validDate <= startDate) {
+        alert('End time must be after start time');
+        return;
+      }
+      
+      if (validDate < minEndTime) {
+        alert('End time must be at least 1 hour after start time');
+        return;
+      }
+    }
+    
     setEndDate(validDate)
   }
 

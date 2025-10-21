@@ -146,12 +146,23 @@ export default function ReschedulePage() {
   const [apiLoading, setApiLoading] = useState(false)
   const [rescheduleConfirmed, setRescheduleConfirmed] = useState(false)
   const [currentStep, setCurrentStep] = useState(() => {
+    // If returning from payment gateway, always go to step 3 to show result (success or error)
     const step = searchParams.get('step')
+    const isRescheduleReturn = searchParams.get('reschedule') === 'true'
+    const status = searchParams.get('status')
+    const paymentReference = searchParams.get('reference')
+    
+    // If returning from payment (has reference and reschedule=true), show step 3 regardless of status
+    if (isRescheduleReturn && paymentReference) {
+      return 3 // Show confirmation page (will display error or success based on status)
+    }
+    
     return step ? parseInt(step) : 1
   })
   const [submitting, setSubmitting] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
   const processedPaymentRef = useRef<string | null>(null)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
 
   // Store API response data for confirmation display
   const [confirmationData, setConfirmationData] = useState<{
@@ -298,6 +309,27 @@ export default function ReschedulePage() {
   // Handle payment confirmation (same pattern as extend booking)
   useEffect(() => {
     const handlePaymentConfirmation = async () => {
+      // Handle failed/cancelled payments
+      if (isRescheduleReturn && status && status !== 'completed') {
+        console.log('❌ Payment not completed. Status:', status)
+        
+        // Clean up any saved credit data
+        localStorage.removeItem(`reschedule_credit_${bookingId}`)
+        
+        // Set error message based on status
+        const errorMessages: Record<string, string> = {
+          'canceled': 'Payment was cancelled. Your booking has not been rescheduled.',
+          'cancelled': 'Payment was cancelled. Your booking has not been rescheduled.',
+          'failed': 'Payment failed. Your booking has not been rescheduled.',
+          'pending': 'Payment is still pending. Please wait or contact support.',
+        }
+        
+        setPaymentError(errorMessages[status] || "Payment was not completed. Your booking has not been rescheduled.")
+        setCurrentStep(3) // Show step 3 with error
+        setApiLoading(false)
+        return
+      }
+      
       if (isRescheduleReturn && status === 'completed' && paymentReference) {
         // Check if already processed (prevent double API calls)
         const processedKey = `reschedule_processed_${bookingId}_${paymentReference}`
@@ -388,6 +420,9 @@ export default function ReschedulePage() {
             description: error instanceof Error ? error.message : "Failed to confirm your reschedule",
             variant: "destructive"
           })
+          // Reset to step 2 to allow retry
+          setCurrentStep(2)
+          updateStepInURL(2)
         } finally {
           setApiLoading(false) // Hide loading
         }
@@ -1420,7 +1455,61 @@ export default function ReschedulePage() {
                   </div>
                 </CardContent>
               </Card>
+            ) : paymentError ? (
+              // Payment failed/cancelled - show error
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <XCircle className="h-5 w-5 mr-2 text-red-600" />
+                    Reschedule Failed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="font-medium text-red-800 mb-2">Payment Not Completed</h3>
+                    <p className="text-sm text-red-700">{paymentError}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-red-200">
+                      <h4 className="font-medium text-red-800 mb-2">Booking Details (Not Changed)</h4>
+                      <div className="space-y-1 text-sm text-red-700">
+                        <div>Reference: {booking?.bookingRef}</div>
+                        <div>Location: {booking?.location}</div>
+                        <div>Current Time: {formatSingaporeDate(
+                          originalStartDate?.toISOString() || booking?.startAt || ''
+                        )} - {formatSingaporeDate(
+                          originalEndDate?.toISOString() || booking?.endAt || ''
+                        )}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-center space-y-3">
+                    <p className="text-gray-600">
+                      Your original booking remains unchanged. You can try rescheduling again.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <Button
+                        onClick={() => {
+                          setPaymentError(null)
+                          setCurrentStep(1)
+                          updateStepInURL(1)
+                        }}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        Try Again
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push('/dashboard')}
+                      >
+                        Back to Dashboard
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (confirmationData || booking) ? (
+              // Payment successful - show success
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">

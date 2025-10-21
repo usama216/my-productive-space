@@ -1428,10 +1428,13 @@ export default function BookingClient() {
                         </div>
                       </div>
                      
-                      <div className="flex flex-col gap-1 mt-2">
+                      <div className="flex flex-col mt-2">
                         <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All timezones are based on GMT+8</p>
                         </div>
-                     
+                        <div className="flex flex-col">
+                        <p className='text-gray-600 border border-gray-600 rounded-md p-1 px-4 text-xs inline-block'>Booking has to be made for at least an hour</p>
+                        </div>
+                       
                       {/* Booking Duration Display */}
                       {bookingDuration && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

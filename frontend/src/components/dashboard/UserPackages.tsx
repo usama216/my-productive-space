@@ -275,11 +275,11 @@ export function UserPackages({ userId }: UserPackagesProps) {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h4 className="font-semibold text-lg text-gray-900">{pkg.packageName}</h4>
-                        <p className="text-sm text-gray-600">Order ID: {pkg.orderId}</p>
-                        <p className="text-xs text-gray-500">Package ID: {pkg.packageId}</p>
+                        {/* <p className="text-sm text-gray-600">Order ID: {pkg.orderId}</p>
+                        <p className="text-xs text-gray-500">Package ID: {pkg.packageId}</p> */}
                       </div>
                       <div className="flex items-center space-x-2">
-                        {getStatusBadge(pkg.paymentStatus)}
+                        {/* {getStatusBadge(pkg.paymentStatus)} */}
                         {isCompleted && !isPackageExpired && !isExpiringSoon && (
                           <Badge variant="outline" className="border-green-300 text-green-700">
                             Active
@@ -292,7 +292,7 @@ export function UserPackages({ userId }: UserPackagesProps) {
                         )}
                         {isPackageExpired && isCompleted && (
                           <Badge variant="outline" className="border-red-300 text-red-700">
-                            {allPassesUsed ? 'Fully Used' : 'Expired'}
+                            {allPassesUsed ? 'Completed' : 'Expired'}
                           </Badge>
                         )}
                         {isPending && (
@@ -378,7 +378,7 @@ export function UserPackages({ userId }: UserPackagesProps) {
                         </div>
                         
                         {/* Progress Bar */}
-                        <div className="mt-3">
+                        <div className="">
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
@@ -392,17 +392,17 @@ export function UserPackages({ userId }: UserPackagesProps) {
                     )}
 
                     {/* Payment Information */}
-                    <div className="p-4 mb-4">
-                      <h5 className="font-medium text-orange-900 mb-2">Payment Information</h5>
+                    <div className="">
+                      {/* <h5 className="font-medium text-orange-900 mb-2">Payment Information</h5> */}
                       <div className="grid grid-cols-2 md:grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="text-orange-600">Total Amount</div>
                           <div className="font-medium">SGD ${pkg.totalAmount}</div>
                         </div>
-                        <div>
+                        {/* <div>
                           <div className="text-orange-600">Status</div>
                           <div className="font-medium">{pkg.paymentStatus}</div>
-                        </div>
+                        </div> */}
                       </div>
                     </div>
 

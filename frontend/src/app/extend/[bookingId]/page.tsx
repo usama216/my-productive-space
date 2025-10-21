@@ -87,8 +87,15 @@ export default function ExtendBookingPage() {
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
   const [checkingSeats, setCheckingSeats] = useState(false)
   const [requiresSeatSelection, setRequiresSeatSelection] = useState(false)
-  const [currentStep, setCurrentStep] = useState(isPaymentConfirmation ? 3 : 1) // 1: Time Selection, 2: Payment, 3: Confirmation
+  // If returning from payment, always show step 3 (will show error or success based on status)
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (isPaymentConfirmation && paymentId) {
+      return 3 // Show confirmation page regardless of status
+    }
+    return 1
+  }) // 1: Time Selection, 2: Payment, 3: Confirmation
   const [extensionConfirmed, setExtensionConfirmed] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
   const [originalBooking, setOriginalBooking] = useState<any>(null)
   const [originalEndTime, setOriginalEndTime] = useState<string | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
@@ -301,6 +308,23 @@ export default function ExtendBookingPage() {
   // Handle payment confirmation
   useEffect(() => {
     const handlePaymentConfirmation = async () => {
+      // Handle failed/cancelled payments
+      if (isPaymentConfirmation && status && status !== 'completed') {
+        console.log('❌ Payment not completed. Status:', status)
+        
+        // Set error message based on status
+        const errorMessages: Record<string, string> = {
+          'canceled': 'Payment was cancelled. Your booking has not been extended.',
+          'cancelled': 'Payment was cancelled. Your booking has not been extended.',
+          'failed': 'Payment failed. Your booking has not been extended.',
+          'pending': 'Payment is still pending. Please wait or contact support.',
+        }
+        
+        setPaymentError(errorMessages[status] || "Payment was not completed. Your booking has not been extended.")
+        setCurrentStep(3) // Show step 3 with error
+        return
+      }
+      
       if (isPaymentConfirmation  && status === 'completed') {
         try {
           console.log('Processing payment confirmation for extension:', { paymentId, status, bookingId })
@@ -1014,52 +1038,103 @@ export default function ExtendBookingPage() {
         {/* Confirmation Step */}
         {currentStep === 3 && booking && (
           <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                  Extension Confirmed
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-medium text-green-800 mb-2">Booking Extended Successfully</h3>
-                  <div className="space-y-1 text-sm text-green-700">
-                    <div>Your booking has been extended by {urlExtensionHours || '0.00'} hours</div>
-                    <div>New end time: {booking?.endAt ? formatLocalDate(booking.endAt) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>
-                    <div>Extension cost: ${(() => {
-                      // Use the latest extension amount from extensionamounts array
-                      if (booking?.extensionamounts && booking.extensionamounts.length > 0) {
-                        return booking.extensionamounts[booking.extensionamounts.length - 1].toFixed(2)
-                      }
-                      return extensionCost.toFixed(2)
-                    })()}</div>
-                    <div>Total actual cost: ${(() => {
-                      // Use the totalactualcost from the API response
-                      if (booking?.totalactualcost) {
-                        return booking.totalactualcost.toFixed(2)
-                      }
-                      // Fallback calculation
-                      const originalCost = booking?.totalAmount || 0
-                      const extensionTotal = booking?.extensionamounts?.reduce((sum: number, amount: number) => sum + amount, 0) || 0
-                      return (originalCost + extensionTotal).toFixed(2)
-                    })()}</div>
-                    {paymentId && (
-                      <div>Payment ID: {paymentId}</div>
-                    )}
+            {paymentError ? (
+              // Payment failed/cancelled - show error
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <XCircle className="h-5 w-5 mr-2 text-red-600" />
+                    Extension Failed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="font-medium text-red-800 mb-2">Payment Not Completed</h3>
+                    <p className="text-sm text-red-700">{paymentError}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-red-200">
+                      <h4 className="font-medium text-red-800 mb-2">Booking Details (Not Changed)</h4>
+                      <div className="space-y-1 text-sm text-red-700">
+                        <div>Reference: {booking?.bookingRef}</div>
+                        <div>Location: {booking?.location}</div>
+                        <div>Current End Time: {booking?.endAt ? formatLocalDate(booking.endAt) : ''}</div>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="text-center">
-                  <Button 
-                    onClick={() => router.push('/dashboard')}
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
-                    Back to Dashboard
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="text-center space-y-3">
+                    <p className="text-gray-600">
+                      Your original booking remains unchanged. You can try extending again.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <Button
+                        onClick={() => {
+                          setPaymentError(null)
+                          setCurrentStep(1)
+                        }}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        Try Again
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push('/dashboard')}
+                      >
+                        Back to Dashboard
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              // Payment successful - show success
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                    Extension Confirmed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h3 className="font-medium text-green-800 mb-2">Booking Extended Successfully</h3>
+                    <div className="space-y-1 text-sm text-green-700">
+                      <div>Your booking has been extended by {urlExtensionHours || '0.00'} hours</div>
+                      <div>New end time: {booking?.endAt ? formatLocalDate(booking.endAt) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>
+                      <div>Extension cost: ${(() => {
+                        // Use the latest extension amount from extensionamounts array
+                        if (booking?.extensionamounts && booking.extensionamounts.length > 0) {
+                          return booking.extensionamounts[booking.extensionamounts.length - 1].toFixed(2)
+                        }
+                        return extensionCost.toFixed(2)
+                      })()}</div>
+                      <div>Total actual cost: ${(() => {
+                        // Use the totalactualcost from the API response
+                        if (booking?.totalactualcost) {
+                          return booking.totalactualcost.toFixed(2)
+                        }
+                        // Fallback calculation
+                        const originalCost = booking?.totalAmount || 0
+                        const extensionTotal = booking?.extensionamounts?.reduce((sum: number, amount: number) => sum + amount, 0) || 0
+                        return (originalCost + extensionTotal).toFixed(2)
+                      })()}</div>
+                      {paymentId && (
+                        <div>Payment ID: {paymentId}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <Button 
+                      onClick={() => router.push('/dashboard')}
+                      className="bg-orange-600 hover:bg-orange-700"
+                    >
+                      Back to Dashboard
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
