@@ -1163,7 +1163,13 @@ export default function ReschedulePage() {
                   </div>
                   <div className="flex items-center">
                     <Users className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{booking.pax} {booking.memberType?.toLowerCase()}(s)</span>
+                    <span>
+                      {[
+                        booking.students > 0 && `${booking.students} Student${booking.students > 1 ? 's' : ''}`,
+                        booking.members > 0 && `${booking.members} Member${booking.members > 1 ? 's' : ''}`,
+                        booking.tutors > 0 && `${booking.tutors} Tutor${booking.tutors > 1 ? 's' : ''}`
+                      ].filter(Boolean).join(', ') || `${booking.pax} people`}
+                    </span>
                   </div>
                   <div className="flex items-center">
                     <span className="text-sm text-gray-500">Seats: {booking.seatNumbers?.join(', ') || 'N/A'}</span>
@@ -1255,7 +1261,13 @@ export default function ReschedulePage() {
                   </div>
                   <div className="flex items-center">
                     <Users className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="text-sm">{booking.pax} {booking.memberType?.toLowerCase()}(s)</span>
+                    <span className="text-sm">
+                      {[
+                        booking.students > 0 && `${booking.students} Student${booking.students > 1 ? 's' : ''}`,
+                        booking.members > 0 && `${booking.members} Member${booking.members > 1 ? 's' : ''}`,
+                        booking.tutors > 0 && `${booking.tutors} Tutor${booking.tutors > 1 ? 's' : ''}`
+                      ].filter(Boolean).join(', ') || `${booking.pax} people`}
+                    </span>
                   </div>
 
                   <div className="border-t pt-4">

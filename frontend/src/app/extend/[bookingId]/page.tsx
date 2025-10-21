@@ -942,7 +942,13 @@ export default function ExtendBookingPage() {
                   
                   <div className="flex items-center text-sm">
                     <Users className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{booking.pax} people</span>
+                    <span>
+                      {[
+                        booking.students > 0 && `${booking.students} Student${booking.students > 1 ? 's' : ''}`,
+                        booking.members > 0 && `${booking.members} Member${booking.members > 1 ? 's' : ''}`,
+                        booking.tutors > 0 && `${booking.tutors} Tutor${booking.tutors > 1 ? 's' : ''}`
+                      ].filter(Boolean).join(', ') || `${booking.pax} people`}
+                    </span>
                   </div>
                   
                   {booking.seatNumbers && booking.seatNumbers.length > 0 && (
