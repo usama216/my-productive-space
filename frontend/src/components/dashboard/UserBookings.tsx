@@ -148,6 +148,10 @@ export function UserBookings() {
           // Deduct 5% card fee
           const actualAmount = paidAmount / 1.05
           setActualRefundAmount(actualAmount)
+        } else if (payNowFee > 0) {
+          // Deduct $0.20 PayNow transaction fee
+          const actualAmount = paidAmount - 0.20
+          setActualRefundAmount(Math.max(0, actualAmount))
         } else {
           setActualRefundAmount(paidAmount)
         }
@@ -1015,7 +1019,7 @@ export function UserBookings() {
                 <AlertDescription>
                    Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation.
                   <br />
-                  Any discounts, promo codes, packages, or credit card fees cannot be refunded.
+                  Any discounts, promo codes, packages, credit card fees, or PayNow transaction fees cannot be refunded.
                 </AlertDescription>
               </Alert>
               

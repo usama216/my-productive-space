@@ -84,7 +84,7 @@ export default function BookingForm() {
   const handleStartChange = (date: Date | null) => {
     const validDate = enforceStrict15Minutes(date);
     setStartDate(validDate)
-    setEndDate(null)
+    setEndDate(null) // Clear end date to force user to select
   }
 
   const handleEndChange = (date: Date | null) => {

@@ -2257,7 +2257,7 @@ export default function BookingClient() {
                       )}
 
                       {/* Show total savings if credit applied */}
-                      {creditInfo && creditInfo.discountAmount > 0 && (
+                      {/* {creditInfo && creditInfo.discountAmount > 0 && (
                         <div className="mt-3 p-3 rounded-md bg-blue-50 border border-blue-200">
                           <div className="text-center">
                             <p className="text-sm font-medium text-blue-800">
@@ -2269,7 +2269,7 @@ export default function BookingClient() {
                             </p>
                           </div>
                         </div>
-                      )}
+                      )} */}
                     </div>
                   ) : null}
                 </CardContent>
