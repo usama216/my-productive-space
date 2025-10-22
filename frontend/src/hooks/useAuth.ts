@@ -89,17 +89,27 @@ export function useAuth() {
   // Fetch actual database user
   const fetchDatabaseUser = async (authUser: User): Promise<DatabaseUser> => {
     try {
-      const { data, error } = await supabase
+      console.log('Fetching database user for:', authUser.id)
+      
+      // Use Promise.race to implement timeout
+      const fetchPromise = supabase
         .from('User')
         .select('*')
         .eq('id', authUser.id)
         .single()
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database fetch timeout')), 3000)
+      )
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
 
       if (error || !data) {
         console.error('Error fetching database user:', error)
         return createMockDatabaseUser(authUser)
       }
 
+      console.log('Database user fetched successfully')
       return {
         id: data.id,
         email: data.email,
@@ -166,15 +176,37 @@ export function useAuth() {
       async (event, session) => {
         if (!isMounted) return
         
+        console.log('Auth state change:', event, session?.user?.id)
+        
         if (session?.user) {
-          const dbUser = await fetchDatabaseUser(session.user)
-          setUser(session.user)
-          setDatabaseUser(dbUser)
-          saveToStorage(session.user, dbUser)
+          // For login events, try to fetch database user
+          if (event === 'SIGNED_IN') {
+            try {
+              const dbUser = await fetchDatabaseUser(session.user)
+              setUser(session.user)
+              setDatabaseUser(dbUser)
+              saveToStorage(session.user, dbUser)
+            } catch (error) {
+              console.error('Error in auth state change:', error)
+              // Still set the user even if database fetch fails
+              setUser(session.user)
+              setDatabaseUser(createMockDatabaseUser(session.user))
+              saveToStorage(session.user, createMockDatabaseUser(session.user))
+            }
+          } else {
+            // For other events, just set the user without database fetch
+            setUser(session.user)
+            setDatabaseUser(createMockDatabaseUser(session.user))
+            saveToStorage(session.user, createMockDatabaseUser(session.user))
+          }
         } else {
+          console.log('No session, clearing user data immediately')
           setUser(null)
           setDatabaseUser(null)
           saveToStorage(null, null)
+          // Force loading to false immediately for logout
+          setLoading(false)
+          return
         }
         
         setLoading(false)
