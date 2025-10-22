@@ -205,6 +205,9 @@ export default function ReschedulePage() {
   
   // Credits state
   const [creditAmount, setCreditAmount] = useState(() => {
+    // Check if we're in the browser (not SSR)
+    if (typeof window === 'undefined') return 0
+    
     // Only restore from localStorage if coming from payment return
     if (isRescheduleReturn && status === 'completed' && paymentReference) {
       const saved = localStorage.getItem(`reschedule_credit_${bookingId}`)

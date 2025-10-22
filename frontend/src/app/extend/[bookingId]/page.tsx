@@ -43,7 +43,7 @@ export default function ExtendBookingPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const { user } = useAuth()
+  const { user, databaseUser } = useAuth()
   
   const bookingId = params.bookingId as string
   
@@ -999,39 +999,154 @@ export default function ExtendBookingPage() {
         {/* Payment Step */}
         {currentStep === 2 && booking && (
           <div className="mt-6">
-            <PaymentStep
-              subtotal={extensionCost}
-              total={finalCost}
-              discountAmount={creditAmount}
-              appliedVoucher={null}
-              selectedPackage={null}
-              customer={{
-                name: user?.name || user?.fullName || 'User',
-                email: user?.email || 'user@example.com',
-                phone: user?.phone || user?.phoneNumber || '+65 1234 5678'
-              }}
-              bookingId={bookingId}
-              onBack={() => setCurrentStep(1)}
-              onComplete={handlePaymentComplete}
-              onPaymentMethodChange={handlePaymentMethodChange}
-              onCreateBooking={async () => {
-                // For extension, we don't need to create a new booking
-                // Just return the existing booking ID
-                return bookingId
-              }}
-              onBookingCreated={(bookingId) => {
-                console.log('Extension booking ID:', bookingId)
-              }}
-              isExtension={true}
-              extensionData={{
-                newEndAt: newEndDate?.toISOString() || '',
-                seatNumbers: selectedSeats,
-                extensionHours: extendedHours,
-                extensionCost: extensionCost,
-                originalEndAt: originalEndTime || booking?.endAt || '',
-                creditAmount: creditAmount
-              }}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Payment Form - Left Side */}
+              <div className="lg:col-span-2">
+                <PaymentStep
+                  subtotal={extensionCost}
+                  total={finalCost}
+                  discountAmount={creditAmount}
+                  appliedVoucher={undefined}
+                  selectedPackage={undefined}
+                  customer={{
+                    name: (databaseUser?.firstName && databaseUser?.lastName) 
+                      ? `${databaseUser.firstName} ${databaseUser.lastName}` 
+                      : user?.email?.split('@')[0] || 'User',
+                    email: user?.email || 'user@example.com',
+                    phone: databaseUser?.contactNumber || '+65 1234 5678'
+                  }}
+                  bookingId={bookingId}
+                  onBack={() => setCurrentStep(1)}
+                  onComplete={handlePaymentComplete}
+                  onPaymentMethodChange={handlePaymentMethodChange}
+                  onCreateBooking={async () => {
+                    // For extension, we don't need to create a new booking
+                    // Just return the existing booking ID
+                    return bookingId
+                  }}
+                  onBookingCreated={(bookingId) => {
+                    console.log('Extension booking ID:', bookingId)
+                  }}
+                  isExtension={true}
+                  extensionData={{
+                    newEndAt: newEndDate?.toISOString() || '',
+                    seatNumbers: selectedSeats,
+                    extensionHours: extendedHours,
+                    extensionCost: extensionCost,
+                    originalEndAt: originalEndTime || booking?.endAt || '',
+                    creditAmount: creditAmount
+                  }}
+                />
+              </div>
+
+              {/* Summary Grid - Right Side */}
+              <div className="lg:col-span-1">
+                <Card className="sticky top-6">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Extension Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Booking Details */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        <span className="font-medium">{booking.location}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        <span>{booking.pax || 1} {(booking.pax || 1) === 1 ? 'Person' : 'People'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        <span>{formatLocalDateOnly(new Date(booking.startAt))}</span>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-3">
+                      <h4 className="font-medium text-sm mb-2">Time Extension</h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Original End:</span>
+                          <span className="font-medium">{formatLocalTimeOnly(new Date(booking.endAt))}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">New End:</span>
+                          <span className="font-medium text-blue-600">{newEndDate ? formatLocalTimeOnly(newEndDate) : '-'}</span>
+                        </div>
+                        <div className="flex justify-between pt-1 border-t">
+                          <span className="text-gray-600">Extended by:</span>
+                          <span className="font-medium">{extendedHours.toFixed(2)} hours</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-3">
+                      <h4 className="font-medium text-sm mb-2">Cost Breakdown</h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Extension Cost:</span>
+                          <span className="font-medium">${extensionCost.toFixed(2)}</span>
+                        </div>
+                        {creditAmount > 0 && (
+                          <div className="flex justify-between text-green-700">
+                            <span>Credits Applied:</span>
+                            <span>-${creditAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between pt-1 border-t">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="font-medium">${finalCost.toFixed(2)}</span>
+                        </div>
+                        {(() => {
+                          const paymentFee = selectedPaymentMethod === 'creditCard' 
+                            ? Math.round(finalCost * 0.05 * 100) / 100 
+                            : (finalCost < 10 ? 0.20 : 0)
+                          const finalTotal = Math.round((finalCost + paymentFee) * 100) / 100
+                          
+                          return (
+                            <>
+                              {selectedPaymentMethod === 'creditCard' ? (
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Credit Card Fee (5%):</span>
+                                  <span>+${paymentFee.toFixed(2)}</span>
+                                </div>
+                              ) : finalCost < 10 ? (
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Transaction Fee:</span>
+                                  <span>+${paymentFee.toFixed(2)}</span>
+                                </div>
+                              ) : (
+                                <div className="flex justify-between text-green-700 text-xs">
+                                  <span>✓ No transaction fee</span>
+                                  <span>$0.00</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between pt-2 border-t font-bold text-base">
+                                <span>Total to Pay:</span>
+                                <span className="text-orange-600">${finalTotal.toFixed(2)}</span>
+                              </div>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </div>
+
+                    {selectedSeats.length > 0 && (
+                      <div className="border-t pt-3">
+                        <h4 className="font-medium text-sm mb-2">Selected Seats</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedSeats.map(seat => (
+                            <Badge key={seat} variant="secondary" className="text-xs">
+                              {seat}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         )}
 

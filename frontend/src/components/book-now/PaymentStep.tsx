@@ -1,7 +1,7 @@
 // src/components/book-now/PaymentStep.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -75,6 +75,14 @@ export default function PaymentStep({
   
   // Calculate totals based on payment method
   const { fee: transactionFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
+
+  // Notify parent component of initial payment method on mount
+  useEffect(() => {
+    const { total: initialTotal } = calculatePaymentTotal(total, 'payNow')
+    console.log('PaymentStep mounted - Initial method: payNow, Total:', initialTotal)
+    onPaymentMethodChange('payNow', initialTotal)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty dependency array - only run on mount
 
   // Map payment methods to API values
   const getPaymentMethodForAPI = (method: PaymentMethod): string => {
