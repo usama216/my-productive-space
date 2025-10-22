@@ -60,16 +60,19 @@ export default function Navbar() {
   const handleLogout = async () => {
     setLogoutLoading(true)
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      // Clear local storage immediately for faster UX
+      localStorage.removeItem('auth_user')
+      localStorage.removeItem('database_user')
       
+      // Navigate first
       router.push('/?toastType=logOut')
+      
+      // Then sign out in background
+      await supabase.auth.signOut()
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "An error occurred during logout",
-        variant: "destructive",
-      })
+      console.error('Logout error:', error)
+      // Still navigate even if signOut fails
+      router.push('/?toastType=logOut')
     } finally {
       setLogoutLoading(false)
     }
@@ -146,6 +149,11 @@ export default function Navbar() {
     </div>
   </DropdownMenuTrigger>
   <DropdownMenuContent align="end">
+    {databaseUser?.memberType === 'ADMIN' && (
+      <DropdownMenuItem asChild>
+        <Link href="/admin">Admin Dashboard</Link>
+      </DropdownMenuItem>
+    )}
     <DropdownMenuItem asChild>
       <Link href="/dashboard">Dashboard</Link>
     </DropdownMenuItem>
@@ -227,16 +235,28 @@ export default function Navbar() {
               )
             )}
             
-            <div className="pt-2 border-t border-gray-200 flex space-x-4">
+            <div className="pt-2 border-t border-gray-200">
               {authLoading ? (
                 <div className="flex items-center justify-center w-full">
                   <Loader2 className="animate-spin h-5 w-5" />
                 </div>
               ) : user ? (
-                <>
+                <div className="space-y-2">
+                  {databaseUser?.memberType === 'ADMIN' && (
+                    <Button 
+                      variant="ghost" 
+                      className="w-full" 
+                      onClick={() => {
+                        router.push('/admin')
+                        setMobileOpen(false)
+                      }}
+                    >
+                      Admin Dashboard
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
-                    className="flex-1" 
+                    className="w-full" 
                     onClick={() => {
                       router.push('/dashboard')
                       setMobileOpen(false)
@@ -246,7 +266,7 @@ export default function Navbar() {
                   </Button>
                   <Button 
                     variant="ghost" 
-                    className="flex-1" 
+                    className="w-full" 
                     onClick={handleLogout}
                     disabled={logoutLoading}
                   >
@@ -256,9 +276,9 @@ export default function Navbar() {
                       "Logout"
                     )}
                   </Button>
-                </>
+                </div>
               ) : (
-                <>
+                <div className="flex space-x-4">
                   <Button 
                     variant="ghost" 
                     className="flex-1" 
@@ -278,7 +298,7 @@ export default function Navbar() {
                   >
                     Sign Up
                   </Button>
-                </>
+                </div>
               )}
             </div>
           </div>

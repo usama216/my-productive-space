@@ -86,22 +86,77 @@ export function useAuth() {
     }
   }
 
-  useEffect(() => {
-    // Load initial data from storage
-    loadFromStorage()
-    
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session?.user) {
-        const mockDbUser = createMockDatabaseUser(session.user)
-        setUser(session.user)
-        setDatabaseUser(mockDbUser)
-        saveToStorage(session.user, mockDbUser)
+  // Fetch actual database user
+  const fetchDatabaseUser = async (authUser: User): Promise<DatabaseUser> => {
+    try {
+      const { data, error } = await supabase
+        .from('User')
+        .select('*')
+        .eq('id', authUser.id)
+        .single()
+
+      if (error || !data) {
+        console.error('Error fetching database user:', error)
+        return createMockDatabaseUser(authUser)
       }
-      
-      setLoading(false)
+
+      return {
+        id: data.id,
+        email: data.email,
+        name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+        firstName: data.firstName,
+        lastName: data.lastName,
+        memberType: data.memberType,
+        contactNumber: data.contactNumber,
+        studentVerificationStatus: data.studentVerificationStatus,
+        studentVerificationImageUrl: data.studentVerificationImageUrl,
+        studentVerificationDate: data.studentVerificationDate,
+        studentRejectionReason: data.studentRejectionReason,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      }
+    } catch (error) {
+      console.error('Error fetching database user:', error)
+      return createMockDatabaseUser(authUser)
+    }
+  }
+
+  useEffect(() => {
+    let isMounted = true
+    
+    // Load initial data from storage
+    const storedAuthUser = localStorage.getItem(STORAGE_KEYS.AUTH_USER)
+    const storedDatabaseUser = localStorage.getItem(STORAGE_KEYS.DATABASE_USER)
+    
+    if (storedAuthUser && storedDatabaseUser) {
+      try {
+        setUser(JSON.parse(storedAuthUser))
+        setDatabaseUser(JSON.parse(storedDatabaseUser))
+        // If we have cached data, set loading to false immediately
+        setLoading(false)
+      } catch (error) {
+        console.error('Error loading from local storage:', error)
+      }
+    }
+    
+    // Get initial session and refresh data in background
+    const getInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user && isMounted) {
+          const dbUser = await fetchDatabaseUser(session.user)
+          setUser(session.user)
+          setDatabaseUser(dbUser)
+          saveToStorage(session.user, dbUser)
+        }
+      } catch (error) {
+        console.error('Error getting session:', error)
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
     }
 
     getInitialSession()
@@ -109,11 +164,13 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return
+        
         if (session?.user) {
-          const mockDbUser = createMockDatabaseUser(session.user)
+          const dbUser = await fetchDatabaseUser(session.user)
           setUser(session.user)
-          setDatabaseUser(mockDbUser)
-          saveToStorage(session.user, mockDbUser)
+          setDatabaseUser(dbUser)
+          saveToStorage(session.user, dbUser)
         } else {
           setUser(null)
           setDatabaseUser(null)
@@ -124,7 +181,10 @@ export function useAuth() {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Helper function to check if user is logged in
@@ -135,19 +195,10 @@ export function useAuth() {
     if (!user) return
 
     try {
-      // Fetch fresh user data from the database using the same API base URL as userProfileService
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api'
-      const response = await fetch(`${API_BASE_URL}/user/${user.id}`)
-      if (response.ok) {
-        const userData = await response.json()
-        if (userData.success && userData.user) {
-          console.log('Refreshing database user with fresh data:', userData.user)
-          setDatabaseUser(userData.user)
-          saveToStorage(user, userData.user)
-        }
-      } else {
-        console.error('Failed to refresh database user:', response.status, response.statusText)
-      }
+      const dbUser = await fetchDatabaseUser(user)
+      console.log('Refreshing database user with fresh data:', dbUser)
+      setDatabaseUser(dbUser)
+      saveToStorage(user, dbUser)
     } catch (error) {
       console.error('Error refreshing database user:', error)
     }

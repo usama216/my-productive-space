@@ -61,7 +61,7 @@ export async function updateSession(request: NextRequest) {
 
   // If user is not logged in and trying to access protected routes, redirect to login
   // Can customize this list based on the finalized protected routes
-  const protectedRoutes = ["/dashboard", "/profile", "/settings"]
+  const protectedRoutes = ["/dashboard", "/profile", "/settings", "/admin"]
   const isProtectedRoute = protectedRoutes.some(route => 
     request.nextUrl.pathname.startsWith(route)
   )
@@ -70,6 +70,25 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(
       new URL("/login", request.url)
     )
+  }
+
+  // Check if user is trying to access admin route
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
+  
+  if (isAdminRoute && user) {
+    // Fetch user profile to check if they are an admin
+    const { data: userProfile } = await supabase
+      .from('User')
+      .select('memberType')
+      .eq('id', user.id)
+      .single()
+
+    // If user is not an admin, redirect to dashboard
+    if (userProfile?.memberType !== 'ADMIN') {
+      return NextResponse.redirect(
+        new URL("/dashboard", request.url)
+      )
+    }
   }
 
   return supabaseResponse

@@ -124,8 +124,33 @@ export function AuthForm({ type }: Props) {
 
       if (error) throw error
 
-      resetCaptcha()
-      router.push(`/?toastType=login`)
+      // Fetch user profile to check memberType
+      if (data.user) {
+        const { data: userProfile, error: profileError } = await supabase
+          .from('User')
+          .select('memberType')
+          .eq('id', data.user.id)
+          .single()
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError)
+          // Fallback to dashboard if we can't fetch profile
+          resetCaptcha()
+          router.push(`/dashboard`)
+          return
+        }
+
+        // Redirect based on memberType
+        resetCaptcha()
+        if (userProfile?.memberType === 'ADMIN') {
+          router.push('/admin')
+        } else {
+          router.push('/dashboard')
+        }
+      } else {
+        resetCaptcha()
+        router.push(`/dashboard`)
+      }
     } catch (error: any) {
       toast({
         title: "Error",
