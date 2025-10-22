@@ -347,6 +347,7 @@ export default function BookingClient() {
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [confirmationStatus, setConfirmationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  const [isOver24Hours, setIsOver24Hours] = useState(false)
 
   const [confirmationHeadingError, setConfirmationHeadingError] = useState<string | null>(null)
   const [confirmedBookingData, setConfirmedBookingData] = useState<any>(null)
@@ -792,8 +793,16 @@ export default function BookingClient() {
       return { isValid: false, message: 'Minimum booking duration is 1 hour' }
     }
 
-    // Check if it is a valid cross-day booking
+    // Check if booking is over 24 hours
     const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+    if (timeDifferenceHours > 24) {
+      return {
+        isValid: false,
+        message: 'Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.'
+      }
+    }
+
+    // Check if it is a valid cross-day booking
     const daysDifference = Math.floor(timeDifferenceHours / 24)
 
     if (daysDifference > 1) {
@@ -1007,6 +1016,27 @@ export default function BookingClient() {
   useEffect(() => {
     setFinalTotal(total)
   }, [total])
+
+  // Check for 24-hour booking validation
+  useEffect(() => {
+    if (startDate && endDate) {
+      const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+      const isOver24 = timeDifferenceHours > 24
+      
+      if (isOver24 && !isOver24Hours) {
+        // Show toast when user selects over 24 hours
+        toast({
+          title: "Booking Duration Exceeded",
+          description: "Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.",
+          variant: "destructive",
+        })
+      }
+      
+      setIsOver24Hours(isOver24)
+    } else {
+      setIsOver24Hours(false)
+    }
+  }, [startDate, endDate, isOver24Hours, toast])
 
   // Handle payment method change
   const handlePaymentMethodChange = (method: 'payNow' | 'creditCard', newTotal: number) => {
@@ -1721,11 +1751,14 @@ export default function BookingClient() {
                           !user ||
                           selectedSeats.length !== people ||
                           (needsStudentVerification && !studentsValidated) ||
-                          isLoading
+                          isLoading ||
+                          isOver24Hours
                         }
                       >
                         {!user
                           ? 'Sign In Required'
+                          : isOver24Hours
+                            ? 'Booking Over 24 Hours Not Allowed'
                           : selectedSeats.length !== people
                             ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
                         : needsStudentVerification && !studentsValidated

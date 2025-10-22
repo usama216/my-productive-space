@@ -25,10 +25,12 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 
 import { PeopleSelector } from '@/components/PeopleSelector'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/hooks/use-toast'
 
 export default function BookingForm() {
   const router = useRouter()
   const { user, loading } = useAuth()
+  const { toast } = useToast()
 
   const [location, setLocation] = useState<string>('kovan')
   const [people, setPeople] = useState<number>(1)
@@ -215,28 +217,54 @@ export default function BookingForm() {
   const handleBookNow = () => {
     // Validate required fields
     if (!location || !startDate || !endDate) {
-      alert('Please fill in all required fields')
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
       return
     }
     // Validate booking time constraints
     if (endDate <= startDate) {
-      alert('End time must be after start time')
+      toast({
+        title: "Invalid Time Range",
+        description: "End time must be after start time",
+        variant: "destructive",
+      })
       return
     }
     
     // Validate minimum booking duration of 1 hour
     const timeDifferenceMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
     if (timeDifferenceMinutes < 60) {
-      alert('Minimum booking duration is 1 hour')
+      toast({
+        title: "Duration Too Short",
+        description: "Minimum booking duration is 1 hour",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Check if booking is over 24 hours
+    const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+    if (timeDifferenceHours > 24) {
+      toast({
+        title: "Booking Duration Exceeded",
+        description: "Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.",
+        variant: "destructive",
+      })
       return
     }
     
     // Check if it is a valid cross-day booking
-    const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
     const daysDifference = Math.floor(timeDifferenceHours / 24)
 
     if (daysDifference > 1) {
-      alert('Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)')
+      toast({
+        title: "Invalid Booking Period",
+        description: "Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)",
+        variant: "destructive",
+      })
       return
     }
 
@@ -247,7 +275,11 @@ export default function BookingForm() {
 
       // Business rule: Cross-day bookings only allowed from 5 PM to 12 PM next day
       if (startHour < 17 || endHour > 12) {
-        alert('Cross-day bookings are only allowed from 5 PM to 12 PM next day')
+        toast({
+          title: "Invalid Cross-Day Booking",
+          description: "Cross-day bookings are only allowed from 5 PM to 12 PM next day",
+          variant: "destructive",
+        })
         return
       }
     }
