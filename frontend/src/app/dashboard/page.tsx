@@ -446,7 +446,7 @@ export default function Dashboard() {
       <Navbar />
 
       <div className="pt-32 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-2 lg:px-2">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">

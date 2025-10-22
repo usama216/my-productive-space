@@ -612,9 +612,35 @@ export function UserBookings() {
                         <span>{booking.location}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-32">
                       <div className="text-sm">
-                        <div className="font-medium">{formatBookingDateRange(booking.startAt, booking.endAt)}</div>
+                        <div className="font-medium leading-tight">
+                          {(() => {
+                            const startDate = formatSingaporeDateOnly(booking.startAt);
+                            const endDate = formatSingaporeDateOnly(booking.endAt);
+                            
+                            // If same date, show date once
+                            if (startDate === endDate) {
+                              return (
+                                <>
+                                  <div>{startDate}</div>
+                                  <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.startAt)}</div>
+                                  <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.endAt)}</div>
+                                </>
+                              );
+                            }
+                            
+                            // If different dates, show both dates
+                            return (
+                              <>
+                                <div>{startDate}</div>
+                                <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.startAt)}</div>
+                                <div>{endDate}</div>
+                                <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.endAt)}</div>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -635,7 +661,7 @@ export function UserBookings() {
                         <span className="text-gray-400 text-xs">---</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-24">
                       <div className="text-sm">
                         {(() => {
                           const bookedFor = [];
@@ -643,7 +669,20 @@ export function UserBookings() {
                           if (booking.students > 0) bookedFor.push(`Students: ${booking.students}`);
                           if (booking.members > 0) bookedFor.push(`Members: ${booking.members}`);
                           if (booking.tutors > 0) bookedFor.push(`Tutors: ${booking.tutors}`);
-                          return bookedFor.length > 0 ? bookedFor.join(', ') : '---';
+                          
+                          if (bookedFor.length === 0) {
+                            return <div className="text-gray-500">---</div>;
+                          }
+                          
+                          return (
+                            <div className="leading-tight">
+                              {bookedFor.map((item, index) => (
+                                <div key={index} className="text-xs">
+                                  {item}
+                                </div>
+                              ))}
+                            </div>
+                          );
                         })()}
                       </div>
                     </TableCell>
@@ -726,7 +765,7 @@ export function UserBookings() {
                         <div className="flex items-center space-x-1 text-green-600">
                           <CheckCircle className="h-4 w-4" />
                           <span className="text-sm">
-                            {booking.extensionamounts && booking.extensionamounts.length > 0 ? 'Paid + Extended' : 'Paid'}
+                            {booking.extensionamounts && booking.extensionamounts.length > 0 ? 'Paid' : 'Paid'}
                           </span>
                         </div>
                       ) : (
@@ -934,7 +973,8 @@ export function UserBookings() {
                 <div className="p-3 bg-gray-50 rounded-md text-sm space-y-2">
                   <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
                   <div><strong>Location:</strong> {selectedBooking.location}</div>
-                  <div><strong>Date:</strong> {formatBookingDateRange(selectedBooking.startAt, selectedBooking.endAt)}</div>
+                  <div><strong>Date:</strong> {formatSingaporeDateOnly(selectedBooking.startAt)}</div>
+                  <div><strong>Time:</strong> {formatSingaporeTimeOnly(selectedBooking.startAt)} - {formatSingaporeTimeOnly(selectedBooking.endAt)}</div>
                   
                   <div className="border-t pt-2 mt-2 space-y-1">
                     <div className="flex justify-between items-center">

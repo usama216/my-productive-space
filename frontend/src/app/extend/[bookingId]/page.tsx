@@ -1345,7 +1345,7 @@ export default function ExtendBookingPage() {
                                   </>
                                 )}
                               </div>
-                              <div className="border-t border-green-300 mt-2 pt-2">
+                              {/* <div className="border-t border-green-300 mt-2 pt-2">
                                 <div className="font-medium text-green-800">
                                   Total Booking Cost: ${(() => {
                                     if (booking?.totalactualcost !== undefined && booking?.totalactualcost !== null) {
@@ -1356,8 +1356,8 @@ export default function ExtendBookingPage() {
                                     return (originalCost + extensionTotal).toFixed(2);
                                   })()}
                                 </div>
-                                {/* <div className="text-xs text-green-600">(Cumulative cost including all extensions)</div> */}
-                              </div>
+                                <div className="text-xs text-green-600">(Cumulative cost including all extensions)</div>
+                              </div> */}
                             </>
                           );
                         })()}
