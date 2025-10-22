@@ -70,9 +70,11 @@ export default function ExtendBookingPage() {
   // Get extension data from URL parameters
   const urlExtensionHours = urlParams.get('extensionHours')
   const urlExtensionCost = urlParams.get('extensionCost')
+  const urlCreditAmount = urlParams.get('creditAmount')
   const urlNewEndAt = urlParams.get('newEndAt')
   const urlSeatNumbers = urlParams.get('seatNumbers')
   const urlOriginalEndAt = urlParams.get('originalEndAt')
+  const urlPaymentMethod = urlParams.get('paymentMethod')
   
   // Debug URL parameters
   console.log('URL params:', { isPaymentConfirmation, paymentId, status })
@@ -87,15 +89,11 @@ export default function ExtendBookingPage() {
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
   const [checkingSeats, setCheckingSeats] = useState(false)
   const [requiresSeatSelection, setRequiresSeatSelection] = useState(false)
-  // If returning from payment, always show step 3 (will show error or success based on status)
-  const [currentStep, setCurrentStep] = useState(() => {
-    if (isPaymentConfirmation && paymentId) {
-      return 3 // Show confirmation page regardless of status
-    }
-    return 1
-  }) // 1: Time Selection, 2: Payment, 3: Confirmation
+  // If returning from payment, start with step 1 and let useEffect handle confirmation
+  const [currentStep, setCurrentStep] = useState(1) // 1: Time Selection, 2: Payment, 3: Confirmation
   const [extensionConfirmed, setExtensionConfirmed] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [confirmingPayment, setConfirmingPayment] = useState(false) // Loading state for payment confirmation
   const [originalBooking, setOriginalBooking] = useState<any>(null)
   const [originalEndTime, setOriginalEndTime] = useState<string | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'payNow' | 'creditCard'>('payNow')
@@ -111,6 +109,7 @@ export default function ExtendBookingPage() {
   // Credit state
   const [creditAmount, setCreditAmount] = useState(0)
   const [finalCost, setFinalCost] = useState(0)
+  const [appliedCreditAmount, setAppliedCreditAmount] = useState(0) // Store credit used for extension after payment
   
   // Calculate final cost after credits
   useEffect(() => {
@@ -321,11 +320,15 @@ export default function ExtendBookingPage() {
         }
         
         setPaymentError(errorMessages[status] || "Payment was not completed. Your booking has not been extended.")
+        setConfirmingPayment(false)
         setCurrentStep(3) // Show step 3 with error
         return
       }
       
       if (isPaymentConfirmation  && status === 'completed') {
+        // Set loading state
+        setConfirmingPayment(true)
+        
         try {
           console.log('Processing payment confirmation for extension:', { paymentId, status, bookingId })
           console.log('Extension data:', { newEndDate, selectedSeats, extendedHours, extensionCost })
@@ -334,9 +337,11 @@ export default function ExtendBookingPage() {
           const extensionData = {
             newEndAt: urlNewEndAt || newEndDate?.toISOString() || booking.endAt,
             seatNumbers: urlSeatNumbers ? JSON.parse(urlSeatNumbers) : (selectedSeats.length > 0 ? selectedSeats : booking.seatNumbers),
-            extensionHours: parseFloat(urlExtensionHours) || extendedHours || 0,
-            extensionCost: parseFloat(urlExtensionCost) || extensionCost || 0,
-            originalEndAt: urlOriginalEndAt || originalEndTime || booking.endAt
+            extensionHours: parseFloat(urlExtensionHours || '0') || extendedHours || 0,
+            extensionCost: parseFloat(urlExtensionCost || '0') || extensionCost || 0,
+            originalEndAt: urlOriginalEndAt || originalEndTime || booking.endAt,
+            creditAmount: parseFloat(urlCreditAmount || '0') || creditAmount || 0, // Use URL credit amount first
+            paymentMethod: urlPaymentMethod || 'paynow_online' // Pass the actual payment method from URL
           }
           
           // Set original end time from URL if available
@@ -363,8 +368,6 @@ export default function ExtendBookingPage() {
             const result = await response.json()
             if (result.success) {
               console.log('Extension confirmed successfully:', result)
-              setExtensionConfirmed(true)
-              setCurrentStep(3)
               
               // Handle already confirmed case
               if (result.alreadyConfirmed) {
@@ -377,6 +380,8 @@ export default function ExtendBookingPage() {
                 if (result.originalEndTime) {
                   setOriginalEndTime(result.originalEndTime)
                 }
+                setExtensionConfirmed(true)
+                setCurrentStep(3)
                 return
               }
               
@@ -392,30 +397,73 @@ export default function ExtendBookingPage() {
                 actualExtensionHours: actualExtensionHours
               })
               
-              // Update booking data with new end time (keep original payment status)
-              setBooking(prev => ({
-                ...prev,
-                endAt: result.booking.endAt,
-                seatNumbers: result.booking.seatNumbers,
-                totalCost: result.booking.totalCost,
-                totalAmount: result.booking.totalAmount,
-                // Don't change confirmedPayment - keep original status
-                // paymentId: paymentId // Don't change original payment ID
-              }))
+              // Store original end time for display
+              if (result.originalEndTime && !originalEndTime) {
+                setOriginalEndTime(result.originalEndTime)
+              }
+              
+              // Store the credit amount used for this extension
+              // Priority: URL params > Calculate from API response > Current state
+              let usedCredit = parseFloat(urlCreditAmount || '0') || creditAmount || 0;
+              
+              console.log('🔍 Credit calculation debug:', {
+                urlCreditAmount,
+                creditAmount,
+                initialUsedCredit: usedCredit,
+                hasExtensionAmounts: !!result.booking?.extensionamounts,
+                hasPayment: !!result.payment,
+                paymentMethod: result.payment?.paymentMethod
+              });
+              
+              // If no credit in URL, try to calculate from API response
+              if (usedCredit === 0 && result.booking?.extensionamounts && result.payment) {
+                const latestExtensionCost = result.booking.extensionamounts[result.booking.extensionamounts.length - 1] || 0;
+                const paymentAmount = result.payment.totalAmount || result.payment.cost || 0;
+                
+                console.log('🔍 Calculating from API:', {
+                  latestExtensionCost,
+                  paymentAmount,
+                  paymentMethod: result.payment.paymentMethod
+                });
+                
+                // If payment method is "Credits", the entire amount was covered
+                if (result.payment.paymentMethod === 'Credits') {
+                  usedCredit = latestExtensionCost;
+                  console.log('✅ Calculated credits from API response (fully covered):', usedCredit);
+                } else if (latestExtensionCost > paymentAmount) {
+                  // Credits = extension cost - payment amount
+                  usedCredit = latestExtensionCost - paymentAmount;
+                  console.log('✅ Calculated credits from API response (partial):', usedCredit);
+                }
+              }
+              
+              setAppliedCreditAmount(usedCredit)
+              console.log('💳 Final credits applied for extension:', usedCredit)
+              
+              // Update booking data with COMPLETE data from API response
+              setBooking(result.booking)
+              
+              // IMPORTANT: Only set these states AFTER booking state is updated
+              setExtensionConfirmed(true)
+              setConfirmingPayment(false)
+              setCurrentStep(3)
               
               toast({
                 title: "Extension Confirmed",
                 description: `Your booking has been extended by ${actualExtensionHours.toFixed(2)} hours`,
               })
             } else {
+              setConfirmingPayment(false)
               throw new Error(result.message || 'Failed to confirm extension')
             }
           } else {
+            setConfirmingPayment(false)
             const errorData = await response.json()
             throw new Error(errorData.message || 'Failed to confirm extension payment')
           }
         } catch (error) {
           console.error('Error confirming extension payment:', error)
+          setConfirmingPayment(false)
           
           // Check if it's already confirmed error
           if (error instanceof Error && (error.message.includes('already confirmed') || error.message.includes('duplicate') || error.message.includes('already exists') || error.message.includes('Extension already confirmed'))) {
@@ -502,7 +550,7 @@ export default function ExtendBookingPage() {
           
           // Check if original seats are still available
           const originalSeats = booking.seatNumbers || []
-          const conflictingSeats = originalSeats.filter(seat => 
+          const conflictingSeats = originalSeats.filter((seat: string) => 
             data.bookedSeats?.includes(seat)
           )
           
@@ -616,6 +664,10 @@ export default function ExtendBookingPage() {
             setOriginalEndTime(booking.endAt)
           }
           
+          // IMPORTANT: Set applied credit amount for display
+          setAppliedCreditAmount(creditAmount)
+          console.log('💳 Full credits applied - setting appliedCreditAmount:', creditAmount)
+          
           toast({
             title: "Extension Confirmed!",
             description: `Your booking has been extended by ${actualExtensionHours.toFixed(2)} hours`,
@@ -725,8 +777,23 @@ export default function ExtendBookingPage() {
           </div>
         </div>
 
+        {/* Loading State - Payment Confirmation */}
+        {confirmingPayment && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
+                <h3 className="text-xl font-semibold text-gray-900">Confirming Your Extension...</h3>
+                <p className="text-gray-600 text-center max-w-md">
+                  Please wait while we process your payment and update your booking. This will only take a moment.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Step 1: Extension Details */}
-        {currentStep === 1 && (
+        {!confirmingPayment && currentStep === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
             {/* Extension Form */}
@@ -997,7 +1064,7 @@ export default function ExtendBookingPage() {
         )}
 
         {/* Payment Step */}
-        {currentStep === 2 && booking && (
+        {!confirmingPayment && currentStep === 2 && booking && (
           <div className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Payment Form - Left Side */}
@@ -1151,7 +1218,7 @@ export default function ExtendBookingPage() {
         )}
 
         {/* Confirmation Step */}
-        {currentStep === 3 && booking && (
+        {!confirmingPayment && currentStep === 3 && booking && (
           <div className="mt-6">
             {paymentError ? (
               // Payment failed/cancelled - show error
@@ -1214,28 +1281,90 @@ export default function ExtendBookingPage() {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <h3 className="font-medium text-green-800 mb-2">Booking Extended Successfully</h3>
                     <div className="space-y-1 text-sm text-green-700">
-                      <div>Your booking has been extended by {urlExtensionHours || '0.00'} hours</div>
+                      <div>Your booking has been extended by {(() => {
+                        // Calculate extension hours from original and new end times
+                        if (originalEndTime && booking?.endAt) {
+                          const hours = (new Date(booking.endAt).getTime() - new Date(originalEndTime).getTime()) / (1000 * 60 * 60)
+                          return hours.toFixed(2)
+                        }
+                        return urlExtensionHours || extendedHours.toFixed(2)
+                      })()} hours</div>
                       <div>New end time: {booking?.endAt ? formatLocalDate(booking.endAt) : (newEndDate ? formatLocalDate(newEndDate) : '')}</div>
-                      <div>Extension cost: ${(() => {
-                        // Use the latest extension amount from extensionamounts array
-                        if (booking?.extensionamounts && booking.extensionamounts.length > 0) {
-                          return booking.extensionamounts[booking.extensionamounts.length - 1].toFixed(2)
-                        }
-                        return extensionCost.toFixed(2)
-                      })()}</div>
-                      <div>Total actual cost: ${(() => {
-                        // Use the totalactualcost from the API response
-                        if (booking?.totalactualcost) {
-                          return booking.totalactualcost.toFixed(2)
-                        }
-                        // Fallback calculation
-                        const originalCost = booking?.totalAmount || 0
-                        const extensionTotal = booking?.extensionamounts?.reduce((sum: number, amount: number) => sum + amount, 0) || 0
-                        return (originalCost + extensionTotal).toFixed(2)
-                      })()}</div>
-                      {paymentId && (
-                        <div>Payment ID: {paymentId}</div>
-                      )}
+                      <div className="border-t border-green-300 pt-2 mt-2">
+                        <div className="font-medium mb-1">Payment Breakdown:</div>
+                        <div>Booking Extension cost: ${(() => {
+                          // Use the latest extension amount from extensionamounts array
+                          if (booking?.extensionamounts && booking.extensionamounts.length > 0) {
+                            return booking.extensionamounts[booking.extensionamounts.length - 1].toFixed(2)
+                          }
+                          const costValue = urlExtensionCost ? parseFloat(urlExtensionCost) : extensionCost
+                          return costValue.toFixed(2)
+                        })()}</div>
+                        {appliedCreditAmount > 0 && (
+                          <div className="text-blue-700">Credits applied: -${appliedCreditAmount.toFixed(2)}</div>
+                        )}
+                        {(() => {
+                          // Calculate subtotal, fee, and total paid
+                          const baseAmount = booking?.extensionamounts?.[booking.extensionamounts.length - 1] || parseFloat(urlExtensionCost || '0') || extensionCost;
+                          const credits = appliedCreditAmount || 0;
+                          const subtotal = Math.max(0, baseAmount - credits);
+                          
+                          // Determine payment method based on subtotal and credits
+                          let paymentMethod = 'paynow_online';
+                          
+                          if (subtotal === 0 && credits > 0) {
+                            // Fully covered by credits
+                            paymentMethod = 'Credits';
+                          } else if (urlPaymentMethod) {
+                            // Use URL payment method
+                            paymentMethod = urlPaymentMethod;
+                          }
+                          
+                          // Calculate fee - NO FEE if method is "Credits" (fully covered)
+                          const isCreditsOnly = paymentMethod === 'Credits';
+                          const isCard = !isCreditsOnly && paymentMethod.toLowerCase().includes('card');
+                          const fee = isCreditsOnly ? 0 : (isCard ? subtotal * 0.05 : (subtotal < 10 ? 0.20 : 0));
+                          const totalPaid = subtotal + fee;
+                          
+                          return (
+                            <>
+                              <div className="border-t border-green-200 mt-1 pt-1">
+                                {subtotal === 0 ? (
+                                  <div className="font-semibold text-green-700 bg-green-100 p-2 rounded">
+                                    ✓ Fully Covered by Credits - No Payment Required
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="text-green-600">Subtotal: ${subtotal.toFixed(2)}</div>
+                                    {fee > 0 && (
+                                      <div className="text-green-600">
+                                        {isCard ? 'Card Fee (5%)' : 'Transaction Fee'}: +${fee.toFixed(2)}
+                                      </div>
+                                    )}
+                                    <div className="font-semibold text-green-800 mt-1">Amount Paid: ${totalPaid.toFixed(2)}</div>
+                                  </>
+                                )}
+                              </div>
+                              <div className="border-t border-green-300 mt-2 pt-2">
+                                <div className="font-medium text-green-800">
+                                  Total Booking Cost: ${(() => {
+                                    if (booking?.totalactualcost !== undefined && booking?.totalactualcost !== null) {
+                                      return booking.totalactualcost.toFixed(2)
+                                    }
+                                    const originalCost = booking?.totalAmount || 0;
+                                    const extensionTotal = booking?.extensionamounts?.reduce((sum: number, amount: number) => sum + amount, 0) || 0;
+                                    return (originalCost + extensionTotal).toFixed(2);
+                                  })()}
+                                </div>
+                                {/* <div className="text-xs text-green-600">(Cumulative cost including all extensions)</div> */}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                      {/* {paymentId && (
+                        <div className="mt-2 pt-2 border-t border-green-300">Payment ID: {paymentId}</div>
+                      )} */}
                     </div>
                   </div>
 

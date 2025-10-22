@@ -123,11 +123,12 @@ export default function PaymentStep({
       }
 
       // Include booking ID in the redirect URL for confirmation
+      const apiPaymentMethod = getPaymentMethodForAPI(selectedPaymentMethod);
       const redirectUrl = isExtension 
-        ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&extension=true&extensionHours=${extensionData?.extensionHours || 0}&extensionCost=${extensionData?.extensionCost || 0}&newEndAt=${encodeURIComponent(extensionData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(extensionData?.seatNumbers || []))}&originalEndAt=${encodeURIComponent(extensionData?.originalEndAt || '')}`
+        ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&extension=true&extensionHours=${extensionData?.extensionHours || 0}&extensionCost=${extensionData?.extensionCost || 0}&creditAmount=${extensionData?.creditAmount || 0}&newEndAt=${encodeURIComponent(extensionData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(extensionData?.seatNumbers || []))}&originalEndAt=${encodeURIComponent(extensionData?.originalEndAt || '')}&paymentMethod=${apiPaymentMethod}`
         : isReschedule
-        ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&reschedule=true&additionalHours=${rescheduleData?.additionalHours || 0}&additionalCost=${rescheduleData?.additionalCost || 0}&newStartAt=${encodeURIComponent(rescheduleData?.newStartAt || '')}&newEndAt=${encodeURIComponent(rescheduleData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(rescheduleData?.seatNumbers || []))}&originalStartAt=${encodeURIComponent(rescheduleData?.originalStartAt || '')}&originalEndAt=${encodeURIComponent(rescheduleData?.originalEndAt || '')}`
-        : `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}`
+        ? `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&reschedule=true&additionalHours=${rescheduleData?.additionalHours || 0}&additionalCost=${rescheduleData?.additionalCost || 0}&creditAmount=${rescheduleData?.creditAmount || 0}&newStartAt=${encodeURIComponent(rescheduleData?.newStartAt || '')}&newEndAt=${encodeURIComponent(rescheduleData?.newEndAt || '')}&seatNumbers=${encodeURIComponent(JSON.stringify(rescheduleData?.seatNumbers || []))}&originalStartAt=${encodeURIComponent(rescheduleData?.originalStartAt || '')}&originalEndAt=${encodeURIComponent(rescheduleData?.originalEndAt || '')}&paymentMethod=${apiPaymentMethod}`
+        : `${window.location.origin}${window.location.pathname}?step=3&bookingId=${currentBookingId}&paymentMethod=${apiPaymentMethod}`
 
       const body = {
         amount: finalTotal.toFixed(2),
