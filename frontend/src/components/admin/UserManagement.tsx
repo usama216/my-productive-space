@@ -498,7 +498,7 @@ export function UserManagement() {
                      <TableHead>User</TableHead>
                      <TableHead>Contact</TableHead>
                      <TableHead>Member Type</TableHead>
-                     <TableHead>Verification Status</TableHead>
+                     <TableHead>Student Verification Status</TableHead>
                      <TableHead>Total Bookings</TableHead>
                      <TableHead>Total Spent</TableHead>
                      <TableHead>Joined</TableHead>
@@ -767,7 +767,7 @@ export function UserManagement() {
              
              {selectedUser?.memberType === 'STUDENT' && (
                <div className="space-y-2">
-                 <Label htmlFor="studentVerificationStatus">Verification Status</Label>
+                 <Label htmlFor="studentVerificationStatus">Student Verification Status</Label>
                  <Select 
                    value={editFormData.studentVerificationStatus || 'NA'} 
                    onValueChange={(value: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED') => 

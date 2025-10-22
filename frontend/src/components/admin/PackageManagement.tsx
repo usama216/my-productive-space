@@ -100,6 +100,25 @@ const PackageManagement: React.FC = () => {
     e.preventDefault();
     
     try {
+      // Check for duplicate package name before submission
+      const trimmedName = formData.name.trim().toLowerCase();
+      const isDuplicate = packages.some(pkg => {
+        // When editing, exclude the current package from duplicate check
+        if (editingPackage && pkg.id === editingPackage.id) {
+          return false;
+        }
+        return pkg.name.trim().toLowerCase() === trimmedName;
+      });
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate Package Name",
+          description: `A package with the name "${formData.name}" already exists. Please use a different name.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       const packageData = {
         ...formData,
         price: parseFloat(formData.price),

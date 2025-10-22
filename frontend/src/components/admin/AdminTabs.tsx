@@ -64,7 +64,7 @@ export default function AdminTabs({
         <TabsTrigger value="packages">Packages</TabsTrigger>
         <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
-        <TabsTrigger value="refunds">Refund Management</TabsTrigger>
+        <TabsTrigger value="refunds">User Credits</TabsTrigger>
         <TabsTrigger value="pricing">Pricing</TabsTrigger>
 
       </TabsList>

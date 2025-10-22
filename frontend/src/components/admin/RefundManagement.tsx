@@ -49,7 +49,7 @@ export function RefundManagement() {
   const [stats, setStats] = useState({ totalRefunded: 0, totalTransactions: 0, averageRefund: 0 })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'refunds' | 'credits' | 'stats'>('refunds')
+  const [activeTab, setActiveTab] = useState<'refunds' | 'credits' | 'stats'>('credits')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedRefund, setSelectedRefund] = useState<RefundTransaction | null>(null)
@@ -139,14 +139,21 @@ export function RefundManagement() {
   }
 
   const formatDate = (dateString: string) => {
-    // Ensure dates are treated as UTC by adding 'Z' if not present
-    const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
-    return new Date(utcDateString).toLocaleString('en-US', {
+    // Handle dates that might have +00:00 timezone or Z suffix
+    const date = new Date(dateString)
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date'
+    }
+    
+    return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'Asia/Singapore'
     })
   }
 
@@ -191,7 +198,7 @@ export function RefundManagement() {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin" />
-        <span className="ml-2">Loading refund management...</span>
+        <span className="ml-2">Loading credits...</span>
       </div>
     )
   }
@@ -213,7 +220,7 @@ export function RefundManagement() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Refund Management</h2>
+        <h2 className="text-2xl font-bold">User Credits</h2>
         <Button onClick={fetchData} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
@@ -221,7 +228,7 @@ export function RefundManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -257,10 +264,10 @@ export function RefundManagement() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
       {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+      {/* <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab('refunds')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -282,7 +289,7 @@ export function RefundManagement() {
           User Credits
         </button>
        
-      </div>
+      </div> */}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
