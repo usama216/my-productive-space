@@ -194,6 +194,8 @@ export default function ReschedulePage() {
   // Step 1: Seat Selection
   const [availableSeats, setAvailableSeats] = useState<string[]>([])
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
+  const [otherBookedSeats, setOtherBookedSeats] = useState<string[]>([])
+  const [conflictingCurrentSeats, setConflictingCurrentSeats] = useState<string[]>([])
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [requiresSeatSelection, setRequiresSeatSelection] = useState(false)
   const [checkingSeats, setCheckingSeats] = useState(false)
@@ -529,14 +531,15 @@ export default function ReschedulePage() {
           },
           body: JSON.stringify({
             location: booking.location,
-            startAt: newStartDate.toISOString().replace('T', ' ').replace('Z', ''),
-            endAt: newEndDate.toISOString().replace('T', ' ').replace('Z', ''),
+            startAt: newStartDate.toISOString(),
+            endAt: newEndDate.toISOString(),
             excludeBookingId: bookingId // Exclude current booking
           })
         })
 
         if (response.ok) {
           const data = await response.json()
+          console.log('🔍 Seat availability response:', data)
           setAvailableSeats(data.availableSeats || [])
           
           // Filter out current booking's seats from occupied seats
@@ -545,6 +548,17 @@ export default function ReschedulePage() {
             (seat: string) => !(booking.seatNumbers || []).includes(seat)
           )
           setOccupiedSeats(data.bookedSeats || [])
+          setOtherBookedSeats(otherBookedSeats)
+          setConflictingCurrentSeats(data.conflictingCurrentSeats || [])
+
+          console.log('🔍 Debug seat availability:', {
+            originalSeats: booking.seatNumbers || [],
+            allBookedSeats: data.bookedSeats || [],
+            otherBookedSeats,
+            availableSeats: data.availableSeats || [],
+            currentBookingSeats: data.currentBookingSeats || [],
+            conflictingCurrentSeats: data.conflictingCurrentSeats || []
+          })
 
           // Check if original seats conflict with OTHER bookings (not current booking)
           const originalSeats = booking.seatNumbers || []
@@ -552,10 +566,34 @@ export default function ReschedulePage() {
             otherBookedSeats.includes(seat)
           )
 
-          if (conflictingSeats.length > 0) {
+          // Also check if any of the original seats are in the booked seats list
+          // (this handles the case where current booking is not properly excluded)
+          const additionalConflicts = originalSeats.filter((seat: string) =>
+            (data.bookedSeats || []).includes(seat) && !(data.currentBookingSeats || []).includes(seat)
+          )
+
+          // Check if user is trying to select seats that are already booked
+          // This is the main issue - we need to check if any seats the user might want are unavailable
+          const unavailableSeats = (data.bookedSeats || []).filter((seat: string) =>
+            !(data.currentBookingSeats || []).includes(seat)
+          )
+
+          // Check if current booking seats conflict with other bookings
+          const conflictingCurrentSeats = data.conflictingCurrentSeats || []
+          
+          const allConflictingSeats = [...new Set([...conflictingSeats, ...additionalConflicts, ...conflictingCurrentSeats])]
+
+          console.log('🔍 Conflicting seats:', conflictingSeats)
+          console.log('🔍 Additional conflicts:', additionalConflicts)
+          console.log('🔍 Conflicting current seats:', conflictingCurrentSeats)
+          console.log('🔍 All conflicting seats:', allConflictingSeats)
+
+          if (allConflictingSeats.length > 0) {
+            console.log('🔍 Setting requiresSeatSelection to true')
             setRequiresSeatSelection(true)
             setSelectedSeats([])
           } else {
+            console.log('🔍 Setting requiresSeatSelection to false')
             setRequiresSeatSelection(false)
             setSelectedSeats(originalSeats)
           }
@@ -1103,13 +1141,13 @@ export default function ReschedulePage() {
                   )}
 
                   {/* Seat Selection */}
-                  {requiresSeatSelection && !checkingSeats && (
+                  {!checkingSeats && newStartDate && newEndDate && (
                     <div>
                       <Label>Select Seats for New Time</Label>
                       <p className="text-sm text-gray-600 mb-3">
                         Choose {booking.pax} seat{booking.pax > 1 ? 's' : ''} for the new time.
                         <span className="ml-2 text-blue-600">
-                          ({DEMO_LAYOUT.length - occupiedSeats.length} seats available)
+                          ({availableSeats.length} seats available)
                         </span>
                       </p>
 
@@ -1120,11 +1158,11 @@ export default function ReschedulePage() {
                             layout={DEMO_LAYOUT}
                             tables={DEMO_TABLES}
                             labels={DEMO_LABELS}
-                            bookedSeats={occupiedSeats.filter((seat: string) => !booking.seatNumbers?.includes(seat))}
+                            bookedSeats={[...otherBookedSeats, ...conflictingCurrentSeats]}
                             overlays={OVERLAYS}
                             maxSeats={booking.pax}
                             onSelectionChange={handleSeatSelectionChange}
-                            initialSelectedSeats={booking.seatNumbers || []}
+                            initialSelectedSeats={selectedSeats}
                           />
                         </div>
                       </div>
