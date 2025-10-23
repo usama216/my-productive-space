@@ -13,6 +13,7 @@ import FAQSection from '@/components/landing-page-sections/FAQSection'
 
 import { ContactSection } from '@/components/landing-page-sections/ContactSection'
 import {FooterSection} from '@/components/landing-page-sections/FooterSection'
+import OpenDoorExample from '@/components/OpenDoorExample'
 
 
 export default function Home() {
@@ -51,6 +52,7 @@ export default function Home() {
       {/* Section 8: Contact & Footer */}
       <ContactSection />
       <FooterSection />
+      <OpenDoorExample />
 
     </main>
   );
