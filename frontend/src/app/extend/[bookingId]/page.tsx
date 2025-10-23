@@ -876,13 +876,13 @@ export default function ExtendBookingPage() {
                       <h3 className="font-medium text-blue-800 mb-2">Extension Summary</h3>
                       <div className="space-y-1 text-sm text-blue-700">
                         <div>Extended by: {extendedHours.toFixed(2)} hours</div>
-                        <div>Cost per person: ${(() => {
-                          // Calculate per person rate: total extension cost ÷ total people
-                          const totalPeople = (booking.members || 0) + (booking.tutors || 0) + (booking.students || 0);
-                          if (totalPeople === 0) return '0.00';
+                        <div>Cost per hour: ${(() => {
+                          // Calculate per hour rate: total extension cost ÷ extension hours
+                          const extensionHours = extendedHours || 0;
+                          if (extensionHours === 0) return '0.00';
                           
-                          const perPersonCost = extensionCost / totalPeople;
-                          return perPersonCost.toFixed(2);
+                          const perHourCost = extensionCost / extensionHours;
+                          return perHourCost.toFixed(2);
                         })()}</div>
                         <div className="font-medium">Total extension cost: ${extensionCost.toFixed(2)}</div>
                         {creditAmount > 0 && (

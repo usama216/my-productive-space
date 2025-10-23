@@ -30,6 +30,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   getBookingForReschedule
 } from '@/lib/rescheduleService'
+import { getAllPricingForLocation } from '@/lib/pricingService'
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
 import PaymentStep from '@/components/book-now/PaymentStep'
 import { EntitlementTabs } from '@/components/book-now-sections/EntitlementTabs'
@@ -219,12 +220,12 @@ export default function ReschedulePage() {
   })
   const [finalCost, setFinalCost] = useState(0)
 
-  // Pricing
-  const pricing = {
-    student: { oneHourRate: 4.00, overOneHourRate: 4.00 },
-    member: { oneHourRate: 5.00, overOneHourRate: 5.00 },
-    tutor: { oneHourRate: 6.00, overOneHourRate: 6.00 }
-  }
+  // Pricing state (dynamic - fetched from backend)
+  const [pricing, setPricing] = useState({
+    student: { oneHourRate: 3.00, overOneHourRate: 3.00 },
+    member: { oneHourRate: 4.00, overOneHourRate: 4.00 },
+    tutor: { oneHourRate: 5.00, overOneHourRate: 5.00 }
+  })
 
   // Helper function to update URL with current step
   const updateStepInURL = (step: number) => {
@@ -282,6 +283,12 @@ export default function ReschedulePage() {
 
           // Set initial selected seats
           setSelectedSeats(bookingData.seatNumbers || [])
+
+          // Load pricing dynamically from backend
+          console.log('🔍 About to call getAllPricingForLocation for Kovan')
+          const allPricing = await getAllPricingForLocation('Kovan')
+          console.log('🔍 Loaded pricing from API:', allPricing)
+          setPricing(allPricing)
 
         } else {
           toast({
