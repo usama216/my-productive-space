@@ -9,6 +9,7 @@ import 'slick-carousel/slick/slick-theme.css'
 import WhatsappLive from "@/components/whatsapp-logo/WhatsappLive";
 import { Toaster } from "@/components/ui/toaster"
 import HomeToast from "@/components/HomeToast"
+import NextTopLoader from 'nextjs-toploader'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NextTopLoader
+          color="#f97316"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={true}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #f97316,0 0 5px #f97316"
+        />
         <div className="w-full">
           {children}
           <WhatsappLive />
