@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2, Timer } from 'lucide-react'
+import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2, Timer, Key } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -23,6 +23,7 @@ import {
   calculateDuration
 } from '@/lib/bookingService'
 import { requestRefund } from '@/lib/refundService'
+import { sendDoorAccessLink } from '@/lib/doorService'
 import { 
   formatSingaporeDate, 
   formatSingaporeDateOnly, 
@@ -48,6 +49,7 @@ export function UserBookings() {
   const [refundReason, setRefundReason] = useState('')
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false)
   const [actualRefundAmount, setActualRefundAmount] = useState<number | null>(null)
+  const [sendingTuyaLink, setSendingTuyaLink] = useState<string | null>(null)
   const [isCardPayment, setIsCardPayment] = useState(false)
   const [promoDiscountAmount, setPromoDiscountAmount] = useState<number>(0)
   const [packageDiscountAmount, setPackageDiscountAmount] = useState<number>(0)
@@ -104,6 +106,36 @@ export function UserBookings() {
   }
 
   // Handle cancel booking (refund request)
+  const handleSendTuyaLink = async (booking: Booking) => {
+    setSendingTuyaLink(booking.bookingRef)
+    
+    try {
+      const result = await sendDoorAccessLink(booking.bookingRef)
+      
+      if (result.success) {
+        toast({
+          title: "Door Access Link Sent!",
+          description: `Access link has been sent to your email for booking ${booking.bookingRef}`,
+        })
+      } else {
+        toast({
+          title: "Failed to Send Access Link",
+          description: result.message || "Please try again later",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error sending Tuya link:', error)
+      toast({
+        title: "Error",
+        description: "Failed to send door access link. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setSendingTuyaLink(null)
+    }
+  }
+
   const handleCancelBooking = async (booking: Booking) => {
     setSelectedBooking(booking)
     setRefundReason('')
@@ -869,6 +901,21 @@ export function UserBookings() {
 
                         {activeTab === 'ongoing' && (
                           <>
+                            {/* Tuya Door Access Button */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSendTuyaLink(booking)}
+                              disabled={sendingTuyaLink === booking.bookingRef}
+                              className="hover:bg-green-50 border-green-200 text-green-700"
+                            >
+                              {sendingTuyaLink === booking.bookingRef ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Key className="h-4 w-4 mr-1" />
+                              )}
+                              {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Tuya'}
+                            </Button>
                         
                             
                             {booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && canEditBooking(booking) && (
