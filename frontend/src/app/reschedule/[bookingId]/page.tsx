@@ -1126,7 +1126,6 @@ export default function ReschedulePage() {
                   {/* Credit Selection - Show in Step 1 if there's additional cost */}
                   {costDifference > 0 && user?.id && (
                     <div className="border-t pt-4 mt-6">
-                      <h3 className="font-medium text-gray-900 mb-3">Apply Store Credits (Optional)</h3>
                       <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
                         <div className="space-y-1 text-sm text-orange-700">
                           <div className="flex justify-between">
