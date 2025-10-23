@@ -44,6 +44,8 @@ import {
 } from '@/lib/timezoneUtils'
 import { supabase } from '@/lib/supabaseClient'
 import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import Navbar from '@/components/Navbar'
+import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 
 // Layout and seat configuration (same as extend page)
 const DEMO_LAYOUT: SeatMeta[] = [
@@ -233,6 +235,11 @@ export default function ReschedulePage() {
     url.searchParams.set('step', step.toString())
     router.replace(url.pathname + url.search, { scroll: false })
   }
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [currentStep])
 
   // Fetch current user info
   useEffect(() => {
@@ -895,10 +902,13 @@ export default function ReschedulePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container px-4 py-8">
+    <>
+    <Navbar/>
+      <div className="min-h-screen bg-gray-50 pt-24 sm:pt-24">
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="flex items-center mb-8">
+        <div className="">
           <Button
             variant="ghost"
             onClick={() => router.push('/dashboard')}
@@ -908,40 +918,43 @@ export default function ReschedulePage() {
             Back to Dashboard
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reschedule Booking</h1>
-            <p className="text-gray-600">Reference: {booking.bookingRef}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reschedule Booking</h1>
+            <p className="text-sm sm:text-base text-gray-600">Reference: {booking.bookingRef}</p>
           </div>
         </div>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center space-x-4">
+        <div className="flex items-center justify-center mb-6 sm:mb-8">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <div className={`flex items-center ${currentStep >= 1 ? 'text-orange-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 1 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
                 1
               </div>
-              <span className="ml-2 font-medium">Select Time</span>
+              <span className="ml-2 font-medium hidden sm:inline">Select Time</span>
+              <span className="ml-1 font-medium sm:hidden">Time</span>
             </div>
-            <ArrowRight className="h-4 w-4 text-gray-400" />
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
             <div className={`flex items-center ${currentStep >= 2 ? 'text-orange-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 2 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 2 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
                 2
               </div>
-              <span className="ml-2 font-medium">Payment</span>
+              <span className="ml-2 font-medium hidden sm:inline">Payment</span>
+              <span className="ml-1 font-medium sm:hidden">Pay</span>
             </div>
-            <ArrowRight className="h-4 w-4 text-gray-400" />
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
             <div className={`flex items-center ${currentStep >= 3 ? 'text-orange-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 3 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 3 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
                 3
               </div>
-              <span className="ml-2 font-medium">Confirmation</span>
+              <span className="ml-2 font-medium hidden sm:inline">Confirmation</span>
+              <span className="ml-1 font-medium sm:hidden">Confirm</span>
             </div>
           </div>
         </div>
 
         {/* Step 1: Time Selection */}
         {currentStep === 1 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Current Booking Info */}
 
 
@@ -954,8 +967,8 @@ export default function ReschedulePage() {
                     Select New Time
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CardContent className="space-y-4 sm:space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div>
                       <Label htmlFor="newStartDate">New Start Time</Label>
                       <DatePicker
@@ -967,7 +980,8 @@ export default function ReschedulePage() {
                         timeIntervals={15}
                         dateFormat="dd MMM yyyy, h:mm aa"
                         minDate={new Date()}
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                        wrapperClassName="w-full"
                         placeholderText="Select new start time"
                       />
                     </div>
@@ -983,7 +997,8 @@ export default function ReschedulePage() {
                         timeIntervals={15}
                         dateFormat="dd MMM yyyy, h:mm aa"
                         minDate={newStartDate || undefined}
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                        wrapperClassName="w-full"
                         placeholderText="Select new end time"
                       />
                     </div>
@@ -1270,7 +1285,7 @@ export default function ReschedulePage() {
 
         {/* Step 2: Payment */}
         {currentStep === 2 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Payment Form */}
             <div className="lg:col-span-2">
               <Card>
@@ -1453,7 +1468,7 @@ export default function ReschedulePage() {
 
         {/* Step 3: Confirmation */}
         {currentStep === 3 && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto px-4 sm:px-0">
             {apiLoading ? (
               <Card>
                 <CardContent className="space-y-6 py-8">
@@ -1563,5 +1578,7 @@ export default function ReschedulePage() {
         )}
       </div>
     </div>
+    <FooterSection/>
+    </>
   )
 }

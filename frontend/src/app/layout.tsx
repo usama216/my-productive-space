@@ -35,7 +35,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="mx-auto">
+        <div className="w-full">
           {children}
           <WhatsappLive />
         </div>

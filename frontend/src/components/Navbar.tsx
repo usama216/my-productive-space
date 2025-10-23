@@ -82,7 +82,7 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-[#efefe7]/80 backdrop-blur z-50">
-      <div className="container mx-auto max-w-7xl px-6 flex items-center justify-between py-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between py-4">
         {/* logo + description */}
         <div className="flex-shrink-0 flex flex-col items-start">
           <Link href="/" className="flex-shrink-0 flex flex-col items-start hover:opacity-80 transition-opacity">

@@ -644,9 +644,9 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
   }
 
   return (
-    <div className="border-t pt-6">
-      <Label className="text-base font-medium block">Apply Discount</Label>
-      <p className="text-sm text-gray-600  mb-4">Please note that all packages, promo codes, credit applied are not refundable.</p>
+    <div className="border-t pt-4 sm:pt-6">
+      <Label className="text-sm sm:text-base font-medium block">Apply Discount</Label>
+      <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">Please note that all packages, promo codes, credit applied are not refundable.</p>
       <Tabs
         value={mode}
         onValueChange={(newMode) => {
@@ -656,22 +656,25 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
           }
         }}
       >
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="package" className="flex items-center gap-2">
-            <Package className="w-4 h-4" />
-            Use Package
+        <TabsList className="grid w-full grid-cols-3 h-auto">
+          <TabsTrigger value="package" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-3">
+            <Package className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Use Package</span>
+            <span className="sm:hidden">Package</span>
           </TabsTrigger>
-          <TabsTrigger value="promo" className="flex items-center gap-2">
-            <Ticket className="w-4 h-4" />
-            Apply Promo
+          <TabsTrigger value="promo" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-3">
+            <Ticket className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Apply Promo</span>
+            <span className="sm:hidden">Promo</span>
           </TabsTrigger>
-          <TabsTrigger value="credit" className="flex items-center gap-2">
-            <Wallet className="w-4 h-4" />
-            Use Credit
+          <TabsTrigger value="credit" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-3">
+            <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Use Credit</span>
+            <span className="sm:hidden">Credit</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="package" className="mt-4 space-y-4">
+        <TabsContent value="package" className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
           <div className="">
             {isLoadingPackages ? (
               // 1. Loading state
@@ -920,7 +923,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
         </TabsContent>
 
 
-        <TabsContent value="promo" className="mt-4 space-y-4">
+        <TabsContent value="promo" className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
           <div>
             <Label className={`text-sm font-medium mb-2 block ${selectedPromoCode ? 'text-gray-500' : ''}`}>
               Discount Code {selectedPromoCode && '(Already Applied)'}
@@ -1114,7 +1117,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
           </div>
         </TabsContent>
 
-        <TabsContent value="credit" className="mt-4 space-y-4">
+        <TabsContent value="credit" className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
           <div>
             {/* Credit Disclaimer */}
             <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">

@@ -22,7 +22,8 @@ import {
   CheckCircle,
   XCircle,
   CreditCard,
-  Shield
+  Shield,
+  ArrowRight
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
@@ -38,6 +39,8 @@ import {
   formatLocalTimeOnly 
 } from '@/lib/timezoneUtils'
 import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import Navbar from '@/components/Navbar'
+import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 
 export default function ExtendBookingPage() {
   const params = useParams()
@@ -91,6 +94,12 @@ export default function ExtendBookingPage() {
   const [requiresSeatSelection, setRequiresSeatSelection] = useState(false)
   // If returning from payment, start with step 1 and let useEffect handle confirmation
   const [currentStep, setCurrentStep] = useState(1) // 1: Time Selection, 2: Payment, 3: Confirmation
+  
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [currentStep])
+  
   const [extensionConfirmed, setExtensionConfirmed] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [confirmingPayment, setConfirmingPayment] = useState(false) // Loading state for payment confirmation
@@ -734,10 +743,12 @@ export default function ExtendBookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <>
+    <Navbar/>
+    <div className="min-h-screen bg-gray-50 pt-24 sm:pt-24">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <Button 
             variant="ghost" 
             onClick={() => router.push('/dashboard')}
@@ -747,33 +758,38 @@ export default function ExtendBookingPage() {
             Back to Dashboard
           </Button>
           
-          <h1 className="text-3xl font-bold text-gray-900">Extend Booking</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Extend Booking</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-2">
             Extend your booking time. You'll be charged for the additional time.
           </p>
         </div>
 
         {/* Progress Steps */}
-        <div className="flex justify-center mb-8">
-          <div className="flex space-x-8">
-            {[
-              { step: 1, title: 'Time Selection', icon: Clock },
-              { step: 2, title: 'Payment', icon: CreditCard },
-              { step: 3, title: 'Confirmation', icon: Shield }
-            ].map(({ step, title, icon: Icon }) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  currentStep >= step ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {currentStep > step ? '✓' : <Icon className="w-5 h-5" />}
-                </div>
-                <span className={`ml-2 text-sm font-medium ${
-                  currentStep >= step ? 'text-orange-500' : 'text-gray-500'
-                }`}>
-                  {title}
-                </span>
+        <div className="flex items-center justify-center mb-6 sm:mb-8">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className={`flex items-center ${currentStep >= 1 ? 'text-orange-600' : 'text-gray-400'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 1 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
+                {currentStep > 1 ? '✓' : <Clock className="w-3 h-3 sm:w-4 sm:h-4" />}
               </div>
-            ))}
+              <span className="ml-2 font-medium hidden sm:inline">Time Selection</span>
+              <span className="ml-1 font-medium sm:hidden">Time</span>
+            </div>
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+            <div className={`flex items-center ${currentStep >= 2 ? 'text-orange-600' : 'text-gray-400'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 2 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
+                {currentStep > 2 ? '✓' : <CreditCard className="w-3 h-3 sm:w-4 sm:h-4" />}
+              </div>
+              <span className="ml-2 font-medium hidden sm:inline">Payment</span>
+              <span className="ml-1 font-medium sm:hidden">Pay</span>
+            </div>
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+            <div className={`flex items-center ${currentStep >= 3 ? 'text-orange-600' : 'text-gray-400'}`}>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 3 ? 'bg-orange-600 text-white' : 'bg-gray-200'}`}>
+                {currentStep > 3 ? '✓' : <Shield className="w-3 h-3 sm:w-4 sm:h-4" />}
+              </div>
+              <span className="ml-2 font-medium hidden sm:inline">Confirmation</span>
+              <span className="ml-1 font-medium sm:hidden">Confirm</span>
+            </div>
           </div>
         </div>
 
@@ -822,9 +838,10 @@ export default function ExtendBookingPage() {
                         showTimeSelect
                         timeIntervals={15}
                         filterTime={filterTime}
-                        dateFormat="MMM d, yyyy h:mm aa"
+                        dateFormat="MMM d, h:mm aa"
                         placeholderText="Select new end time"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                        wrapperClassName="w-full"
                         minDate={originalEndDate || new Date()}
                         maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)}
                         minTime={
@@ -1065,8 +1082,8 @@ export default function ExtendBookingPage() {
 
         {/* Payment Step */}
         {!confirmingPayment && currentStep === 2 && booking && (
-          <div className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="mt-4 sm:mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               {/* Payment Form - Left Side */}
               <div className="lg:col-span-2">
                 <PaymentStep
@@ -1383,5 +1400,7 @@ export default function ExtendBookingPage() {
         )}
       </div>
     </div>
+    <FooterSection/>
+    </>
   )
 }

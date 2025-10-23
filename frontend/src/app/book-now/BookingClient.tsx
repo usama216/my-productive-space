@@ -456,8 +456,9 @@ export default function BookingClient() {
     }
   }, [startDate, endDate])
 
-  const { minDate, maxDate } = getSingaporeTimeConstraints()
-  const maxBookingDate = maxDate
+  const { minTime, maxTime } = getSingaporeTimeConstraints()
+  const minDate = minTime
+  const maxBookingDate = maxTime
 
   const isPaymentFailed = useCallback((status: string | null) => {
     return status === 'canceled' || status === 'cancelled' || status === 'failed' ||
@@ -1353,13 +1354,13 @@ export default function BookingClient() {
                 </CardHeader>
                 <CardContent>
                   {bookingStep === 1 && (
-                    <form onSubmit={handleBookingSubmit} className="space-y-6">
+                    <form onSubmit={handleBookingSubmit} className="space-y-4 sm:space-y-6">
                       {/* Workspace Selection */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                         <div>
                           <Label htmlFor="location">Location</Label>
                           <Select value={location} onValueChange={setLocation} disabled={!user}>
-                            <SelectTrigger className={!user ? "bg-gray-50" : ""}>
+                            <SelectTrigger className={`w-full ${!user ? "bg-gray-50" : ""}`}>
                               <SelectValue placeholder="Select location" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1405,7 +1406,7 @@ export default function BookingClient() {
                       </div>
 
                       {/* Date & Time Selection */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                         <div>
                           <Label>Start Date & Time</Label>
                           {/* Get minimum start time constraints */}
@@ -1419,9 +1420,10 @@ export default function BookingClient() {
                             showTimeSelect
                             timeIntervals={15}
                             filterTime={filterTime}
-                            dateFormat="MMM d, yyyy h:mm aa"
+                            dateFormat="MMM d, h:mm aa"
                             placeholderText="Select start time"
-                            className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent ${!user ? "bg-gray-50" : ""}`}
+                            className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
+                            wrapperClassName="w-full"
                             minDate={minDate}
                             maxDate={maxBookingDate}
                             {...getStartTimeConstraints()}
@@ -1444,9 +1446,10 @@ export default function BookingClient() {
                             showTimeSelect
                             timeIntervals={15}
                             filterTime={filterTime}
-                            dateFormat="MMM d, yyyy h:mm aa"
+                            dateFormat="MMM d, h:mm aa"
                             placeholderText="Select end time"
-                            className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent ${!user ? "bg-gray-50" : ""}`}
+                            className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
+                            wrapperClassName="w-full"
                             disabled={!startDate || !user}
                             {...endTimeConstraints}
                           />
@@ -1538,7 +1541,7 @@ export default function BookingClient() {
                             </div>
                           ) : null}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                           <div>
                             <Label htmlFor="name">Full Name *</Label>
                             <Input

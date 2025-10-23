@@ -19,7 +19,7 @@ export default function Home() {
 
   return (
 
-    <main className="space-y-32">
+    <main className="space-y-16 md:space-y-24">
       {/* NavBar */}
       <Navbar />
 

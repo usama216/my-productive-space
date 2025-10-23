@@ -14,13 +14,6 @@ import { isSameDay, endOfDay, addMonths, addDays, setHours, setMinutes } from 'd
 import { ChevronDown } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 
 import { PeopleSelector } from '@/components/PeopleSelector'
@@ -32,7 +25,6 @@ export default function BookingForm() {
   const { user, loading } = useAuth()
   const { toast } = useToast()
 
-  const [location, setLocation] = useState<string>('kovan')
   const [people, setPeople] = useState<number>(1)
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
@@ -216,7 +208,7 @@ export default function BookingForm() {
 
   const handleBookNow = () => {
     // Validate required fields
-    if (!location || !startDate || !endDate) {
+    if (!startDate || !endDate) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -301,7 +293,7 @@ export default function BookingForm() {
     
     // Create URL with prefilled data
     const params = new URLSearchParams({
-      location: location.toString(),
+      location: 'kovan',
       people: people.toString(),
       start: startDate!.toISOString(),
       end: endDate!.toISOString(),
@@ -352,127 +344,319 @@ export default function BookingForm() {
 
   return (
     <section id="BookNow" className="pt-24">
-      <div className="relative h-[600px]">
-        <Image src="/mock_img/hero-bg.png" alt="Hero" fill className="object-cover" />
-        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white">
-          <h1 className="text-5xl font-serif">
+      <div className="relative h-[600px] md:h-[700px]">
+        <Image src="/mock_img/hero-image.jpg" alt="Hero" fill className="object-cover" />
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif leading-tight">
             Start your unforgettable co-working journey with us.
           </h1>
-          <p className="mt-4">Where Community meets Productivity</p>
+          <p className="mt-4 text-sm sm:text-base md:text-lg">Where Community meets Productivity</p>
 
-          {/*  THE WHITE BAR  */}
-          <div className="mt-8 bg-white p-6 rounded-lg flex space-x-8 items-end">
+          {/*  THE WHITE BAR - RESPONSIVE  */}
+          <div className="mt-6 md:mt-8 bg-white p-4 md:p-6 rounded-lg w-full max-w-4xl mx-auto">
+            {/* Desktop Layout */}
+            <div className="hidden lg:flex space-x-6 items-end">
 
-            {/* LOCATION */}
-            <div className="flex flex-col">
-              <label className="text-xs text-gray-500 uppercase mb-1">Location</label>
-              <Select
-                value={location}
-                onValueChange={setLocation}
-              >
-                <SelectTrigger className="flex h-10 w-40 items-center justify-between rounded-none border-b border-gray-300 bg-transparent px-3 py-2 text-left text-sm focus:ring-0 text-black">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kovan">Kovan</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              {/* LOCATION */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 uppercase mb-1 text-left">Location</label>
+                <div className="flex w-36 items-center border-b border-gray-300 pb-2 text-sm text-black">
+                  Kovan
+                </div>
+              </div>
 
-            {/* PEOPLE */}
-            <div className="flex flex-col">
-              <label className="text-xs text-gray-500 uppercase">People</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    className="w-32 text-black border-b border-gray-300 pb-1 text-left focus:outline-none"
-                  >
-                    {people} {people === 1 ? 'Person' : 'People'}
-                    {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
-                      <div className="text-xs text-gray-500 mt-1">
-                        {peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓
-                      </div>
-                    ) : null}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" className="w-auto">
-                  <PeopleSelector
-                    value={people}
-                    min={1}
-                    max={15}
-                    onChange={handlePeopleChange}
-                    showBreakdown={true}
-                    onBreakdownChange={handleBreakdownChange}
-                    storageKey="home-page-people-selector"
-                    enablePersistence={false}
+              {/* PEOPLE */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 uppercase mb-1 text-left">People</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="w-28 text-black border-b border-gray-300 pb-1 text-left focus:outline-none"
+                    >
+                      {people} {people === 1 ? 'Person' : 'People'}
+                      {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓
+                        </div>
+                      ) : null}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="bottom" className="w-auto">
+                    <PeopleSelector
+                      value={people}
+                      min={1}
+                      max={15}
+                      onChange={handlePeopleChange}
+                      showBreakdown={true}
+                      onBreakdownChange={handleBreakdownChange}
+                      storageKey="home-page-people-selector"
+                      enablePersistence={false}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* DATE & TIME RANGE */}
+              <div className="flex space-x-4">
+                {/* From */}
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">From</label>
+                  <DatePicker
+                    selected={startDate}
+                    onChange={handleStartChange}
+                    onChangeRaw={(e) => e?.preventDefault()}
+                    selectsStart
+                    startDate={startDate}
+                    endDate={endDate}
+                    showTimeSelect
+                    timeIntervals={15}
+                    filterTime={filterTime}
+                    dateFormat="MMM d, yyyy h:mm aa"
+                    placeholderText="Start"
+                    className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                    minDate={new Date()}
+                    maxDate={maxBookingDate}
+                    {...getStartTimeConstraints()}
                   />
-                </PopoverContent>
-              </Popover>
-            </div>
+                </div>
 
-            {/* DATE & TIME RANGE */}
-            <div className="flex space-x-6">
-              {/* From */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 uppercase mb-1">From</label>
-                {/* For START date picker: */}
-                <DatePicker
-                  selected={startDate}
-                  onChange={handleStartChange}
-                  onChangeRaw={(e) => e?.preventDefault()}
-                  selectsStart
-                  startDate={startDate}
-                  endDate={endDate}
-                  showTimeSelect
-                  timeIntervals={15}
-                  filterTime={filterTime}
-                  dateFormat="MMM d, yyyy h:mm aa"
-                  placeholderText="Start"
-                  className="w-48 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
-                  minDate={new Date()}
-                  maxDate={maxBookingDate}
-                  {...getStartTimeConstraints()}
-                />
+                {/* To */}
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">To</label>
+                  <DatePicker
+                    selected={endDate}
+                    onChange={handleEndChange}
+                    onChangeRaw={(e) => e?.preventDefault()}
+                    selectsEnd
+                    startDate={startDate}
+                    endDate={endDate}
+                    minDate={endMinDate}
+                    maxDate={endMaxDate}
+                    showTimeSelect
+                    timeIntervals={15}
+                    filterTime={filterTime}
+                    dateFormat="MMM d, yyyy h:mm aa"
+                    placeholderText="End"
+                    className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                    disabled={!startDate}
+                    {...endTimeConstraints}
+                  />
+                </div>
               </div>
 
-              {/* To */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 uppercase mb-1">To</label>
-                {/* For END date picker */}
-                <DatePicker
-                  selected={endDate}
-                  onChange={handleEndChange}
-                  onChangeRaw={(e) => e?.preventDefault()}
-                  selectsEnd
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={endMinDate}
-                  maxDate={endMaxDate}
-                  showTimeSelect
-                  timeIntervals={15}
-                  filterTime={filterTime}
-                  dateFormat="MMM d, yyyy h:mm aa"
-                  placeholderText="End"
-                  className="w-48 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
-                  disabled={!startDate}
-                  {...endTimeConstraints}
-                />
+              {/* BOOK BUTTON */}
+              <Button
+                onClick={handleBookNow}
+                className="bg-orange-500 text-white ml-auto px-6 py-2 transition-colors duration-200"
+                disabled={loading}
+              >
+                {loading ? 'Loading...' : 'Book Now →'}
+              </Button>
+            </div>
+
+            {/* Tablet Layout */}
+            <div className="hidden md:flex lg:hidden flex-col space-y-4">
+              {/* Row 1: Location and People */}
+              <div className="flex space-x-6">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 uppercase text-left">Location</label>
+                  <div className="flex w-32 items-center border-b border-gray-300 text-sm text-black">
+                    Kovan
+                  </div>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">People</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="w-28 text-black border-b border-gray-300 pb-1 text-left focus:outline-none"
+                      >
+                        {people} {people === 1 ? 'Person' : 'People'}
+                        {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓
+                          </div>
+                        ) : null}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="bottom" className="w-auto">
+                      <PeopleSelector
+                        value={people}
+                        min={1}
+                        max={15}
+                        onChange={handlePeopleChange}
+                        showBreakdown={true}
+                        onBreakdownChange={handleBreakdownChange}
+                        storageKey="home-page-people-selector"
+                        enablePersistence={false}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Row 2: Date Range */}
+              <div className="flex space-x-4">
+                <div className="flex flex-col flex-1">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">From</label>
+                  <DatePicker
+                    selected={startDate}
+                    onChange={handleStartChange}
+                    onChangeRaw={(e) => e?.preventDefault()}
+                    selectsStart
+                    startDate={startDate}
+                    endDate={endDate}
+                    showTimeSelect
+                    timeIntervals={15}
+                    filterTime={filterTime}
+                    dateFormat="MMM d, h:mm aa"
+                    placeholderText="Start"
+                    className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                    minDate={new Date()}
+                    maxDate={maxBookingDate}
+                    {...getStartTimeConstraints()}
+                  />
+                </div>
+
+                <div className="flex flex-col flex-1">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">To</label>
+                  <DatePicker
+                    selected={endDate}
+                    onChange={handleEndChange}
+                    onChangeRaw={(e) => e?.preventDefault()}
+                    selectsEnd
+                    startDate={startDate}
+                    endDate={endDate}
+                    minDate={endMinDate}
+                    maxDate={endMaxDate}
+                    showTimeSelect
+                    timeIntervals={15}
+                    filterTime={filterTime}
+                    dateFormat="MMM d, h:mm aa"
+                    placeholderText="End"
+                    className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                    disabled={!startDate}
+                    {...endTimeConstraints}
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Book Button */}
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleBookNow}
+                  className="bg-orange-500 text-white px-6 py-2 transition-colors duration-200"
+                  disabled={loading}
+                >
+                  {loading ? 'Loading...' : 'Book Now →'}
+                </Button>
               </div>
             </div>
 
-            {/* BOOK BUTTON */}
-            <Button
-              onClick={handleBookNow}
-              className="bg-orange-500 text-white ml-auto transition-colors duration-200"
-              disabled={loading}
-            >
-              {loading ? 'Loading...' : 'Book Now →'}
-            </Button>
+            {/* Mobile Layout */}
+            <div className="flex md:hidden flex-col space-y-4">
+              {/* Location */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 uppercase mb-1 text-left">Location</label>
+                <div className="flex h-10 w-full items-center border-b border-gray-300 px-3 py-2 text-sm text-black">
+                  Kovan
+                </div>
+              </div>
+
+              {/* People */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 uppercase mb-1 text-left">People</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="w-full text-black border-b border-gray-300 pb-1 text-left focus:outline-none"
+                    >
+                      {people} {people === 1 ? 'Person' : 'People'}
+                      {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓
+                        </div>
+                      ) : null}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="bottom" className="w-auto">
+                    <PeopleSelector
+                      value={people}
+                      min={1}
+                      max={15}
+                      onChange={handlePeopleChange}
+                      showBreakdown={true}
+                      onBreakdownChange={handleBreakdownChange}
+                      storageKey="home-page-people-selector"
+                      enablePersistence={false}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Date Range */}
+              <div className="flex flex-col space-y-3">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">From</label>
+                  <DatePicker
+                    selected={startDate}
+                    onChange={handleStartChange}
+                    onChangeRaw={(e) => e?.preventDefault()}
+                    selectsStart
+                    startDate={startDate}
+                    endDate={endDate}
+                    showTimeSelect
+                    timeIntervals={15}
+                    filterTime={filterTime}
+                    dateFormat="MMM d, h:mm aa"
+                    placeholderText="Start"
+                    className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                    minDate={new Date()}
+                    maxDate={maxBookingDate}
+                    {...getStartTimeConstraints()}
+                  />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">To</label>
+                  <DatePicker
+                    selected={endDate}
+                    onChange={handleEndChange}
+                    onChangeRaw={(e) => e?.preventDefault()}
+                    selectsEnd
+                    startDate={startDate}
+                    endDate={endDate}
+                    minDate={endMinDate}
+                    maxDate={endMaxDate}
+                    showTimeSelect
+                    timeIntervals={15}
+                    filterTime={filterTime}
+                    dateFormat="MMM d, h:mm aa"
+                    placeholderText="End"
+                    className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
+                    disabled={!startDate}
+                    {...endTimeConstraints}
+                  />
+                </div>
+              </div>
+
+              {/* Book Button */}
+              <div className="flex justify-center pt-2">
+                <Button
+                  onClick={handleBookNow}
+                  className="bg-orange-500 text-white w-full py-3 transition-colors duration-200"
+                  disabled={loading}
+                >
+                  {loading ? 'Loading...' : 'Book Now →'}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Helper text for cross-day bookings */}
           {startDate && (
-            <div className="mt-4 text-sm text-white/80 max-w-md text-center">
+            <div className="mt-4 text-xs sm:text-sm text-white/80 max-w-md text-center px-4">
               <p>💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)</p>
               <p>Bookings are limited to 2 months in advance</p>
             </div>
