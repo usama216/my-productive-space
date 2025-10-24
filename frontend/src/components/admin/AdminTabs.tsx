@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertTriangle, Clock, Search, Settings, Mail, FileText, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Clock, Search, Settings, Mail, FileText, RefreshCw, Key } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PromoCodeManagement } from './PromoCodeManagement'
 import { BookingManagement } from './BookingManagement'
@@ -13,6 +13,7 @@ import PackageManagement from './PackageManagement'
 import PackageUsageTable from './PackageUsageTable'
 import { RefundManagement } from './RefundManagement'
 import { PricingManagement } from './PricingManagement'
+import OpenDoorExample from '@/components/OpenDoorExample'
 
 export default function AdminTabs({
   activeTab,
@@ -49,7 +50,7 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-8">
+      <TabsList className="flex w-full overflow-x-auto p-1">
         <TabsTrigger value="overview">
           Overview
           {pendingStudents.length > 0 && (
@@ -66,6 +67,10 @@ export default function AdminTabs({
         <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
         <TabsTrigger value="refunds">User Credits</TabsTrigger>
         <TabsTrigger value="pricing">Pricing</TabsTrigger>
+        <TabsTrigger value="door-lock" className="flex items-center whitespace-nowrap">
+      
+          Door Lock
+        </TabsTrigger>
 
       </TabsList>
 
@@ -256,6 +261,21 @@ export default function AdminTabs({
       {/* Pricing Management Tab */}
       <TabsContent value="pricing" className="space-y-4">
         <PricingManagement />
+      </TabsContent>
+
+      {/* Door Lock Tab */}
+      <TabsContent value="door-lock" className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              
+              Door Access Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <OpenDoorExample />
+          </CardContent>
+        </Card>
       </TabsContent>
 
       {/* Settings Tab */}

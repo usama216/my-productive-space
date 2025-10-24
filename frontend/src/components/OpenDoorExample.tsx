@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { generateOpenLink, GenerateOpenLinkResponse } from '@/lib/doorService';
+import { useToast } from '@/hooks/use-toast';
 
 export default function OpenDoorExample() {
+  const { toast } = useToast();
   const [bookingRef, setBookingRef] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GenerateOpenLinkResponse | null>(null);
@@ -36,8 +38,10 @@ export default function OpenDoorExample() {
   const handleCopyLink = () => {
     if (result?.data?.accessPath) {
       navigator.clipboard.writeText(result.data.accessPath);
-      // You could add a toast notification here
-      alert('Link copied to clipboard!');
+      toast({
+        title: "Link Copied!",
+        description: "Access link has been copied to clipboard.",
+      });
     }
   };
 
@@ -71,7 +75,7 @@ export default function OpenDoorExample() {
       <button
         onClick={handleGenerateLink}
         disabled={isLoading || !bookingRef.trim()}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        className="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
         {isLoading ? 'Generating...' : 'Generate Access Link'}
       </button>
@@ -116,7 +120,7 @@ export default function OpenDoorExample() {
           </div>
 
           {/* Additional Info */}
-          <div className="space-y-2 text-sm text-gray-600">
+          {/* <div className="space-y-2 text-sm text-gray-600">
             <div>
               <span className="font-medium">Booking Reference:</span> {result.data.bookingRef}
             </div>
@@ -131,7 +135,7 @@ export default function OpenDoorExample() {
               {result.data.maxAccessCount && ` / ${result.data.maxAccessCount}`}
               {result.data.unlimitedAccess && ' (Unlimited)'}
             </div>
-          </div>
+          </div> */}
         </div>
       )}
     </div>
