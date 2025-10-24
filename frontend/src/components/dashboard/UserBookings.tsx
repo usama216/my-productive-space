@@ -278,8 +278,14 @@ export function UserBookings() {
     .filter(booking => {
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
-      // Upcoming: all bookings that haven't started yet (future bookings)
-      return startAt > now
+      const endAt = new Date(booking.endAt)
+      
+      // Upcoming: bookings that haven't started yet AND are not within 15 minutes of starting
+      const GRACE_PERIOD_MS = 15 * 60 * 1000 // 15 minutes
+      const enableAt = new Date(startAt.getTime() - GRACE_PERIOD_MS)
+      const isWithinGracePeriod = now >= enableAt && startAt > now
+      
+      return startAt > now && !isWithinGracePeriod
     })
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) // Earliest first
 
@@ -289,9 +295,13 @@ export function UserBookings() {
       const startAt = new Date(booking.startAt)
       const endAt = new Date(booking.endAt)
       
-      // Ongoing: ONLY bookings that are currently in progress (between start and end time)
+      // Ongoing: bookings that are currently in progress OR within 15 minutes of starting
+      const GRACE_PERIOD_MS = 15 * 60 * 1000 // 15 minutes
+      const enableAt = new Date(startAt.getTime() - GRACE_PERIOD_MS)
       const isOngoing = startAt <= now && endAt > now
-      return isOngoing
+      const isWithinGracePeriod = now >= enableAt && startAt > now
+      
+      return isOngoing || isWithinGracePeriod
     })
     .sort((a, b) => {
       // Sort by earliest start time first (most recent ongoing booking)
