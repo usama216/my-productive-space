@@ -1013,10 +1013,12 @@ export default function BookingClient() {
 
 
 
-  // Update finalTotal when total changes
+  // Update finalTotal when total changes (only for step 1, step 2+ uses payment method calculation)
   useEffect(() => {
-    setFinalTotal(total)
-  }, [total])
+    if (bookingStep === 1) {
+      setFinalTotal(total)
+    }
+  }, [total, bookingStep])
 
   // Check for 24-hour booking validation
   useEffect(() => {
@@ -1815,7 +1817,10 @@ export default function BookingClient() {
                             selectedPackage={selectedPackage}
                             customer={{ name: customerName, email: customerEmail, phone: customerPhone }}
                             bookingId={bookingId || undefined}
-                            onBack={() => setBookingStep(1)}
+                            onBack={() => {
+                              setBookingStep(1)
+                              setSelectedPaymentMethod('payNow') // Reset to default payment method
+                            }}
                             onComplete={() => setBookingStep(3)}
                             onPaymentMethodChange={handlePaymentMethodChange}
                             onCreateBooking={createBookingForPayment}
@@ -2236,14 +2241,32 @@ export default function BookingClient() {
                           </div>
                         )
                       })()}
+
+                      {bookingStep >= 2 && selectedPaymentMethod === 'payNow' && (() => {
+                        const { fee } = calculatePaymentTotal(subtotal, 'payNow')
+                        if (fee > 0) {
+                          return (
+                            <div className="flex justify-between text-orange-600">
+                              <span>PayNow Transaction Fee</span>
+                              <span>${formatCurrency(fee)}</span>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total</span>
                         <span className={total <= 0 ? "text-green-600" : ""}>
                           {total <= 0 ? (
                             <>
                               <span className="line-through text-gray-400">${(() => {
-                                if (selectedPaymentMethod === 'creditCard') {
-                                  return (subtotal * 1.05).toFixed(2);
+                                if (bookingStep >= 2) {
+                                  if (selectedPaymentMethod === 'creditCard') {
+                                    return (subtotal * 1.05).toFixed(2);
+                                  } else if (selectedPaymentMethod === 'payNow') {
+                                    const { total } = calculatePaymentTotal(subtotal, 'payNow');
+                                    return total.toFixed(2);
+                                  }
                                 }
                                 return subtotal.toFixed(2);
                               })()}</span>
@@ -2252,8 +2275,13 @@ export default function BookingClient() {
                             </>
                           ) : (
                             `$${(() => {
-                              if (selectedPaymentMethod === 'creditCard') {
-                                return (subtotal * 1.05).toFixed(2);
+                              if (bookingStep >= 2) {
+                                if (selectedPaymentMethod === 'creditCard') {
+                                  return (subtotal * 1.05).toFixed(2);
+                                } else if (selectedPaymentMethod === 'payNow') {
+                                  const { total } = calculatePaymentTotal(subtotal, 'payNow');
+                                  return total.toFixed(2);
+                                }
                               }
                               return subtotal.toFixed(2);
                             })()}`

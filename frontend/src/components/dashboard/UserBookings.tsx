@@ -636,7 +636,7 @@ export function UserBookings() {
                   <TableHead>Discount Type</TableHead>
                   <TableHead>Discount Amount</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Payment Method</TableHead>
+                  {/* <TableHead>Payment Method</TableHead> */}
                   {/* <TableHead>Status</TableHead> */}
                   <TableHead>Payment</TableHead>
                   <TableHead>Actions</TableHead>
@@ -666,8 +666,8 @@ export function UserBookings() {
                               return (
                                 <>
                                   <div>{startDate}</div>
-                                  <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.startAt)}</div>
-                                  <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.endAt)}</div>
+                                  <div className="text-xs text-gray-500">Start: {formatSingaporeTimeOnly(booking.startAt)}</div>
+                                  <div className="text-xs text-gray-500">End: {formatSingaporeTimeOnly(booking.endAt)}</div>
                                 </>
                               );
                             }
@@ -676,9 +676,9 @@ export function UserBookings() {
                             return (
                               <>
                                 <div>{startDate}</div>
-                                <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.startAt)}</div>
+                                <div className="text-xs text-gray-500">Start: {formatSingaporeTimeOnly(booking.startAt)}</div>
                                 <div>{endDate}</div>
-                                <div className="text-xs text-gray-500">{formatSingaporeTimeOnly(booking.endAt)}</div>
+                                <div className="text-xs text-gray-500">End: {formatSingaporeTimeOnly(booking.endAt)}</div>
                               </>
                             );
                           })()}
@@ -780,7 +780,7 @@ export function UserBookings() {
                         )}
                       </div> */}
                     </TableCell>
-                    <TableCell>
+                    {/* <TableCell>
                       <div className="text-sm">
                         {(() => {
                           // If payment method exists from backend, only show Card or PayNow
@@ -796,7 +796,7 @@ export function UserBookings() {
                           return <span className="text-gray-400 text-xs">---</span>;
                         })()}
                       </div>
-                    </TableCell>
+                    </TableCell> */}
                     {/* <TableCell>
                       <Badge className={getStatusColor(getBookingStatus(booking))}>
                         {getBookingStatus(booking)}
@@ -846,6 +846,22 @@ export function UserBookings() {
                         )}
 
                         {activeTab === 'upcoming' && canExtendBooking(booking) && (
+                           <>
+                           <Button
+                           size="sm"
+                           variant="outline"
+                           onClick={() => handleSendTuyaLink(booking)}
+                           disabled={sendingTuyaLink === booking.bookingRef}
+                           className="hover:bg-green-50 border-green-200 text-green-700"
+                         >
+                           {sendingTuyaLink === booking.bookingRef ? (
+                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                           ) : (
+                             <Key className="h-4 w-4 mr-1" />
+                           )}
+                           {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Tuya'}
+                         </Button>
+
                           <Button
                             size="sm"
                             variant="outline"
@@ -855,6 +871,7 @@ export function UserBookings() {
                             <Timer className="h-4 w-4 mr-1" />
                             Extend
                           </Button>
+                          </>
                         )}
 
                         {activeTab === 'upcoming' && canCancelBooking(booking) && (
@@ -1038,25 +1055,25 @@ export function UserBookings() {
                       <span>Original Cost:</span>
                       <span>${totalCost.toFixed(2)}</span>
                     </div>
-                    {promoDiscountAmount > 0 && (
+                    {/* {promoDiscountAmount > 0 && (
                       <div className="flex justify-between items-center text-green-600">
                         <span>Promo Code Discount:</span>
                         <span>-${promoDiscountAmount.toFixed(2)}</span>
                       </div>
-                    )}
-                    {packageDiscountAmount > 0 && (
+                    )} */}
+                    {/* {packageDiscountAmount > 0 && (
                       <div className="flex justify-between items-center text-green-600">
                         <span>Package Discount:</span>
                         <span>-${packageDiscountAmount.toFixed(2)}</span>
                       </div>
-                    )}
-                    {creditAmount > 0 && (
+                    )} */}
+                    {/* {creditAmount > 0 && (
                       <div className="flex justify-between items-center text-green-600">
                         <span>Store Credit Applied:</span>
                         <span>-${creditAmount.toFixed(2)}</span>
                       </div>
-                    )}
-                    {cardFee > 0 && (
+                    )} */}
+                    {/* {cardFee > 0 && (
                       <div className="flex justify-between items-center text-blue-600">
                         <span>Credit Card Fee (5%):</span>
                         <span>+${cardFee.toFixed(2)}</span>
@@ -1067,7 +1084,7 @@ export function UserBookings() {
                         <span>PayNow Transaction Fee:</span>
                         <span>+${payNowFee.toFixed(2)}</span>
                       </div>
-                    )}
+                    )} */}
                     <div className="flex justify-between items-center font-medium border-t pt-1">
                       <span>Amount Paid:</span>
                       <span>${Number(selectedBooking.totalAmount).toFixed(2)}</span>
