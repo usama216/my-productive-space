@@ -231,6 +231,32 @@ export default function ReschedulePage() {
     tutor: { oneHourRate: 5.00, overOneHourRate: 5.00 }
   })
 
+  // Filter function to only allow 15-minute intervals and disable past hours
+  const filterTime = (time: Date): boolean => {
+    const minutes = time.getMinutes()
+    // Only allow :00, :15, :30, :45
+    if (minutes % 15 !== 0) return false
+    
+    // Get current time
+    const now = new Date()
+    
+    // If the selected date is today, only allow times after current time
+    if (newStartDate) {
+      const selectedDateIsToday = 
+        newStartDate.getFullYear() === now.getFullYear() &&
+        newStartDate.getMonth() === now.getMonth() &&
+        newStartDate.getDate() === now.getDate()
+      
+      if (selectedDateIsToday) {
+        // Only allow times after current time (on same day)
+        return time.getTime() > now.getTime()
+      }
+    }
+    
+    // If selected date is a different day (future), allow all times
+    return true
+  }
+
   // Helper function to update URL with current step
   const updateStepInURL = (step: number) => {
     const url = new URL(window.location.href)
@@ -1018,6 +1044,7 @@ export default function ReschedulePage() {
                         timeIntervals={15}
                         dateFormat="dd MMM yyyy, h:mm aa"
                         minDate={new Date()}
+                        filterTime={filterTime}
                         className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                         wrapperClassName="w-full"
                         placeholderText="Select new start time"
@@ -1035,6 +1062,7 @@ export default function ReschedulePage() {
                         timeIntervals={15}
                         dateFormat="dd MMM yyyy, h:mm aa"
                         minDate={newStartDate || undefined}
+                        filterTime={filterTime}
                         className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                         wrapperClassName="w-full"
                         placeholderText="Select new end time"
