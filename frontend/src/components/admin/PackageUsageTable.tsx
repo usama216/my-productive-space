@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Package, Users, Calendar, TrendingUp, Search, Filter } from 'lucide-react'
+import { Package, Users, Calendar, TrendingUp, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { formatSingaporeDateOnly } from '@/lib/timezoneUtils'
 
@@ -41,20 +41,43 @@ interface PackageUsageStats {
   averageUsage: number
 }
 
+interface Pagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export default function PackageUsageTable() {
   const { toast } = useToast()
   const [packageUsages, setPackageUsages] = useState<PackageUsage[]>([])
   const [stats, setStats] = useState<PackageUsageStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterType, setFilterType] = useState('all')
   const [sortBy, setSortBy] = useState('usagePercentage')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  })
 
   const fetchPackageUsage = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/packages/usage`)
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: debouncedSearch,
+        filterType: filterType,
+        sortBy: sortBy,
+        sortOrder: sortOrder
+      })
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/packages/usage?${params}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch package usage data')
@@ -63,6 +86,9 @@ export default function PackageUsageTable() {
       const data = await response.json()
       setPackageUsages(data.packages || [])
       setStats(data.stats || null)
+      if (data.pagination) {
+        setPagination(data.pagination)
+      }
     } catch (error) {
       console.error('Error fetching package usage:', error)
       toast({
@@ -75,34 +101,38 @@ export default function PackageUsageTable() {
     }
   }
 
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, page }))
+  }
+
+  const handleLimitChange = (newLimit: number) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1 // Reset to first page when limit changes
+    }))
+  }
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+    }, 500) // 500ms delay
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Update pagination when debounced search changes
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }, [debouncedSearch])
+
   useEffect(() => {
     fetchPackageUsage()
-  }, [])
+  }, [pagination.page, pagination.limit, debouncedSearch, filterType, sortBy, sortOrder])
 
+  // Backend handles filtering and sorting, so we use packages directly
   const filteredPackages = packageUsages
-    .filter(pkg => {
-      const matchesSearch = pkg.packageName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           pkg.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           pkg.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           pkg.targetRole.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesFilter = filterType === 'all' || pkg.packageType === filterType
-      return matchesSearch && matchesFilter
-    })
-    .sort((a, b) => {
-      let aValue = a[sortBy as keyof PackageUsage]
-      let bValue = b[sortBy as keyof PackageUsage]
-      
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase()
-        bValue = (bValue as string).toLowerCase()
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
-      }
-    })
 
   const getPackageTypeIcon = (type: string) => {
     switch (type) {
@@ -142,24 +172,26 @@ export default function PackageUsageTable() {
 
   return (
     <div className="space-y-6">
-   
-
-      {/* Package Usage Table */}
+      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Package Usage Details
+            <Filter className="h-5 w-5" />
+            Search & Filters
           </CardTitle>
-          
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              {isLoading ? (
+                <Loader2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              )}
               <Input
-                placeholder="Search packages, users, emails..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search packages"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -176,7 +208,7 @@ export default function PackageUsageTable() {
               </SelectContent>
             </Select>
             
-            <Select value={sortBy} onValueChange={setSortBy}>
+            {/* <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -189,21 +221,35 @@ export default function PackageUsageTable() {
                 <SelectItem value="userName">User Name</SelectItem>
                 <SelectItem value="purchasedAt">Purchase Date</SelectItem>
               </SelectContent>
-            </Select>
+            </Select> */}
             
-            <Button
+            {/* <Button
               variant="outline"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               className="w-full sm:w-auto"
             >
               <Filter className="h-4 w-4 mr-2" />
               {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-            </Button>
+            </Button> */}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Package Usage Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Package Usage Details
+          </CardTitle>
         </CardHeader>
-        
         <CardContent>
-          {filteredPackages.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading package usage data...</p>
+            </div>
+          ) : filteredPackages.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">No package usage data found</p>
@@ -223,7 +269,7 @@ export default function PackageUsageTable() {
                     <TableHead>Revenue</TableHead>
                     <TableHead>Purchased</TableHead>
                     <TableHead>Expires</TableHead>
-                    <TableHead>Last Used</TableHead>
+              
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -286,16 +332,14 @@ export default function PackageUsageTable() {
                       </TableCell>
                       
                       <TableCell className="text-sm text-gray-500">
-                        {pkg.purchasedAt ? new Date(pkg.purchasedAt.endsWith('Z') ? pkg.purchasedAt : pkg.purchasedAt + 'Z').toLocaleDateString() : 'N/A'}
+                        {pkg.purchasedAt ? new Date(pkg.purchasedAt).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       
                       <TableCell className="text-sm text-gray-500">
-                        {pkg.expiresAt ? new Date(pkg.expiresAt.endsWith('Z') ? pkg.expiresAt : pkg.expiresAt + 'Z').toLocaleDateString() : 'N/A'}
+                        {pkg.expiresAt ? new Date(pkg.expiresAt).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       
-                      <TableCell className="text-sm text-gray-500">
-                        {pkg.lastUsed ? new Date(pkg.lastUsed.endsWith('Z') ? pkg.lastUsed : pkg.lastUsed + 'Z').toLocaleDateString() : 'Never'}
-                      </TableCell>
+                 
                     </TableRow>
                   ))}
                 </TableBody>
@@ -304,6 +348,103 @@ export default function PackageUsageTable() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                  {pagination.total} packages
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+                  <Select value={pagination.limit.toString()} onValueChange={(value) => handleLimitChange(parseInt(value))}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (pagination.totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (pagination.page <= 3) {
+                        pageNum = i + 1
+                      } else if (pagination.page >= pagination.totalPages - 2) {
+                        pageNum = pagination.totalPages - 4 + i
+                      } else {
+                        pageNum = pagination.page - 2 + i
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pagination.page === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

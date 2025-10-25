@@ -30,7 +30,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Download,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
 import { 
   User, 
@@ -84,6 +85,24 @@ export function UserManagement() {
   
   // Loading states
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Debounced search state
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+    }, 500) // 500ms delay
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Update filters when debounced search changes
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }))
+  }, [debouncedSearch])
 
   useEffect(() => {
     loadUsers()
@@ -387,7 +406,9 @@ export function UserManagement() {
     
     const memberTypeMatch = !filters.memberType || user.memberType === filters.memberType
     
-    return searchMatch && memberTypeMatch
+    const verificationStatusMatch = !(filters as any).studentVerificationStatus || user.studentVerificationStatus === (filters as any).studentVerificationStatus
+    
+    return searchMatch && memberTypeMatch && verificationStatusMatch
   })
 
 
@@ -463,7 +484,92 @@ export function UserManagement() {
         </div>
       )}
 
-    
+      {/* Search and Filters */}
+      <Card>
+       
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search Input */}
+            <div className="space-y-2">
+              <Label htmlFor="search">Search Users</Label>
+              <div className="relative">
+                {loading && searchInput ? (
+                  <Loader2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                )}
+                <Input
+                  id="search"
+                  placeholder="Search by name or email..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Member Type Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="memberType">Member Type</Label>
+              <Select 
+                value={filters.memberType || 'all'} 
+                onValueChange={(value) => handleFilterChange('memberType', value === 'all' ? undefined : value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All Member Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Member Types</SelectItem>
+                  <SelectItem value="STUDENT">Student</SelectItem>
+                  <SelectItem value="MEMBER">Member</SelectItem>
+                  <SelectItem value="TUTOR">Tutor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Verification Status Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="verificationStatus">Verification Status</Label>
+              <Select 
+                value={(filters as any).studentVerificationStatus || 'all'} 
+                onValueChange={(value) => handleFilterChange('studentVerificationStatus' as any, value === 'all' ? undefined : value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="NA">Not Applicable</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="VERIFIED">Verified</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Clear Filters Button */}
+          <div className="flex justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchInput('')
+                setDebouncedSearch('')
+                setFilters({
+                  search: '',
+                  includeStats: true,
+                  page: 1,
+                  limit: 20
+                })
+              }}
+              className="flex items-center space-x-2"
+            >
+              <AlertCircle className="h-4 w-4" />
+              <span>Clear Filters</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Users Table */}
       <Card>

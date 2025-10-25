@@ -35,6 +35,7 @@ export interface UserFilters {
   limit?: number
   search?: string
   memberType?: string
+  studentVerificationStatus?: string // Added for admin filtering
   sortBy?: 'createdAt' | 'name' | 'email'
   sortOrder?: 'asc' | 'desc'
   includeStats?: boolean

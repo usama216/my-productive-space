@@ -2,6 +2,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText, Download } from 'lucide-react'
+import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { 
   Booking, 
@@ -62,6 +64,41 @@ export function BookingManagement() {
     specialRequests: '',
     totalAmount: 0
   })
+  
+  // Debounced search state
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  
+  // Date picker states
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+
+  // Helper function to format date to YYYY-MM-DD in local timezone
+  const formatDateToLocal = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  // Helper function to format date for dateFrom (start of day)
+  const formatDateFrom = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}T00:00:00.000Z`
+  }
+
+  // Helper function to format date for dateTo (end of day)
+  const formatDateTo = (date: Date): string => {
+    // Add 1 day to the date and subtract 1 millisecond to get the exact end of the selected day
+    const nextDay = new Date(date)
+    nextDay.setDate(nextDay.getDate() + 1)
+    nextDay.setHours(0, 0, 0, 0)
+    nextDay.setMilliseconds(nextDay.getMilliseconds() - 1)
+    
+    return nextDay.toISOString()
+  }
 
   // Load dashboard data
   const loadDashboard = async () => {
@@ -121,6 +158,41 @@ export function BookingManagement() {
     loadAnalytics()
   }, [])
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+    }, 500) // 500ms delay
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Update filters when debounced search changes
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }))
+  }, [debouncedSearch])
+
+  // Update filters when date picker values change
+  // Only apply filter when end date is selected (or both dates are selected)
+  useEffect(() => {
+    if (endDate) {
+      setFilters(prev => ({
+        ...prev,
+        dateFrom: startDate ? formatDateFrom(startDate) : undefined,
+        dateTo: formatDateTo(endDate),
+        page: 1
+      }))
+    } else if (!startDate && !endDate) {
+      // Clear filters when both dates are cleared
+      setFilters(prev => ({
+        ...prev,
+        dateFrom: undefined,
+        dateTo: undefined,
+        page: 1
+      }))
+    }
+  }, [startDate, endDate])
+
   useEffect(() => {
     loadBookings()
   }, [filters])
@@ -137,6 +209,14 @@ export function BookingManagement() {
   // Handle pagination
   const handlePageChange = (page: number) => {
     setFilters(prev => ({ ...prev, page }))
+  }
+
+  const handleLimitChange = (newLimit: number) => {
+    setFilters(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1 // Reset to first page when limit changes
+    }))
   }
 
   // Handle edit booking
@@ -361,132 +441,83 @@ export function BookingManagement() {
 
    
 
-      {/* Filters */}
-      {/* <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filters & Search</span>
-          </CardTitle>
-        </CardHeader>
+      {/* Search and Date Filters */}
+      <Card>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="search">Search</Label>
-              <Input
-                id="search"
-                placeholder="Booking ref, location, user..."
-                value={filters.search || ''}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search Input */}
+            <div className="space-y-2">
+              <Label htmlFor="search">Search Bookings</Label>
+              <div className="relative">
+                {loading && searchInput ? (
+                  <Loader2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                )}
+                <Input
+                  id="search"
+                  placeholder="Search by reference"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Start Date Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="dateFrom">Start Date</Label>
+              <DatePicker
+                selected={startDate}
+                onChange={(date) => setStartDate(date)}
+                dateFormat="MMM d, yyyy"
+                placeholderText="Select start date"
+                className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                wrapperClassName="w-full"
+                minDate={new Date()}
+                maxDate={endDate || undefined}
               />
             </div>
 
-            <div>
-              <Label htmlFor="status">Status</Label>
-                              <Select value={filters.status || 'all'} onValueChange={(value) => handleFilterChange('status', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="ongoing">Ongoing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                placeholder="Room A, Room B..."
-                value={filters.location || ''}
-                onChange={(e) => handleFilterChange('location', e.target.value)}
+            {/* End Date Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="dateTo">End Date</Label>
+              <DatePicker
+                selected={endDate}
+                onChange={(date) => setEndDate(date)}
+                dateFormat="MMM d, yyyy"
+                placeholderText="Select end date"
+                className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                wrapperClassName="w-full"
+                minDate={startDate || new Date()}
               />
-            </div>
-
-            <div>
-              <Label htmlFor="paymentStatus">Payment Status</Label>
-                              <Select value={filters.paymentStatus || 'all'} onValueChange={(value) => handleFilterChange('paymentStatus', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Payments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Payments</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div>
-              <Label htmlFor="dateFrom">Date From</Label>
-              <Input
-                id="dateFrom"
-                type="date"
-                value={filters.dateFrom || ''}
-                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="dateTo">Date To</Label>
-              <Input
-                id="dateTo"
-                type="date"
-                value={filters.dateTo || ''}
-                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="sortBy">Sort By</Label>
-              <Select value={filters.sortBy || 'startAt'} onValueChange={(value) => handleFilterChange('sortBy', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="startAt">Start Time</SelectItem>
-                  <SelectItem value="totalAmount">Amount</SelectItem>
-                  <SelectItem value="createdAt">Created</SelectItem>
-                  <SelectItem value="bookingRef">Reference</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center mt-4">
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="limit">Items per page:</Label>
-              <Select value={filters.limit?.toString() || '20'} onValueChange={(value) => handleFilterChange('limit', parseInt(value))}>
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFilters({ page: 1, limit: 20, sortBy: 'startAt', sortOrder: 'desc' })}
-              >
-                Clear Filters
-              </Button>
-            </div>
+          {/* Clear Filters Button */}
+          <div className="flex justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchInput('')
+                setDebouncedSearch('')
+                setStartDate(null)
+                setEndDate(null)
+                setFilters({
+                  page: 1,
+                  limit: 20,
+                  sortBy: 'startAt',
+                  sortOrder: 'desc'
+                })
+              }}
+              className="flex items-center space-x-2"
+            >
+              <AlertCircle className="h-4 w-4" />
+              <span>Clear Filters</span>
+            </Button>
           </div>
         </CardContent>
-      </Card> */}
+      </Card>
 
       {/* Bookings Table */}
       <Card>
@@ -560,7 +591,7 @@ export function BookingManagement() {
                       <TableCell>
                         <div className="text-sm">
                           <div className="font-medium">${booking.totalAmount}</div>
-                          {booking.extensionamounts && booking.extensionamounts.length > 0 && (
+                          {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
                             <div className="text-xs text-blue-600">
                               Total: ${(() => {
                                 const originalCost = booking.totalCost || 0
@@ -568,12 +599,12 @@ export function BookingManagement() {
                                 return (originalCost + extensionTotal).toFixed(2)
                               })()}
                             </div>
-                          )}
-                          {booking.discountAmount && booking.discountAmount > 0 && (
+                          )} */}
+                          {/* {booking.discountAmount && booking.discountAmount > 0 && (
                             <div className="text-xs text-green-600">
                               -${booking.discountAmount} off
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -597,32 +628,99 @@ export function BookingManagement() {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <div className="text-sm text-gray-700">
-                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(pagination.page - 1)}
-                      disabled={pagination.page <= 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm">
-                      Page {pagination.page} of {pagination.totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(pagination.page + 1)}
-                      disabled={pagination.page >= pagination.totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
+                <Card>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <span>
+                          Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                          {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                          {pagination.total} bookings
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-muted-foreground">Rows per page:</span>
+                          <Select value={pagination.limit.toString()} onValueChange={(value) => handleLimitChange(parseInt(value))}>
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(1)}
+                            disabled={pagination.page === 1}
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(pagination.page - 1)}
+                            disabled={pagination.page === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          
+                          <div className="flex items-center space-x-1">
+                            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                              let pageNum: number
+                              if (pagination.totalPages <= 5) {
+                                pageNum = i + 1
+                              } else if (pagination.page <= 3) {
+                                pageNum = i + 1
+                              } else if (pagination.page >= pagination.totalPages - 2) {
+                                pageNum = pagination.totalPages - 4 + i
+                              } else {
+                                pageNum = pagination.page - 2 + i
+                              }
+                              
+                              return (
+                                <Button
+                                  key={pageNum}
+                                  variant={pagination.page === pageNum ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => handlePageChange(pageNum)}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  {pageNum}
+                                </Button>
+                              )
+                            })}
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(pagination.page + 1)}
+                            disabled={pagination.page === pagination.totalPages}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(pagination.totalPages)}
+                            disabled={pagination.page === pagination.totalPages}
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </>
           )}
