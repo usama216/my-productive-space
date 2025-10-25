@@ -168,13 +168,13 @@ export const PackageRecommendations: React.FC<PackageRecommendationsProps> = ({
                   {rec.package.packageContents.halfDayPasses && (
                     <div className="flex items-center text-xs">
                       <CheckCircle className="h-3 w-3 text-green-500 mr-2" />
-                      {rec.package.packageContents.halfDayPasses} Half-Day Passes
+                      {rec.package.packageContents.halfDayPasses} Half-Day Packages
                     </div>
                   )}
                   {rec.package.packageContents.fullDayPasses && (
                     <div className="flex items-center text-xs">
                       <CheckCircle className="h-3 w-3 text-green-500 mr-2" />
-                      {rec.package.packageContents.fullDayPasses} Full-Day Passes
+                      {rec.package.packageContents.fullDayPasses} Full-Day Packages
                     </div>
                   )}
                   {rec.package.packageContents.complimentaryHours && (

@@ -1052,7 +1052,7 @@ export function UserBookings() {
                   
                   <div className="border-t pt-2 mt-2 space-y-1">
                     <div className="flex justify-between items-center">
-                      <span>Original Cost:</span>
+                      <span>Booking Cost:</span>
                       <span>${totalCost.toFixed(2)}</span>
                     </div>
                     {/* {promoDiscountAmount > 0 && (
@@ -1085,7 +1085,7 @@ export function UserBookings() {
                         <span>+${payNowFee.toFixed(2)}</span>
                       </div>
                     )} */}
-                    <div className="flex justify-between items-center font-medium border-t pt-1">
+                    <div className="flex justify-between items-center font-medium pt-1">
                       <span>Amount Paid:</span>
                       <span>${Number(selectedBooking.totalAmount).toFixed(2)}</span>
                     </div>
@@ -1109,7 +1109,7 @@ export function UserBookings() {
                       )}
                       {totalDiscountAmount > 0 && (
                         <div className="text-xs text-gray-600 mt-1">
-                          * All discounts (${totalDiscountAmount.toFixed(2)}) are non-refundable
+                          * All discounts,store credits applied (${totalDiscountAmount.toFixed(2)}) are non-refundable
                         </div>
                       )}
                     </div>

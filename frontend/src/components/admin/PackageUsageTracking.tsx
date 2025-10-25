@@ -212,7 +212,7 @@ export const PackageUsageTracking: React.FC = () => {
                     <TableHead>User</TableHead>
                     <TableHead>Package</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Passes</TableHead>
+                    <TableHead>Packages</TableHead>
                     <TableHead>Usage</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
@@ -321,7 +321,7 @@ export const PackageUsageTracking: React.FC = () => {
                   <div className="text-lg font-bold">
                     {selectedUser.usedPasses} / {selectedUser.totalPasses}
                   </div>
-                  <p className="text-sm text-gray-500">Passes Used</p>
+                  <p className="text-sm text-gray-500">Packages Used</p>
                 </div>
               </div>
 
@@ -366,7 +366,7 @@ export const PackageUsageTracking: React.FC = () => {
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
-                  {selectedUser.usagePercentage.toFixed(1)}% of passes used
+                  {selectedUser.usagePercentage.toFixed(1)}% of packages used
                 </p>
               </div>
             </div>

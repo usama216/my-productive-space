@@ -37,7 +37,7 @@ const perks = [
   { src: '/mock_img/perk3.png', title: 'Premium Coffee Bar', subtitle: 'Barista-quality espresso & healthy meal options' },
   { src: '/mock_img/perk4.png', title: 'Meeting Ready', subtitle: 'Soundproof phone booths & conference rooms' },
   { src: '/mock_img/perk1.png', title: 'Networking Hub', subtitle: 'Connect with entrepreneurs & industry professionals' },
-  { src: '/mock_img/perk2.png', title: 'Flexible Membership', subtitle: 'Day passes to monthly plans - scale as you grow' },
+  { src: '/mock_img/perk2.png', title: 'Flexible Membership', subtitle: 'Day packages to monthly plans - scale as you grow' },
   { src: '/mock_img/perk1.png', title: 'Peak Performance Setup', subtitle: 'High-speed internet & premium tech infrastructure' },
   { src: '/mock_img/perk2.png', title: 'Professional Atmosphere', subtitle: 'Quiet zones designed for deep work & focus' },
   { src: '/mock_img/perk3.png', title: 'Fuel Your Hustle', subtitle: 'Gourmet coffee, healthy snacks & energy drinks' },
@@ -235,7 +235,7 @@ export default function CoworkPage() {
                       <h4 className="text-xl font-semibold">{pkg.name}</h4>
                       <ul className="mt-2 list-disc list-inside space-y-1 text-gray-700">
                         <li>{pkg.description}</li>
-                        <li>{pkg.passCount} Passes Included (1 pass per booking)</li>
+                        <li>{pkg.passCount} Packages Included (1 pass per booking)</li>
                         <li>Package Type: {pkg.packageType.replace('_', ' ')}</li>
                         <li>Valid {pkg.validityDays} days from activation</li>
                         <li>SGD {pkg.price} {pkg.originalPrice && pkg.originalPrice > pkg.price && `(UP ${pkg.originalPrice})`} + SGD {pkg.outletFee} for all outlets</li>

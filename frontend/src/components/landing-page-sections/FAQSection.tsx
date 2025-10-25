@@ -35,7 +35,7 @@ const faqs: { question: string, answer: React.ReactNode }[] = [
   },
   {
     question: 'Can I bring guests?',
-    answer: `Of course—every member tier comes with two complimentary guest passes per month.  Guests get full
+    answer: `Of course—every member tier comes with two complimentary guest packages per month.  Guests get full
              access to all amenities but must be accompanied by a member at all times.`,
   },
   {

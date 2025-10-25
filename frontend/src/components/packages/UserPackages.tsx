@@ -157,13 +157,13 @@ export const UserPackages: React.FC<UserPackagesProps> = ({ userId }) => {
               <div className="text-2xl font-bold text-green-600">
                 {userPackages.reduce((sum, pkg) => sum + pkg.remainingPasses, 0)}
               </div>
-              <div className="text-sm text-muted-foreground">Available Passes</div>
+              <div className="text-sm text-muted-foreground">Available Packages</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
                 {userPackages.reduce((sum, pkg) => sum + pkg.usedPasses, 0)}
               </div>
-              <div className="text-sm text-muted-foreground">Used Passes</div>
+              <div className="text-sm text-muted-foreground">Used Packages</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
@@ -215,10 +215,10 @@ export const UserPackages: React.FC<UserPackagesProps> = ({ userId }) => {
                   </div>
                   <div className="text-sm text-blue-700 space-y-1">
                     {userPackage.packageContents.halfDayPasses && (
-                      <div>{userPackage.packageContents.halfDayPasses} Half-Day Passes</div>
+                      <div>{userPackage.packageContents.halfDayPasses} Half-Day Packages</div>
                     )}
                     {userPackage.packageContents.fullDayPasses && (
-                      <div>{userPackage.packageContents.fullDayPasses} Full-Day Passes</div>
+                      <div>{userPackage.packageContents.fullDayPasses} Full-Day Packages</div>
                     )}
                     {userPackage.packageContents.complimentaryHours && (
                       <div>+{userPackage.packageContents.complimentaryHours} Complimentary Hours</div>
@@ -233,7 +233,7 @@ export const UserPackages: React.FC<UserPackagesProps> = ({ userId }) => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Usage Progress</span>
                   <span className="font-medium">
-                    {userPackage.usedPasses} / {userPackage.totalPasses} passes
+                    {userPackage.usedPasses} / {userPackage.totalPasses} packages
                   </span>
                 </div>
                 <Progress 

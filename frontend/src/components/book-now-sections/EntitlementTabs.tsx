@@ -707,10 +707,10 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium text-gray-900 mb-1">
-                      No passes available
+                      No packages available
                     </h3>
                     <p className="text-xs text-gray-600 mb-3">
-                      You don't have any valid passes for this booking. Purchase passes to
+                      You don't have any valid packages for this booking. Purchase packages to
                       save money!
                     </p>
                     <div className="flex space-x-2">
@@ -718,7 +718,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                         href="/buy-pass"
                         className="inline-flex items-center px-2.5 py-1.5 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors font-medium"
                       >
-                        Buy Passes
+                        Buy Packages
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Link>
                       <Link
@@ -830,7 +830,7 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                     variant="secondary"
                                     className="bg-green-100 text-green-800"
                                   >
-                                    {remaining} passes left
+                                    {remaining} packages left
                                   </Badge>
                                 </div>
 
@@ -926,13 +926,13 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
         <TabsContent value="promo" className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
           <div>
             <Label className={`text-sm font-medium mb-2 block ${selectedPromoCode ? 'text-gray-500' : ''}`}>
-              Discount Code {selectedPromoCode && '(Already Applied)'}
+              Discount Code {selectedPromoCode && '(Applied)'}
             </Label>
             {/* Applied Promo Code Indicator */}
             {selectedPromoCode && (
-              <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+              <div className="p-2 mb-4 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
                 <p className="flex items-center gap-1">
-                  <span>✅</span>
+                
                   <span>Promo code <strong>{selectedPromoCode.code}</strong> is applied. Remove it below to apply a different one.</span>
                 </p>
               </div>

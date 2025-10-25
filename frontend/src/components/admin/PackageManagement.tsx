@@ -371,7 +371,7 @@ const PackageManagement: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{pkg.passCount}</div>
-                        <div className="text-xs text-gray-500">passes</div>
+                        <div className="text-xs text-gray-500">packages</div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm font-medium">
@@ -510,7 +510,7 @@ const PackageManagement: React.FC = () => {
                   min="1"
                   value={formData.passCount}
                   onChange={(e) => setFormData({ ...formData, passCount: e.target.value })}
-                  placeholder="Number of passes"
+                  placeholder="Number of packages"
                   required
                 />
               </div>
@@ -669,7 +669,7 @@ const PackageManagement: React.FC = () => {
                   min="1"
                   value={formData.passCount}
                   onChange={(e) => setFormData({ ...formData, passCount: e.target.value })}
-                  placeholder="Number of passes"
+                  placeholder="Number of packages"
                   required
                 />
               </div>

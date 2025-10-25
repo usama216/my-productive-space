@@ -313,7 +313,7 @@ export function EntitlementHistory() {
           <CardContent className="p-4 text-center">
             <TrendingDown className="w-8 h-8 mx-auto mb-2 text-purple-600" />
             <p className="text-2xl font-bold">{totalPassesUsed}</p>
-            <p className="text-sm text-gray-600">Total Passes Used</p>
+            <p className="text-sm text-gray-600">Total Packages Used</p>
           </CardContent>
         </Card>
       </div>

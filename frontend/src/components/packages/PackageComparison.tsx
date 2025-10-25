@@ -44,10 +44,10 @@ export const PackageComparison: React.FC<PackageComparisonProps> = ({
     const features = [];
     
     if (pkg.packageContents.halfDayPasses) {
-      features.push(`${pkg.packageContents.halfDayPasses} Half-Day Passes`);
+      features.push(`${pkg.packageContents.halfDayPasses} Half-Day Packages`);
     }
     if (pkg.packageContents.fullDayPasses) {
-      features.push(`${pkg.packageContents.fullDayPasses} Full-Day Passes`);
+      features.push(`${pkg.packageContents.fullDayPasses} Full-Day Packages`);
     }
     if (pkg.packageContents.complimentaryHours) {
       features.push(`+${pkg.packageContents.complimentaryHours} Bonus Hours`);

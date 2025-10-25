@@ -182,8 +182,8 @@ export default function PackageUsageTable() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="usagePercentage">Usage %</SelectItem>
-                <SelectItem value="usedPasses">Used Passes</SelectItem>
-                <SelectItem value="remainingPasses">Remaining Passes</SelectItem>
+                <SelectItem value="usedPasses">Used Packages</SelectItem>
+                <SelectItem value="remainingPasses">Remaining Packages</SelectItem>
                 <SelectItem value="revenue">Revenue</SelectItem>
                 <SelectItem value="packageName">Package Name</SelectItem>
                 <SelectItem value="userName">User Name</SelectItem>
@@ -216,7 +216,7 @@ export default function PackageUsageTable() {
                     <TableHead>Package</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Total Passes</TableHead>
+                    <TableHead>Total Packages</TableHead>
                     <TableHead>Used</TableHead>
                     <TableHead>Remaining</TableHead>
                     <TableHead>Usage %</TableHead>

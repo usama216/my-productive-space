@@ -213,7 +213,7 @@ export default function PackageSelection({
                     Covers {getPackageHourLimit(pkg.packageType)} per day
                   </p>
                   <p className="text-xs text-gray-500">
-                    {pkg.remainingCount} of {pkg.totalCount} passes remaining
+                    {pkg.remainingCount} of {pkg.totalCount} packages remaining
                   </p>
                 </div>
               </div>

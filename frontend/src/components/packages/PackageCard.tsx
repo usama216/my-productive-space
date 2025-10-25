@@ -57,7 +57,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({ package: pkg, onPurcha
         <div className="package-contents mb-4 space-y-3">
           <div className="content-item text-sm flex items-center space-x-2 p-2 bg-blue-50 rounded-lg">
             <span className="text-blue-600 font-bold">{pkg.passCount}</span>
-            <span>Passes Included</span>
+            <span>Packages Included</span>
             <span className="text-muted-foreground">(1 pass per booking)</span>
           </div>
           <div className="content-item text-sm flex items-center space-x-2 p-2 bg-green-50 rounded-lg">
