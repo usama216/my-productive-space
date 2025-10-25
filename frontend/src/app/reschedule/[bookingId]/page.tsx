@@ -1168,8 +1168,18 @@ export default function ReschedulePage() {
                     </Alert>
                   )}
 
+                  {/* No Seats Available Message */}
+                  {!checkingSeats && newStartDate && newEndDate && availableSeats.length === 0 && (
+                    <Alert className="border-red-500 bg-red-50">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700">
+                        There is not enough seats for your current timeslot. Please change another timeslot.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {/* Seat Selection */}
-                  {!checkingSeats && newStartDate && newEndDate && (
+                  {!checkingSeats && newStartDate && newEndDate && availableSeats.length > 0 && (
                     <div>
                       <Label>Select Seats for New Time</Label>
                       <p className="text-sm text-gray-600 mb-3">

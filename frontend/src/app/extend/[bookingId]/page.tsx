@@ -954,8 +954,18 @@ export default function ExtendBookingPage() {
 
                
 
+                  {/* No Seats Available Message */}
+                  {!checkingSeats && extendedHours > 0 && (DEMO_LAYOUT.length - occupiedSeats.length) === 0 && (
+                    <Alert className="border-red-500 bg-red-50">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700">
+                        There is not enough seats for your current timeslot. Please change another timeslot.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {/* Seat Selection */}
-                  {requiresSeatSelection && !checkingSeats && extendedHours > 0 && (
+                  {requiresSeatSelection && !checkingSeats && extendedHours > 0 && (DEMO_LAYOUT.length - occupiedSeats.length) > 0 && (
                     <div>
                       <Label>Select Seats for Extended Time</Label>
                       <p className="text-sm text-gray-600 mb-3">
