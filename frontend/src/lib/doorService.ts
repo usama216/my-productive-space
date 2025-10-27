@@ -5,11 +5,40 @@ export interface GenerateOpenLinkResponse {
         accessPath: string;
         token: string;
         bookingRef: string;
-        enable_at: string;
+        createdAt: string;
+        used: boolean;
+        accessCount: number;
+        enableAt: string;
         expiresAt: string;
         maxAccessCount: number | null;
         currentAccessCount: number;
         unlimitedAccess: boolean;
+        manualCreated?: boolean;
+        manualStartTime?: string;
+        manualEndTime?: string;
+        seatNumber?: string;
+    };
+    message?: string;
+}
+
+export interface AdminGenerateOpenLinkResponse {
+    success: boolean;
+    data?: {
+        accessPath: string;
+        token: string;
+        bookingRef: string;
+        createdAt: string;
+        used: boolean;
+        accessCount: number;
+        enableAt: string;
+        expiresAt: string;
+        maxAccessCount: number | null;
+        currentAccessCount: number;
+        unlimitedAccess: boolean;
+        manualCreated: boolean;
+        manualStartTime: string;
+        manualEndTime: string;
+        seatNumber: string;
     };
     message?: string;
 }
@@ -40,20 +69,26 @@ export async function generateOpenLink(bookingRef: string): Promise<GenerateOpen
 }
 
 /**
- * Send door access link via email
- * @param bookingRef - The booking reference
- * @returns Promise with email sending result
+ * Generate a secure access link for admin with manual seat and time
+ * @param seatNumber - The seat number (S1-S15)
+ * @param startTime - Start time in ISO 8601 format
+ * @param endTime - End time in ISO 8601 format
+ * @returns Promise with access link data
  */
-export async function sendDoorAccessLink(bookingRef: string): Promise<GenerateOpenLinkResponse> {
+export async function adminGenerateOpenLink(
+    seatNumber: string, 
+    startTime: string, 
+    endTime: string
+): Promise<AdminGenerateOpenLinkResponse> {
     try {
-        const response = await fetch(`${API_BASE}/door/send-access-link`, {
+        const response = await fetch(`${API_BASE}/door/admin-generate-open-link`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ bookingRef }),
+            body: JSON.stringify({ seatNumber, startTime, endTime }),
         });
-        return handleResponse(response);
+        return handleAdminResponse(response);
     } catch (error) {
         return {
             success: false,
@@ -84,6 +119,87 @@ const handleResponse = async (response: Response): Promise<GenerateOpenLinkRespo
         return {
             success: false,
             message: 'Failed to parse response',
+        };
+    }
+}
+
+// Helper function to handle admin API responses
+const handleAdminResponse = async (response: Response): Promise<AdminGenerateOpenLinkResponse> => {
+    try {
+        const responseData = await response.json();
+        if (!response.ok) {
+            return {
+                success: false,
+                message: responseData.message || responseData.error || `HTTP ${response.status}`,
+            };
+        }
+        return {
+            success: true,
+            data: {
+                ...responseData.data,
+                accessPath: `${API_BASE}${responseData.data.accessPath}`,
+            },
+            message: responseData.message,
+        };
+    } catch (error) {   
+        return {
+            success: false,
+            message: 'Failed to parse response',
+        };
+    }
+}
+
+export async function sendDoorAccessLink(bookingRef: string): Promise<GenerateOpenLinkResponse> {
+    try {
+        const response = await fetch(`${API_BASE}/door/send-access-link`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bookingRef }),
+        });
+        return handleResponse(response);
+    } catch (error) {
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+
+/**
+ * Send admin door access link via email
+ * @param token - The generated token
+ * @param recipientEmail - Email address to send to
+ * @param userName - User's name
+ * @param seatNumber - Seat number
+ * @param startTime - Start time in ISO format
+ * @param endTime - End time in ISO format
+ * @returns Promise with email sending result
+ */
+export async function sendAdminDoorAccessLink(
+    token: string,
+    recipientEmail: string,
+    userName: string,
+    seatNumber: string,
+    startTime: string,
+    endTime: string
+): Promise<{ success: boolean; message?: string }> {
+    try {
+        const response = await fetch(`${API_BASE}/door/send-admin-access-link`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token, recipientEmail, userName, seatNumber, startTime, endTime }),
+        });
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error',
         };
     }
 }

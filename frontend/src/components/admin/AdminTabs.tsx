@@ -14,6 +14,7 @@ import PackageUsageTable from './PackageUsageTable'
 import { RefundManagement } from './RefundManagement'
 import { PricingManagement } from './PricingManagement'
 import OpenDoorExample from '@/components/OpenDoorExample'
+import AdminDoorUnlock from '../AdminDoorUnlock'
 
 export default function AdminTabs({
   activeTab,
@@ -273,7 +274,7 @@ export default function AdminTabs({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <OpenDoorExample />
+            <AdminDoorUnlock/>
           </CardContent>
         </Card>
       </TabsContent>

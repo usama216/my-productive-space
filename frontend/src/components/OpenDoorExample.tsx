@@ -1,47 +1,107 @@
 'use client';
 
 import { useState } from 'react';
-import { generateOpenLink, GenerateOpenLinkResponse } from '@/lib/doorService';
-import { useToast } from '@/hooks/use-toast';
+import { generateOpenLink, adminGenerateOpenLink, GenerateOpenLinkResponse, AdminGenerateOpenLinkResponse } from '@/lib/doorService';
 
 export default function OpenDoorExample() {
-  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'regular' | 'admin'>('regular');
+  
+  // Regular booking form state
   const [bookingRef, setBookingRef] = useState('');
+  
+  // Admin form state
+  const [seatNumber, setSeatNumber] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  
+  // Common state
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<GenerateOpenLinkResponse | null>(null);
+  const [result, setResult] = useState<GenerateOpenLinkResponse | AdminGenerateOpenLinkResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerateLink = async () => {
-    if (!bookingRef.trim()) {
-      setError('Please enter a booking reference');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const response = await generateOpenLink(bookingRef.trim());
-      setResult(response);
-      
-      if (!response.success) {
-        setError(response.message || 'Failed to generate access link');
+    if (activeTab === 'regular') {
+      if (!bookingRef.trim()) {
+        setError('Please enter a booking reference');
+        return;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
+
+      setIsLoading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        const response = await generateOpenLink(bookingRef.trim());
+        setResult(response);
+        
+        if (!response.success) {
+          setError(response.message || 'Failed to generate access link');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Admin form validation
+      if (!seatNumber.trim()) {
+        setError('Please enter a seat number');
+        return;
+      }
+      if (!startTime.trim()) {
+        setError('Please enter a start time');
+        return;
+      }
+      if (!endTime.trim()) {
+        setError('Please enter an end time');
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        // Convert datetime-local format to ISO 8601 format
+        const startDate = new Date(startTime.trim());
+        const endDate = new Date(endTime.trim());
+        
+        // Validate dates
+        if (isNaN(startDate.getTime())) {
+          setError('Invalid start time format');
+          return;
+        }
+        if (isNaN(endDate.getTime())) {
+          setError('Invalid end time format');
+          return;
+        }
+        if (startDate >= endDate) {
+          setError('Start time must be before end time');
+          return;
+        }
+        
+        const startTimeISO = startDate.toISOString();
+        const endTimeISO = endDate.toISOString();
+        
+        const response = await adminGenerateOpenLink(seatNumber.trim(), startTimeISO, endTimeISO);
+        setResult(response);
+        
+        if (!response.success) {
+          setError(response.message || 'Failed to generate admin access link');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleCopyLink = () => {
     if (result?.data?.accessPath) {
       navigator.clipboard.writeText(result.data.accessPath);
-      toast({
-        title: "Link Copied!",
-        description: "Access link has been copied to clipboard.",
-      });
+      // You could add a toast notification here
+      alert('Link copied to clipboard!');
     }
   };
 
@@ -52,32 +112,109 @@ export default function OpenDoorExample() {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Generate Door Access Link</h2>
       
-      {/* Input Section */}
+      {/* Tab Navigation */}
       <div className="mb-6">
-        <label htmlFor="bookingRef" className="block text-sm font-medium text-gray-700 mb-2">
-          Booking Reference
-        </label>
-        <input
-          id="bookingRef"
-          type="text"
-          value={bookingRef}
-          onChange={(e) => setBookingRef(e.target.value)}
-          placeholder="Enter your booking reference"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isLoading}
-        />
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('regular')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'regular'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Regular Booking
+          </button>
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'admin'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Admin Manual
+          </button>
+        </div>
       </div>
+
+      {/* Regular Booking Form */}
+      {activeTab === 'regular' && (
+        <div className="mb-6">
+          <label htmlFor="bookingRef" className="block text-sm font-medium text-gray-700 mb-2">
+            Booking Reference
+          </label>
+          <input
+            id="bookingRef"
+            type="text"
+            value={bookingRef}
+            onChange={(e) => setBookingRef(e.target.value)}
+            placeholder="Enter your booking reference"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isLoading}
+          />
+        </div>
+      )}
+
+      {/* Admin Manual Form */}
+      {activeTab === 'admin' && (
+        <div className="space-y-4 mb-6">
+          <div>
+            <label htmlFor="seatNumber" className="block text-sm font-medium text-gray-700 mb-2">
+              Seat Number
+            </label>
+            <input
+              id="seatNumber"
+              type="text"
+              value={seatNumber}
+              onChange={(e) => setSeatNumber(e.target.value)}
+              placeholder="S1, S2, S3, ..., S15"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 mt-1">Enter seat number in format S1-S15</p>
+          </div>
+          
+          <div>
+            <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-2">
+              Start Time
+            </label>
+            <input
+              id="startTime"
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isLoading}
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 mb-2">
+              End Time
+            </label>
+            <input
+              id="endTime"
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Generate Button */}
       <button
         onClick={handleGenerateLink}
-        disabled={isLoading || !bookingRef.trim()}
-        className="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        disabled={isLoading || (activeTab === 'regular' ? !bookingRef.trim() : !seatNumber.trim() || !startTime.trim() || !endTime.trim())}
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
-        {isLoading ? 'Generating...' : 'Generate Access Link'}
+        {isLoading ? 'Generating...' : `Generate ${activeTab === 'regular' ? 'Regular' : 'Admin'} Access Link`}
       </button>
 
       {/* Error Message */}
@@ -120,12 +257,12 @@ export default function OpenDoorExample() {
           </div>
 
           {/* Additional Info */}
-          {/* <div className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-2 text-sm text-gray-600">
             <div>
-              <span className="font-medium">Booking Reference:</span> {result.data.bookingRef}
+              <span className="font-medium">Booking Reference:</span> {result.data.bookingRef || 'N/A (Manual Token)'}
             </div>
             <div>
-              <span className="font-medium">Valid From:</span> {new Date(result.data.enable_at).toLocaleString()}
+              <span className="font-medium">Valid From:</span> {new Date(result.data.enableAt).toLocaleString()}
             </div>
             <div>
               <span className="font-medium">Expires At:</span> {new Date(result.data.expiresAt).toLocaleString()}
@@ -135,7 +272,31 @@ export default function OpenDoorExample() {
               {result.data.maxAccessCount && ` / ${result.data.maxAccessCount}`}
               {result.data.unlimitedAccess && ' (Unlimited)'}
             </div>
-          </div> */}
+            <div>
+              <span className="font-medium">Used:</span> {result.data.used ? 'Yes' : 'No'}
+            </div>
+            <div>
+              <span className="font-medium">Created At:</span> {new Date(result.data.createdAt).toLocaleString()}
+            </div>
+            
+            {/* Show admin-specific info if it's an admin token */}
+            {'manualCreated' in result.data && result.data.manualCreated && (
+              <>
+                <div>
+                  <span className="font-medium">Seat Number:</span> {result.data.seatNumber}
+                </div>
+                <div>
+                  <span className="font-medium">Manual Start Time:</span> {new Date(result.data.manualStartTime!).toLocaleString()}
+                </div>
+                <div>
+                  <span className="font-medium">Manual End Time:</span> {new Date(result.data.manualEndTime!).toLocaleString()}
+                </div>
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <span className="text-blue-800 font-medium">Admin Manual Token</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
