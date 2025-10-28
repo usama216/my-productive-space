@@ -107,11 +107,13 @@ const handleResponse = async (response: Response): Promise<GenerateOpenLinkRespo
                 message: responseData.message || responseData.error || `HTTP ${response.status}`,
             };
         }
+        // Remove /api from base URL for public routes like /open
+        const baseUrl = API_BASE.replace(/\/api\/?$/, '');
         return {
             success: true,
             data: {
                 ...responseData.data,
-                accessPath: `${API_BASE}${responseData.data.accessPath}`,
+                accessPath: `${baseUrl}${responseData.data.accessPath}`,
             },
             message: responseData.message,
         };
@@ -133,11 +135,13 @@ const handleAdminResponse = async (response: Response): Promise<AdminGenerateOpe
                 message: responseData.message || responseData.error || `HTTP ${response.status}`,
             };
         }
+        // Remove /api from base URL for public routes like /open
+        const baseUrl = API_BASE.replace(/\/api\/?$/, '');
         return {
             success: true,
             data: {
                 ...responseData.data,
-                accessPath: `${API_BASE}${responseData.data.accessPath}`,
+                accessPath: `${baseUrl}${responseData.data.accessPath}`,
             },
             message: responseData.message,
         };
