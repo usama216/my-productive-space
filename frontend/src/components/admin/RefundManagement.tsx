@@ -25,7 +25,11 @@ import {
   TrendingUp,
   Wallet,
   Search,
-  Filter
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { 
@@ -35,7 +39,8 @@ import {
   rejectRefund, 
   getRefundStats,
   RefundTransaction,
-  UserCredit
+  UserCredit,
+  UserCreditsResponse
 } from '@/lib/refundService'
 import { 
   formatSingaporeDate, 
@@ -46,30 +51,40 @@ import {
 export function RefundManagement() {
   const [refunds, setRefunds] = useState<RefundTransaction[]>([])
   const [credits, setCredits] = useState<UserCredit[]>([])
+  const [creditsPagination, setCreditsPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 })
   const [stats, setStats] = useState({ totalRefunded: 0, totalTransactions: 0, averageRefund: 0 })
   const [isLoading, setIsLoading] = useState(true)
+  const [isCreditsLoading, setIsCreditsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'refunds' | 'credits' | 'stats'>('credits')
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedRefund, setSelectedRefund] = useState<RefundTransaction | null>(null)
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const { toast } = useToast()
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCreditsPagination(prev => ({ ...prev, page: 1 })) // Reset to page 1 on search
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const fetchData = async () => {
     try {
       setIsLoading(true)
       setError(null)
       
-      const [refundsData, creditsData, statsData] = await Promise.all([
+      const [refundsData, statsData] = await Promise.all([
         getAllRefundRequests(),
-        getAllUserCredits(),
         getRefundStats()
       ])
       
       setRefunds(refundsData)
-      setCredits(creditsData)
       setStats(statsData)
     } catch (err) {
       setError('Failed to load refund data')
@@ -79,9 +94,41 @@ export function RefundManagement() {
     }
   }
 
+  const fetchCredits = async () => {
+    try {
+      setIsCreditsLoading(true)
+      const creditsResp = await getAllUserCredits({ 
+        page: creditsPagination.page, 
+        limit: creditsPagination.limit, 
+        search: debouncedSearchTerm 
+      })
+      setCredits(creditsResp.items)
+      setCreditsPagination(creditsResp.pagination)
+    } catch (err) {
+      setError('Failed to load credits data')
+      console.error('Error fetching credits:', err)
+    } finally {
+      setIsCreditsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'credits') {
+      fetchCredits()
+    }
+  }, [creditsPagination.page, creditsPagination.limit, debouncedSearchTerm, activeTab])
+
+  const handlePageChange = (newPage: number) => {
+    setCreditsPagination(prev => ({ ...prev, page: newPage }))
+  }
+
+  const handleLimitChange = (newLimit: number) => {
+    setCreditsPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
+  }
 
   const handleApproveRefund = async (refundId: string) => {
     try {
@@ -189,21 +236,18 @@ export function RefundManagement() {
     return matchesSearch && matchesStatus
   })
 
-  const filteredCredits = credits.filter(credit => {
-    return searchTerm === '' || 
-      credit.Booking?.bookingRef?.toLowerCase().includes(searchTerm.toLowerCase())
-  })
+  const filteredCredits = credits
 
-  if (isLoading) {
+  if (isLoading && activeTab !== 'credits') {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin" />
-        <span className="ml-2">Loading credits...</span>
+        <span className="ml-2">Loading...</span>
       </div>
     )
   }
 
-  if (error) {
+  if (error && activeTab !== 'credits') {
     return (
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />
@@ -293,15 +337,21 @@ export function RefundManagement() {
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search by booking reference or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div> */}
+        {activeTab === 'credits' && (
+          <div className="relative flex-1">
+            {isCreditsLoading ? (
+              <Loader2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            )}
+            <Input
+              placeholder="Search by user email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        )}
         {activeTab === 'refunds' && (
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -399,79 +449,207 @@ export function RefundManagement() {
       {activeTab === 'credits' && (
         <Card>
           <CardHeader>
-            <CardTitle>User Credits ({filteredCredits.length})</CardTitle>
+            <CardTitle>User Credits ({creditsPagination.total})</CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredCredits.length === 0 ? (
+            {isCreditsLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
+                <p className="text-gray-500">Loading credits...</p>
+              </div>
+            ) : filteredCredits.length === 0 ? (
               <div className="text-center py-8">
                 <Wallet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">No user credits found</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredCredits.map((credit) => (
-                  <div
-                    key={credit.id}
-                    className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">
-                          {formatCurrency(credit.amount)}
-                        </span>
-                        {/* <Badge variant={credit.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                          {credit.status}
-                        </Badge> */}
-                        <Badge
-  className={
-    credit.status === "ACTIVE"
-      ? "bg-orange-600 text-white hover:bg-orange-700"
-      : "bg-gray-200 text-gray-800"
-  }
->
-  {credit.status}
-</Badge>
-
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="space-y-2">
+                {(() => {
+                  // Group credits by user
+                  const grouped: Record<string, any> = {};
+                  filteredCredits.forEach((c: any) => {
+                    if (!grouped[c.userid]) {
+                      grouped[c.userid] = {
+                        userEmail: c.User?.email || 'N/A',
+                        items: [],
+                        totalCredit: c.totalCredit ?? 0,
+                        usedCredit: c.usedCredit ?? 0,
+                        remainingCredit: c.remainingCredit ?? 0,
+                      };
+                    }
+                    grouped[c.userid].items.push(c);
+                  });
+                  const groups = Object.values(grouped);
+                  return groups.map((group: any, idx: number) => (
+                    <div key={idx} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">User Email:</span>
-                          <span>{credit.User?.email || 'N/A'}</span>
+                          <span className="font-medium">{group.userEmail}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">Created:</span>
-                          <span>{formatDate(credit.createdat)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">Expires:</span>
-                          <span>{formatDate(credit.expiresat)}</span>
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4 text-gray-500" />
+                            <span className="text-gray-600">Total:</span>
+                            <span className="font-medium">{formatCurrency(group.totalCredit)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="h-4 w-4 text-orange-500" />
+                            <span className="text-gray-600">Used:</span>
+                            <span className="text-orange-600 font-medium">{formatCurrency(group.usedCredit)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Wallet className="h-4 w-4 text-green-500" />
+                            <span className="text-gray-600">Remaining:</span>
+                            <span className="text-green-600 font-medium">{formatCurrency(group.remainingCredit)}</span>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="space-y-2">
-                        {credit.Booking && (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-gray-500" />
-                            <span className="font-medium">From Booking:</span>
-                            <span>{credit.Booking.bookingRef}</span>
+
+                      {/* User's individual credits */}
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {group.items.map((credit: any) => (
+                          <div key={credit.id} className="p-3 border rounded-md bg-white">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  className={
+                                    credit.status === 'ACTIVE'
+                                      ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                      : 'bg-gray-200 text-gray-800'
+                                  }
+                                >
+                                  {credit.status}
+                                </Badge>
+                                <span className="font-medium">{formatCurrency(credit.amount)}</span>
+                              </div>
+                              {credit.Booking && (
+                                <div className="text-xs text-gray-500">{credit.Booking.bookingRef}</div>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="text-gray-500">Created</div>
+                              <div>{formatDate(credit.createdat)}</div>
+                              <div className="text-gray-500">Expires</div>
+                              <div>{formatDate(credit.expiresat)}</div>
+                              {typeof credit.creditUsed === 'number' && (
+                                <>
+                                  <div className="text-gray-500">Used (this credit)</div>
+                                  <div className="text-orange-600">{formatCurrency(credit.creditUsed)}</div>
+                                </>
+                              )}
+                              {typeof credit.creditRemaining === 'number' && (
+                                <>
+                                  <div className="text-gray-500">Remaining (this credit)</div>
+                                  <div className="text-green-600">{formatCurrency(credit.creditRemaining)}</div>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <span className="font-medium">Booking Location:</span>
-                          <p className="text-gray-600 mt-1">{credit.Booking?.location || 'N/A'}</p>
-                        </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pagination */}
+      {activeTab === 'credits' && creditsPagination.totalPages > 1 && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>
+                  Showing {((creditsPagination.page - 1) * creditsPagination.limit) + 1} to{' '}
+                  {Math.min(creditsPagination.page * creditsPagination.limit, creditsPagination.total)} of{' '}
+                  {creditsPagination.total} credits
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+                  <Select value={creditsPagination.limit.toString()} onValueChange={(value) => handleLimitChange(parseInt(value))}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={creditsPagination.page === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(creditsPagination.page - 1)}
+                    disabled={creditsPagination.page === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, creditsPagination.totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (creditsPagination.totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (creditsPagination.page <= 3) {
+                        pageNum = i + 1
+                      } else if (creditsPagination.page >= creditsPagination.totalPages - 2) {
+                        pageNum = creditsPagination.totalPages - 4 + i
+                      } else {
+                        pageNum = creditsPagination.page - 2 + i
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={creditsPagination.page === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(creditsPagination.page + 1)}
+                    disabled={creditsPagination.page === creditsPagination.totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(creditsPagination.totalPages)}
+                    disabled={creditsPagination.page === creditsPagination.totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

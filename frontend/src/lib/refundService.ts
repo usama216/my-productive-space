@@ -19,6 +19,18 @@ export interface UserCredit {
   };
 }
 
+export interface CreditsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface UserCreditsResponse {
+  items: UserCredit[];
+  pagination: CreditsPagination;
+}
+
 export interface RefundTransaction {
   id: string;
   userid: string;
@@ -207,9 +219,14 @@ export const getAllRefundRequests = async (): Promise<RefundTransaction[]> => {
   }
 };
 
-export const getAllUserCredits = async (): Promise<UserCredit[]> => {
+export const getAllUserCredits = async (params?: { page?: number; limit?: number; search?: string }): Promise<UserCreditsResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/refund/credits`);
+    const q: string[] = [];
+    if (params?.page) q.push(`page=${params.page}`);
+    if (params?.limit) q.push(`limit=${params.limit}`);
+    if (params?.search && params.search.trim()) q.push(`search=${encodeURIComponent(params.search.trim())}`);
+    const qs = q.length ? `?${q.join('&')}` : '';
+    const response = await fetch(`${API_BASE_URL}/admin/refund/credits${qs}`);
     if (!response.ok) {
       throw new Error('Failed to fetch user credits');
     }
