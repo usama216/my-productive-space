@@ -27,7 +27,8 @@ import {
   formatBookingDate,
   getBookingStatus,
   getStatusColor,
-  calculateDuration
+  calculateDuration,
+  getAdminBookingDetails
 } from '@/lib/bookingService'
 import { 
   formatSingaporeDate, 
@@ -64,6 +65,9 @@ export function BookingManagement() {
     specialRequests: '',
     totalAmount: 0
   })
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailData, setDetailData] = useState<any>(null)
   
   // Debounced search state
   const [searchInput, setSearchInput] = useState('')
@@ -72,6 +76,10 @@ export function BookingManagement() {
   // Date picker states
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
+  
+  // Seat filter state
+  const [selectedSeat, setSelectedSeat] = useState<string>('')
+  const hasDateRange = !!startDate && !!endDate
 
   // Helper function to format date to YYYY-MM-DD in local timezone
   const formatDateToLocal = (date: Date): string => {
@@ -81,23 +89,9 @@ export function BookingManagement() {
     return `${year}-${month}-${day}`
   }
 
-  // Helper function to format date for dateFrom (start of day)
-  const formatDateFrom = (date: Date): string => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}T00:00:00.000Z`
-  }
-
-  // Helper function to format date for dateTo (end of day)
-  const formatDateTo = (date: Date): string => {
-    // Add 1 day to the date and subtract 1 millisecond to get the exact end of the selected day
-    const nextDay = new Date(date)
-    nextDay.setDate(nextDay.getDate() + 1)
-    nextDay.setHours(0, 0, 0, 0)
-    nextDay.setMilliseconds(nextDay.getMilliseconds() - 1)
-    
-    return nextDay.toISOString()
+  // Helper to format exact datetime as ISO
+  const formatExact = (date: Date): string => {
+    return date.toISOString()
   }
 
   // Load dashboard data
@@ -172,14 +166,14 @@ export function BookingManagement() {
     setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }))
   }, [debouncedSearch])
 
-  // Update filters when date picker values change
-  // Only apply filter when end date is selected (or both dates are selected)
+  // Update filters when date/time picker values change
+  // Only apply filter when end date is selected (or both are selected)
   useEffect(() => {
     if (endDate) {
       setFilters(prev => ({
         ...prev,
-        dateFrom: startDate ? formatDateFrom(startDate) : undefined,
-        dateTo: formatDateTo(endDate),
+        dateFrom: startDate ? formatExact(startDate) : undefined,
+        dateTo: formatExact(endDate),
         page: 1
       }))
     } else if (!startDate && !endDate) {
@@ -192,6 +186,15 @@ export function BookingManagement() {
       }))
     }
   }, [startDate, endDate])
+
+  // Update filters when seat selection or dates change
+  useEffect(() => {
+    setFilters(prev => ({
+      ...prev,
+      seatNumbers: selectedSeat || undefined,
+      page: 1
+    }))
+  }, [selectedSeat])
 
   useEffect(() => {
     loadBookings()
@@ -444,7 +447,7 @@ export function BookingManagement() {
       {/* Search and Date Filters */}
       <Card>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search Input */}
             <div className="space-y-2">
               <Label htmlFor="search">Search Bookings</Label>
@@ -456,7 +459,7 @@ export function BookingManagement() {
                 )}
                 <Input
                   id="search"
-                  placeholder="Search by reference"
+                  placeholder="Search by booking ref or email"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   className="pl-10"
@@ -464,33 +467,53 @@ export function BookingManagement() {
               </div>
             </div>
 
-            {/* Start Date Filter */}
+            {/* Start Time Filter */}
             <div className="space-y-2">
-              <Label htmlFor="dateFrom">Start Date</Label>
+              <Label htmlFor="dateFrom">Start Time</Label>
               <DatePicker
                 selected={startDate}
                 onChange={(date) => setStartDate(date)}
-                dateFormat="MMM d, yyyy"
-                placeholderText="Select start date"
+                showTimeSelect
+                timeIntervals={15}
+                dateFormat="MMM d, yyyy h:mm aa"
+                placeholderText="Select start time"
                 className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                 wrapperClassName="w-full"
-                minDate={new Date()}
-                maxDate={endDate || undefined}
               />
             </div>
 
-            {/* End Date Filter */}
+            {/* End Time Filter */}
             <div className="space-y-2">
-              <Label htmlFor="dateTo">End Date</Label>
+              <Label htmlFor="dateTo">End Time</Label>
               <DatePicker
                 selected={endDate}
                 onChange={(date) => setEndDate(date)}
-                dateFormat="MMM d, yyyy"
-                placeholderText="Select end date"
+                showTimeSelect
+                timeIntervals={15}
+                dateFormat="MMM d, yyyy h:mm aa"
+                placeholderText="Select end time"
                 className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                 wrapperClassName="w-full"
-                minDate={startDate || new Date()}
               />
+            </div>
+
+            {/* Seat Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="seatFilter">Seat Filter</Label>
+              <Select value={selectedSeat} onValueChange={(val) => setSelectedSeat(val === 'ALL' ? '' : val)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select seat" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Seats</SelectItem>
+                  {Array.from({ length: 15 }, (_, i) => (
+                    <SelectItem key={`S${i + 1}`} value={`S${i + 1}`}>
+                      S{i + 1}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* If needed, admin can also narrow by date using the date filters above */}
             </div>
           </div>
 
@@ -503,6 +526,7 @@ export function BookingManagement() {
                 setDebouncedSearch('')
                 setStartDate(null)
                 setEndDate(null)
+                setSelectedSeat('')
                 setFilters({
                   page: 1,
                   limit: 20,
@@ -540,17 +564,25 @@ export function BookingManagement() {
             </div>
           ) : (
             <>
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Reference</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Location</TableHead>
+                    <TableHead>Pax</TableHead>
+                    <TableHead>Seats</TableHead>
                     <TableHead>Date & Time</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Total Cost</TableHead>
+                    <TableHead>Amount Paid</TableHead>
+                    <TableHead>Package</TableHead>
+                    <TableHead>Refund Status</TableHead>
+                    <TableHead>Reschedule</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -580,31 +612,78 @@ export function BookingManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
+                          <div className="font-medium">{booking.pax || 0}</div>
+                          <div className="text-xs text-gray-500">
+                            S:{booking.students || 0} M:{booking.members || 0} T:{booking.tutors || 0}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div className="font-medium">
+                            {booking.seatNumbers && booking.seatNumbers.length > 0 ? booking.seatNumbers.join(', ') : 'N/A'}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
                           <div className="font-medium">{formatBookingDateRange(booking.startAt, booking.endAt)}</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {calculateDuration(booking.startAt, booking.endAt)} hours
+                          {booking.durationHours ? `${booking.durationHours}h` : `${calculateDuration(booking.startAt, booking.endAt)}h`}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          <div className="font-medium">${booking.totalAmount}</div>
-                          {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
-                            <div className="text-xs text-blue-600">
-                              Total: ${(() => {
-                                const originalCost = booking.totalCost || 0
-                                const extensionTotal = booking.extensionamounts.reduce((sum: number, amount: number) => sum + amount, 0)
-                                return (originalCost + extensionTotal).toFixed(2)
-                              })()}
-                            </div>
-                          )} */}
-                          {/* {booking.discountAmount && booking.discountAmount > 0 && (
+                          <div className="font-medium">${booking.totalCost || 0}</div>
+                          {booking.discountAmount && booking.discountAmount > 0 && (
                             <div className="text-xs text-green-600">
                               -${booking.discountAmount} off
                             </div>
-                          )} */}
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div className="font-medium">${booking.totalAmount || 0}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {booking.packageUsed ? (
+                            <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                              Used
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {booking.refundstatus && booking.refundstatus !== 'NONE' ? (
+                            <Badge 
+                              variant="outline"
+                              className={booking.refundstatus === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
+                            >
+                              {booking.refundstatus}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {(booking.rescheduleCount || 0) > 0 ? (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                              {booking.rescheduleCount}x
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -620,11 +699,35 @@ export function BookingManagement() {
                           {booking.confirmedPayment ? 'Paid' : 'Unpaid'}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            setIsDetailDialogOpen(true)
+                            setDetailLoading(true)
+                            setDetailData(null)
+                            try {
+                              const resp = await getAdminBookingDetails(booking.id || booking.bookingRef)
+                              if (resp && resp.success) {
+                                setDetailData(resp.data)
+                              }
+                            } catch (e) {
+                              // no-op
+                            } finally {
+                              setDetailLoading(false)
+                            }
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                       
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
@@ -815,6 +918,129 @@ export function BookingManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+  {/* Booking Details Dialog */}
+  <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+    <DialogContent className="min-w-3xl max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Booking Details</DialogTitle>
+      </DialogHeader>
+      {detailLoading ? (
+        <div className="py-6 text-center text-gray-500">
+          <Loader2 className="h-5 w-5 inline animate-spin mr-2" /> Loading details...
+        </div>
+      ) : detailData ? (
+        <div className="space-y-6">
+          {/* Header summary */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="font-mono text-lg font-semibold">{detailData.booking.bookingRef}</div>
+            {/* <div className="flex items-center gap-2">
+              <Badge variant="outline" className={detailData.booking.confirmedPayment ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                {detailData.booking.confirmedPayment ? 'Paid' : 'Unpaid'}
+              </Badge>
+              <Badge variant="outline">{detailData.booking.memberType || 'N/A'}</Badge>
+            </div> */}
+          </div>
+
+          {/* Booking + User */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Booking</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-x-2 gap-y-2 text-sm">
+                <div className="text-gray-500">Location</div><div>{detailData.booking.location}</div>
+                <div className="text-gray-500">Dates</div><div>{formatBookingDateRange(detailData.booking.startAt, detailData.booking.endAt)}</div>
+                <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
+                <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
+                <div className="text-gray-500">Amount Paid</div><div>${detailData.booking.totalAmount}</div>
+                {detailData.booking.discountAmount ? (<><div className="text-gray-500">Discount</div><div>${detailData.booking.discountAmount}</div></>) : null}
+                <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
+                {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">User</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div className="text-gray-500">Email</div><div className="break-all">{detailData.user?.email || '-'}</div>
+                <div className="text-gray-500">Name</div><div>{detailData.user?.firstName && detailData.user?.lastName ? `${detailData.user.firstName} ${detailData.user.lastName}` : (detailData.user?.firstName || detailData.user?.lastName || '-')}</div>
+                <div className="text-gray-500">Phone</div><div>{detailData.user?.contactNumber || '-'}</div>
+                <div className="text-gray-500">Role</div><div>{detailData.user?.memberType || '-'}</div>
+                <div className="text-gray-500">Booked For</div><div className="break-all">{detailData.booking.bookedForEmails?.join(', ') || '-'}</div>
+                </CardContent>
+            </Card>
+          </div>
+
+          {/* Payment + Promo/Package */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Promo / Package</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div className="text-gray-500">Promo Code</div><div>{detailData.promoCode?.code || '-'}</div>
+                <div className="text-gray-500">Package Used</div><div>{detailData.booking.packageUsed ? 'Yes' : 'No'}</div>
+                {detailData.package ? (
+                  <>
+                    <div className="text-gray-500">Plan</div><div>{detailData.package.packageId ? 'Count-based Pass' : '-'}</div>
+                    <div className="text-gray-500">Quantity</div><div>{detailData.package.quantity ?? '-'}</div>
+                    <div className="text-gray-500">Active</div><div>{detailData.package.isActive ? 'Yes' : 'No'}</div>
+                    </>
+                ) : (
+                  <>
+                    <div className="text-gray-500">Plan</div><div>-</div>
+                    <div className="text-gray-500">Quantity</div><div>-</div>
+                    <div className="text-gray-500">Active</div><div>-</div>
+                 
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* User Activity + Audit */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">User Activity</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div className="text-gray-500">Total Bookings</div><div>{detailData.userStats?.totalBookings ?? '-'}</div>
+                <div className="text-gray-500">Total Spent</div><div>{detailData.userStats ? `$${detailData.userStats.totalSpent.toFixed(2)}` : '-'}</div>
+                <div className="text-gray-500">Last Booking</div><div>{detailData.userStats?.lastBookingAt ? formatBookingDate(detailData.userStats.lastBookingAt) : '-'}</div>
+                <div className="text-gray-500">Recent Bookings</div>
+                <div className="space-y-1">
+                  {Array.isArray(detailData.recentBookings) && detailData.recentBookings.length > 0 ? (
+                    detailData.recentBookings.map((b: any) => (
+                      <div key={b.id} className="text-xs flex items-center justify-between gap-2">
+                        <span className="font-mono">{b.bookingRef}</span>
+                        </div>
+                    ))
+                  ) : (
+                    <span className="text-gray-400">No recent bookings</span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Audit</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div className="text-gray-500">Booked At</div><div>{formatBookingDate(detailData.booking.bookedAt || detailData.booking.createdAt)}</div>
+                <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : (
+        <div className="py-6 text-center text-gray-500">No details found</div>
+      )}
+    </DialogContent>
+  </Dialog>
     </div>
   )
 }

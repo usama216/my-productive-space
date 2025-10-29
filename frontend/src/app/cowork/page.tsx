@@ -10,12 +10,9 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { usePackages } from '@/hooks/useNewPackages'
 import { NewPackage } from '@/lib/services/packageService'
+import { usePricing } from '@/hooks/usePricing'
 
-const rateHeaders = ['1 hr', '> 1 hr']
-const rateRows = [
-  { label: 'Guest', values: ['6', '6'] },
-  { label: 'Member', values: ['4', '4'] },
-]
+const rateHeaders = ['1 hr']
 
 const promos = [
   {
@@ -49,11 +46,26 @@ const perks = [
 export default function CoworkPage() {
   const router = useRouter()
   const { packages, loading: packagesLoading, error: packagesError } = usePackages('MEMBER')
+  const { memberPricing, loading: pricingLoading } = usePricing('ALL')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const packagesRef = useRef<HTMLDivElement | null>(null)
 
   // Filter cowork packages (member packages)
   const coworkPackages = packages
+
+  // Generate rate rows based on backend pricing
+  const getRateRows = () => {
+    if (!memberPricing) {
+      return [
+        { label: 'Member', values: ['4'] },
+      ]
+    }
+    return [
+      { label: 'Member', values: [memberPricing.oneHourRate.toString()] },
+    ]
+  }
+
+  const rateRows = getRateRows()
 
   const handleBuyNow = (packageData: NewPackage) => {
     router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=cowork&packageId=${packageData.id}`)
@@ -172,7 +184,7 @@ export default function CoworkPage() {
                 </table>
 
                 {/* Scenario Example */}
-                <div className="mt-6 p-4 bg-gray-50 rounded">
+                {/* <div className="mt-6 p-4 bg-gray-50 rounded">
                   <p className="text-sm text-gray-500">
                     *Disclaimer: We go by an hourly fee...Full terms & conditions apply. Maximum xx pax in meeting rooms and 5 pax in collaborative spaces.
                     All xxx activities deemed xxxx.
@@ -181,7 +193,7 @@ export default function CoworkPage() {
                   <p>
                     1 hr @ 6 + 0.5 hr @ (6/2) = <strong>$9</strong>
                   </p>
-                </div>
+                </div> */}
               </div>
             </Tab.Panel>
 

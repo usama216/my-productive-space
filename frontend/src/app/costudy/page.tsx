@@ -13,6 +13,7 @@ import { usePackages } from '@/hooks/useNewPackages'
 import { NewPackage } from '@/lib/services/packageService'
 import { useAuth } from '@/hooks/useAuth'
 import { getEffectiveMemberType } from '@/lib/userProfileService'
+import { usePricing } from '@/hooks/usePricing'
 
 // Define the user type for API response
 interface ApiUser {
@@ -29,10 +30,7 @@ interface ApiUser {
   createdAt: string
   updatedAt: string
 }
-const rateHeaders = ['1 hr', '> 1 hr']
-const rateRows = [
-  { label: 'Student', values: ['3', '3'] },
-]
+const rateHeaders = ['1 hr']
 
 const promos = [
   {
@@ -69,11 +67,26 @@ export default function CoLearningPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { packages, loading: packagesLoading, error: packagesError } = usePackages('STUDENT')
+  const { studentPricing, loading: pricingLoading } = usePricing('ALL')
   const [currentUser, setCurrentUser] = useState<ApiUser | null>(null)
   const [userLoading, setUserLoading] = useState(true)
 
   // Filter student packages
   const studentPackages = packages
+
+  // Generate rate rows based on backend pricing
+  const getRateRows = () => {
+    if (studentPricing) {
+      return [
+        { label: 'Student', values: [studentPricing.oneHourRate.toString()] },
+      ]
+    }
+    return [
+      { label: 'Student', values: ['3'] },
+    ]
+  }
+
+  const rateRows = getRateRows()
 
   // Fetch fresh user data from API
   const fetchCurrentUser = async () => {
@@ -252,7 +265,7 @@ export default function CoLearningPage() {
                                </table>
                
                                {/* Scenario Example */}
-                               <div className="mt-6 p-4 bg-gray-50 rounded">
+                               {/* <div className="mt-6 p-4 bg-gray-50 rounded">
                                 <p className="text-sm text-gray-500">
                                 *Disclaimer: We go by an hourly fee...Full terms & conditions apply. Maximum xx pax in meeting rooms and 5 pax in collaborative spaces.
                                 All xxx activities deemed xxxx.
@@ -261,7 +274,7 @@ export default function CoLearningPage() {
                                  <p>
                                    1 hr @ 6 + 0.5 hr @ (6/2) = <strong>$9</strong>
                                  </p>
-                               </div>
+                               </div> */}
                              </div>
                            </Tab.Panel>
                

@@ -98,8 +98,9 @@ export interface BookingFilters {
   memberType?: string
   paymentStatus?: 'paid' | 'unpaid'
   refundStatus?: 'none' | 'requested' | 'approved' | 'rejected' | 'cancelled'
-  sortBy?: 'startAt' | 'totalAmount' | 'createdAt' | 'bookingRef'
+  sortBy?: 'startAt' | 'endAt' | 'createdAt' | 'totalAmount'
   sortOrder?: 'asc' | 'desc'
+  seatNumbers?: string
 }
 
 export interface BookingResponse {
@@ -365,6 +366,29 @@ export const getDashboardSummary = async (): Promise<BookingResponse> => {
       error: 'Failed to fetch dashboard',
       message: 'Failed to fetch dashboard'
     }
+  }
+}
+
+export interface BookingDetailResponse {
+  success: boolean
+  data?: {
+    booking: Booking
+    user: any
+    payment: any
+    promoCode: any
+    package: any
+  }
+  error?: string
+}
+
+export const getAdminBookingDetails = async (idOrRef: string): Promise<BookingDetailResponse> => {
+  try {
+    const response = await fetch(`${API_BASE}/booking/admin/details/${idOrRef}`)
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Get Booking Details Error:', error)
+    return { success: false, error: 'Failed to fetch booking details' }
   }
 }
 

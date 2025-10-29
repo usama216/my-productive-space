@@ -439,8 +439,8 @@ export function RefundManagement() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">User ID:</span>
-                          <span className="font-mono text-xs">{credit.userid}</span>
+                          <span className="font-medium">User Email:</span>
+                          <span>{credit.User?.email || 'N/A'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-gray-500" />

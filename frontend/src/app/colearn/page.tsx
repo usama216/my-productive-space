@@ -8,11 +8,9 @@ import { Carousel } from '@/components/Carousel'
 import { useRouter } from 'next/navigation'
 import { usePackages } from '@/hooks/useNewPackages'
 import { NewPackage } from '@/lib/services/packageService'
-const rateHeaders = ['1 hr', '> 1 hr']
-const rateRows = [
-  { label: 'Student', values: ['3', '3'] },
-  { label: 'Tutor', values: ['5', '5'] },
-]
+import { usePricing } from '@/hooks/usePricing'
+
+const rateHeaders = ['1 hr']
 
 const promos = [
   {
@@ -63,9 +61,31 @@ const perks = [
 export default function CoTutorPage() {
   const router = useRouter()
   const { packages, loading: packagesLoading, error: packagesError } = usePackages('TUTOR')
+  const { tutorPricing, studentPricing, loading: pricingLoading } = usePricing('ALL')
 
   // Filter tutor packages
   const tutorPackages = packages
+
+  // Generate rate rows based on backend pricing
+  const getRateRows = () => {
+    const rows = []
+    
+    if (studentPricing) {
+      rows.push({ label: 'Student', values: [studentPricing.oneHourRate.toString()] })
+    } else {
+      rows.push({ label: 'Student', values: ['3'] })
+    }
+    
+    if (tutorPricing) {
+      rows.push({ label: 'Tutor', values: [tutorPricing.oneHourRate.toString()] })
+    } else {
+      rows.push({ label: 'Tutor', values: ['5'] })
+    }
+    
+    return rows
+  }
+
+  const rateRows = getRateRows()
 
   const handleBuyNow = (packageData: NewPackage) => {
     router.push(`/buy-pass?package=${encodeURIComponent(packageData.name)}&type=tutor&packageId=${packageData.id}`)
@@ -162,7 +182,7 @@ export default function CoTutorPage() {
                
                                {/* Scenario Example */}
                               
-                               <div className="mt-6 p-4 bg-gray-50 rounded">
+                               {/* <div className="mt-6 p-4 bg-gray-50 rounded">
                                  <p className="text-sm text-gray-500">
                                 *Disclaimer: We go by an hourly fee...Full terms & conditions apply. Maximum xx pax in meeting rooms and 5 pax in collaborative spaces.
                                 All xxx activities deemed xxxx.
@@ -171,7 +191,7 @@ export default function CoTutorPage() {
                                  <p>
                                    1 hr @ 6 + 0.5 hr @ (6/2) = <strong>$9</strong>
                                  </p>
-                               </div>
+                               </div> */}
                              </div>
                            </Tab.Panel>
                
