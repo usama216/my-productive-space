@@ -1051,10 +1051,10 @@ export function UserBookings() {
                   <div><strong>Time:</strong> {formatSingaporeTimeOnly(selectedBooking.startAt)} - {formatSingaporeTimeOnly(selectedBooking.endAt)}</div>
                   
                   <div className="border-t pt-2 mt-2 space-y-1">
-                    <div className="flex justify-between items-center">
+                    {/* <div className="flex justify-between items-center">
                       <span>Booking Cost:</span>
                       <span>${totalCost.toFixed(2)}</span>
-                    </div>
+                    </div> */}
                     {/* {promoDiscountAmount > 0 && (
                       <div className="flex justify-between items-center text-green-600">
                         <span>Promo Code Discount:</span>
@@ -1109,7 +1109,7 @@ export function UserBookings() {
                       )}
                       {totalDiscountAmount > 0 && (
                         <div className="text-xs text-gray-600 mt-1">
-                          * All discounts,store credits applied (${totalDiscountAmount.toFixed(2)}) are non-refundable
+                          * Discount, promo code if any, will not be refundable.
                         </div>
                       )}
                     </div>
