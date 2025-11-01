@@ -57,17 +57,35 @@ export const PackageUsageTracking: React.FC = () => {
   const [packageStats, setPackageStats] = useState<PackageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedUser, setSelectedUser] = useState<PackageUsageData | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Fetch package usage data
   const fetchPackageUsage = async () => {
     try {
       setLoading(true);
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
-      const response = await fetch(`${API_BASE_URL}/packages/admin/usage`);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+      
+      const queryString = params.toString();
+      const url = `${API_BASE_URL}/packages/admin/usage${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error('Failed to fetch package usage data');
@@ -90,22 +108,17 @@ export const PackageUsageTracking: React.FC = () => {
 
   useEffect(() => {
     fetchPackageUsage();
-  }, []);
+  }, [debouncedSearchTerm]);
 
-  // Filter data based on search and filters
+  // Filter data based on type and status (search is handled by backend)
   const filteredData = packageUsage.filter(item => {
-    const matchesSearch = 
-      item.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.packageName.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesType = filterType === 'all' || item.packageType === filterType;
     const matchesStatus = filterStatus === 'all' || 
       (filterStatus === 'active' && !item.isExpired && item.activePasses > 0) ||
       (filterStatus === 'expired' && item.isExpired) ||
       (filterStatus === 'fully_used' && item.usedPasses === item.totalPasses);
     
-    return matchesSearch && matchesType && matchesStatus;
+    return matchesType && matchesStatus;
   });
 
   const getUsageColor = (percentage: number) => {
@@ -120,17 +133,6 @@ export const PackageUsageTracking: React.FC = () => {
     if (item.activePasses > 0) return <Badge className="bg-green-100 text-green-800">Active</Badge>;
     return <Badge variant="secondary">Inactive</Badge>;
   };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-          <span className="ml-2">Loading package usage data...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -199,7 +201,14 @@ export const PackageUsageTracking: React.FC = () => {
           <CardTitle>Package Usage Details</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredData.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <Package className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
+                <p className="text-gray-600">Loading package usage data...</p>
+              </div>
+            </div>
+          ) : filteredData.length === 0 ? (
             <div className="text-center py-8">
               <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">No package usage data found</p>

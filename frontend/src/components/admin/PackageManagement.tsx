@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Eye, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Package, FilterX } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 
@@ -63,12 +63,39 @@ const PackageManagement: React.FC = () => {
     hoursAllowed: '4'
   });
 
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Fetch packages
   const fetchPackages = async () => {
     try {
       setLoading(true);
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api';
-      const response = await fetch(`${API_BASE_URL}/admin/packages`);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+      if (filterType !== 'all') params.append('packageType', filterType);
+      if (filterRole !== 'all') params.append('targetRole', filterRole);
+      if (filterStatus !== 'all') params.append('status', filterStatus);
+
+      const queryString = params.toString();
+      const url = `${API_BASE_URL}/admin/packages${queryString ? `?${queryString}` : ''}`;
+
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setPackages(data.packages || []);
@@ -93,7 +120,16 @@ const PackageManagement: React.FC = () => {
 
   useEffect(() => {
     fetchPackages();
-  }, []);
+  }, [debouncedSearchTerm, filterType, filterRole, filterStatus]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setFilterType('all');
+    setFilterRole('all');
+    setFilterStatus('all');
+  };
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -276,17 +312,6 @@ const PackageManagement: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Package className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading packages...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -294,22 +319,116 @@ const PackageManagement: React.FC = () => {
           <h2 className="text-2xl font-bold">Package Management</h2>
           <p className="text-gray-600">Manage count-based packages for your space</p>
         </div>
-        <Button onClick={openCreateDialog} className="flex items-center gap-2">
+        <Button onClick={openCreateDialog} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600">
           <Plus className="h-4 w-4" />
           Create Package
         </Button>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg">Filters</CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearFilters}
+              className="flex items-center gap-2"
+            >
+              <FilterX className="h-4 w-4" />
+              Clear Filters
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="space-y-2">
+              <Label htmlFor="search">Search Package Name</Label>
+              <Input
+                id="search"
+                type="text"
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Type Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="type">Package Type</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger id="type" className="w-full">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="HALF_DAY">Half Day</SelectItem>
+                  <SelectItem value="FULL_DAY">Full Day</SelectItem>
+                  <SelectItem value="SEMESTER_BUNDLE">Semester Bundle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Target Role Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="role">Target Role</Label>
+              <Select value={filterRole} onValueChange={setFilterRole}>
+                <SelectTrigger id="role" className="w-full">
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="MEMBER">Member</SelectItem>
+                  <SelectItem value="TUTOR">Tutor</SelectItem>
+                  <SelectItem value="STUDENT">Student</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger id="status" className="w-full">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Packages Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Package List</CardTitle>
-          <CardDescription>
-            Manage your packages and their configurations
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Package List</CardTitle>
+              <CardDescription>
+                Manage your packages and their configurations
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-sm">
+              {packages.length} {packages.length === 1 ? 'Package' : 'Packages'}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent>
-          {packages.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <Package className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
+                <p className="text-gray-600">Loading packages...</p>
+              </div>
+            </div>
+          ) : packages.length === 0 ? (
             <div className="text-center py-8">
               <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No packages found</h3>
@@ -364,14 +483,12 @@ const PackageManagement: React.FC = () => {
                               ${pkg.originalPrice}
                             </div>
                           )}
-                          <div className="text-xs text-gray-500">
-                            +${pkg.outletFee} fee
-                          </div>
+                         
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{pkg.passCount}</div>
-                        <div className="text-xs text-gray-500">packages</div>
+                     
                       </TableCell>
                       <TableCell>
                         <div className="text-sm font-medium">
@@ -382,7 +499,7 @@ const PackageManagement: React.FC = () => {
                         <div className="text-sm">{pkg.validityDays} days</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={pkg.isActive ? "default" : "secondary"}>
+                        <Badge className={pkg.isActive ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-gray-100 text-gray-800 hover:bg-gray-100"}>
                           {pkg.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
@@ -584,7 +701,7 @@ const PackageManagement: React.FC = () => {
               <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create Package</Button>
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600">Create Package</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -743,7 +860,7 @@ const PackageManagement: React.FC = () => {
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Update Package</Button>
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600">Update Package</Button>
             </DialogFooter>
           </form>
         </DialogContent>

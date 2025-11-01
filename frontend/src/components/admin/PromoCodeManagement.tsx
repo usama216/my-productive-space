@@ -31,6 +31,7 @@ export function PromoCodeManagement() {
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterType, setFilterType] = useState<string>('all')
   const [filterGroup, setFilterGroup] = useState<string>('all')
@@ -72,20 +73,44 @@ export function PromoCodeManagement() {
     priority: 1
   })
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   useEffect(() => {
     fetchPromoCodes()
-  }, [currentPage, searchTerm, filterStatus, filterType, filterGroup])
+  }, [currentPage, debouncedSearchTerm, filterStatus, filterType, filterGroup])
 
   const fetchPromoCodes = async () => {
     try {
       setLoading(true)
+      
+      // Handle combined GROUP_ filters
+      let promoTypeParam = undefined
+      let targetGroupParam = undefined
+      
+      if (filterType !== 'all') {
+        if (filterType.startsWith('GROUP_')) {
+          // Extract group type from GROUP_MEMBER, GROUP_STUDENT, etc.
+          promoTypeParam = 'GROUP_SPECIFIC'
+          targetGroupParam = filterType.replace('GROUP_', '')
+        } else {
+          promoTypeParam = filterType
+        }
+      }
+      
       const response = await getAllPromoCodes({
         page: currentPage,
         limit: 20,
-        search: searchTerm || undefined,
+        search: debouncedSearchTerm || undefined,
         status: filterStatus !== 'all' ? filterStatus : undefined,
-        promoType: filterType !== 'all' ? filterType : undefined,
-        targetGroup: filterGroup !== 'all' ? filterGroup : undefined
+        promoType: promoTypeParam,
+        targetGroup: targetGroupParam
       })
       
       setPromoCodes(response.promoCodes)
@@ -350,6 +375,7 @@ export function PromoCodeManagement() {
 
   const clearFilters = () => {
     setSearchTerm('')
+    setDebouncedSearchTerm('')
     setFilterStatus('all')
     setFilterType('all')
     setFilterGroup('all')
@@ -689,6 +715,66 @@ export function PromoCodeManagement() {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg">Filters</CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearFilters}
+              className="flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              Clear Filters
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Search */}
+            <div className="space-y-2">
+              <Label htmlFor="search">Search Promo Code</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  id="search"
+                  type="text"
+                  placeholder="Search by code or name"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Type Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="type">Promo Type</Label>
+              <Select value={filterType} onValueChange={(value) => {
+                setFilterType(value)
+                // Reset group filter when type changes
+                if (!value.startsWith('GROUP_')) {
+                  setFilterGroup('all')
+                }
+              }}>
+                <SelectTrigger id="type" className="w-full">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="GENERAL">General</SelectItem>
+                  <SelectItem value="WELCOME">Welcome</SelectItem>
+                  <SelectItem value="GROUP_MEMBER">Group: Member</SelectItem>
+                  <SelectItem value="GROUP_STUDENT">Group: Student</SelectItem>
+                  <SelectItem value="GROUP_TUTOR">Group: Tutor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
      
       <Card>
         <CardHeader>
@@ -696,9 +782,11 @@ export function PromoCodeManagement() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading promo codes...</p>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <Gift className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
+                <p className="text-gray-600">Loading promo codes...</p>
+              </div>
             </div>
           ) : promoCodes.length === 0 ? (
             <div className="text-center py-8">
