@@ -272,8 +272,8 @@ export default function BookingClient() {
   
   const needsStudentVerification = studentsNeedingVerification > 0
   
-  // Check if tutor has more than 5 students (not allowed)
-  const hasTutorWithTooManyStudents = peopleBreakdown.coTutors === 1 && peopleBreakdown.coStudents > 5
+  // Check if tutor has more than 4 students or more than 4 workers (not allowed)
+  const hasTutorWithTooManyPeople = peopleBreakdown.coTutors === 1 && (peopleBreakdown.coStudents > 4 || peopleBreakdown.coWorkers > 4)
 
   // Debug console logs
 
@@ -1491,13 +1491,13 @@ export default function BookingClient() {
                           </p>
                         </div>
                       )}
-                      {hasTutorWithTooManyStudents && (
+                      {hasTutorWithTooManyPeople && (
                         <Alert variant="destructive" className="mb-4">
                           <AlertTriangle className="h-4 w-4" />
                           <AlertTitle>Booking Not Allowed</AlertTitle>
                           <AlertDescription>
-                            Tutors with more than 5 students will need to book the entire space. 
-                            Please WhatsApp admin for more questions.
+                           
+                            A maximum of 4 students or 4 co-workers in a booking is allowed. Anything more than this, please contact us via whatsapp to make special arrangements
                           </AlertDescription>
                         </Alert>
                       )}
@@ -1774,13 +1774,13 @@ export default function BookingClient() {
                           (needsStudentVerification && !studentsValidated) ||
                           isLoading ||
                           isOver24Hours ||
-                          hasTutorWithTooManyStudents
+                          hasTutorWithTooManyPeople
                         }
                       >
                         {!user
                           ? 'Sign In Required'
-                          : hasTutorWithTooManyStudents
-                            ? 'Tutors with >5 Students Not Allowed - Contact Admin'
+                          : hasTutorWithTooManyPeople
+                            ? 'Tutors with >4 Students/Workers Not Allowed - Contact Admin'
                           : isOver24Hours
                             ? 'Booking Over 24 Hours Not Allowed'
                           : selectedSeats.length !== people
