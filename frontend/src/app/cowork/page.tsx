@@ -122,7 +122,7 @@ export default function CoworkPage() {
       <main className="max-w-7xl mx-auto py-20 px-4 space-y-12">
 
         <section className="space-y-6">
-          <h2 className="text-3xl font-bold text-center">Reasons to Co-Work at My Prodcutive Space</h2>
+          <h2 className="text-3xl font-bold text-center">Reasons to Co-Work at My Productive Space</h2>
           <div className="mt-4">
             <Carousel>
               {perks.map((item, i) => (
