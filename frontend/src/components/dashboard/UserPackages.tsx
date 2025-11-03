@@ -238,6 +238,47 @@ export function UserPackages({ userId }: UserPackagesProps) {
     )
   }
 
+  // Sort packages: Active packages first, then expiring soon, then pending, then expired
+  const sortedPackages = [...packages].sort((a, b) => {
+    const getRemainingDaysForPkg = (expiresAt: string | null) => {
+      if (!expiresAt) return 0
+      const now = new Date()
+      const expiry = new Date(expiresAt)
+      const diffTime = expiry.getTime() - now.getTime()
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    }
+
+    const getPackagePriority = (pkg: UserPackage) => {
+      const remainingDays = getRemainingDaysForPkg(pkg.expiresAt)
+      const isExpired = remainingDays <= 0 || pkg.isExpired
+      const allPassesUsed = (pkg.remainingPasses || 0) === 0 && (pkg.totalPasses || 0) > 0
+      const isPackageExpired = isExpired || allPassesUsed
+      const isPending = pkg.paymentStatus === 'PENDING'
+      const isCompleted = pkg.paymentStatus === 'COMPLETED'
+      const isExpiringSoon = remainingDays <= 7 && remainingDays > 0
+
+      // Priority: Lower number = higher priority (shown first)
+      if (isCompleted && !isPackageExpired && !isExpiringSoon) return 1 // Active packages
+      if (isExpiringSoon && !isPackageExpired && isCompleted) return 2 // Expiring soon
+      if (isPending) return 3 // Pending payment
+      if (isPackageExpired && isCompleted) return 4 // Expired/Completed
+      return 5 // Any other status
+    }
+
+    const priorityA = getPackagePriority(a)
+    const priorityB = getPackagePriority(b)
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB
+    }
+
+    // If same priority, sort by expiration date (soonest first) or creation date
+    if (a.expiresAt && b.expiresAt) {
+      return new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime()
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+
   return (
     <div className="space-y-6">
       <Card>
@@ -256,7 +297,7 @@ export function UserPackages({ userId }: UserPackagesProps) {
         <CardContent>
           <div className="space-y-4">
             <h3 className="text-lg font-semibold mb-4">Your Packages</h3>
-            {packages.map((pkg) => {
+            {sortedPackages.map((pkg) => {
               const remainingDays = getRemainingDays(pkg.expiresAt)
               const isExpiringSoon = remainingDays <= 7 && remainingDays > 0
               const isExpired = remainingDays <= 0 || pkg.isExpired
