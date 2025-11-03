@@ -14,6 +14,7 @@ export interface UserProfile {
   updatedAt: string;
   studentVerificationImageUrl?: string;
   studentVerificationDate?: string;
+  studentVerifiedAt?: string;  // When student was verified (for 6-month expiry)
   studentRejectionReason?: string | null;
   studentVerificationStatus: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 }
@@ -247,5 +248,75 @@ export async function getCurrentAuthUser() {
   } catch (error) {
     console.error('Error getting current auth user:', error)
     return null
+  }
+}
+
+// Calculate days until verification expires (6 months from verification date)
+export function getDaysUntilVerificationExpiry(studentVerifiedAt?: string): number {
+  if (!studentVerifiedAt) return 0;
+  
+  const verifiedDate = new Date(studentVerifiedAt);
+  const expiryTime = new Date(verifiedDate);
+  // CURRENT: 1 day expiry (24 hours)
+  expiryTime.setDate(expiryTime.getDate() + 1);
+  // PRODUCTION: Uncomment below and comment above for 6 months
+  // expiryTime.setMonth(expiryTime.getMonth() + 6);
+  
+  const now = new Date();
+  const diffTime = expiryTime.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays;
+}
+
+// Check if verification has expired
+export function isVerificationExpired(studentVerifiedAt?: string): boolean {
+  return getDaysUntilVerificationExpiry(studentVerifiedAt) <= 0;
+}
+
+// Check if verification is expiring soon (within 6 hours for 1-day expiry)
+export function isVerificationExpiringSoon(studentVerifiedAt?: string): boolean {
+  if (!studentVerifiedAt) return false;
+  
+  const verifiedDate = new Date(studentVerifiedAt);
+  const expiryTime = new Date(verifiedDate);
+  expiryTime.setDate(expiryTime.getDate() + 1); // 1 day expiry
+  
+  const now = new Date();
+  const hoursRemaining = (expiryTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+  
+  // Show "expiring soon" if less than 6 hours remaining
+  return hoursRemaining > 0 && hoursRemaining <= 6;
+}
+
+// Get verification expiry date
+export function getVerificationExpiryDate(studentVerifiedAt?: string): Date | null {
+  if (!studentVerifiedAt) return null;
+  
+  const verifiedDate = new Date(studentVerifiedAt);
+  const expiryTime = new Date(verifiedDate);
+  // CURRENT: 1 day expiry (24 hours)
+  expiryTime.setDate(expiryTime.getDate() + 1);
+  // PRODUCTION: Uncomment below and comment above for 6 months
+  // expiryTime.setMonth(expiryTime.getMonth() + 6);
+  
+  return expiryTime;
+}
+
+// Format expiry message for user display
+export function getVerificationExpiryMessage(studentVerifiedAt?: string): string {
+  if (!studentVerifiedAt) {
+    return 'Verification date not available';
+  }
+  
+  const daysRemaining = getDaysUntilVerificationExpiry(studentVerifiedAt);
+  
+  if (daysRemaining <= 0) {
+    return 'Your student verification has expired. Please verify again to maintain student status.';
+  } else if (daysRemaining <= 30) {
+    return `Your student verification will expire in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Please renew soon to maintain student benefits.`;
+  } else {
+    const expiryDate = getVerificationExpiryDate(studentVerifiedAt);
+    return `Your student verification is valid until ${expiryDate?.toLocaleDateString()}`;
   }
 }

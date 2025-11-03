@@ -48,6 +48,7 @@ import {
   getVerificationStatusText
 } from '@/lib/userService'
 import { getEffectiveMemberType, getMemberTypeDisplayName } from '@/lib/userProfileService'
+import UserVerificationModal from './UserVerificationModal'
 
 export function UserManagement() {
   const { toast } = useToast()
@@ -73,7 +74,9 @@ export function UserManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedUserForReview, setSelectedUserForReview] = useState<User | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
   const [editFormData, setEditFormData] = useState({
     firstName: '',
@@ -329,7 +332,7 @@ export function UserManagement() {
       setIsSubmitting(true)
       
       // Call your API with rejection reason if provided
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/booking/admin/users/${userId}/verify`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/admin/users/${userId}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -363,6 +366,13 @@ export function UserManagement() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Handle user verification from modal (for Review button)
+  const handleUserVerification = async (user: User, action: 'verify' | 'reject', rejectionReason?: string) => {
+    const status = action === 'verify' ? 'VERIFIED' : 'REJECTED'
+    await handleVerifyStudent(user.id, status, rejectionReason)
+    setSelectedUserForReview(null)
   }
 
   const handleDelete = async () => {
@@ -678,28 +688,21 @@ export function UserManagement() {
                                                  <div className="flex items-center gap-2">
                          
                            
-                           {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && user.studentVerificationImageUrl && (
-                             <>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => handleVerifyStudent(user.id, 'VERIFIED')}
-                                 disabled={isSubmitting}
-                                 className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                               >
-                                 Approve
-                               </Button>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => handleRejectClick(user)}
-                                 disabled={isSubmitting}
-                                 className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                               >
-                                 Reject
-                               </Button>
-                             </>
-                           )}
+                          {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && user.studentVerificationImageUrl && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedUserForReview(user)}
+                                disabled={isSubmitting}
+                                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Review
+                              </Button>
+                            
+                            </>
+                          )}
                            
                            <Button
                              variant="outline"
@@ -981,6 +984,15 @@ export function UserManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* User Verification Review Modal */}
+      <UserVerificationModal
+        selectedUser={selectedUserForReview}
+        setSelectedUser={setSelectedUserForReview}
+        handleUserVerification={handleUserVerification}
+        isLoading={isSubmitting}
+        onRefresh={loadUsers}
+      />
     </div>
   )
 }

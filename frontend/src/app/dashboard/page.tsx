@@ -53,7 +53,7 @@ import { RefundSystemTest } from '@/components/RefundSystemTest'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { getUserProfile, updateUserProfile, UserProfile, formatUserName, getMemberTypeDisplayName, getVerificationStatusDisplayName, getVerificationStatusColor, getEffectiveMemberType } from '@/lib/userProfileService'
+import { getUserProfile, updateUserProfile, UserProfile, formatUserName, getMemberTypeDisplayName, getVerificationStatusDisplayName, getVerificationStatusColor, getEffectiveMemberType, getDaysUntilVerificationExpiry, isVerificationExpired, isVerificationExpiringSoon, getVerificationExpiryMessage } from '@/lib/userProfileService'
 import { StudentDocumentUpload } from '@/components/StudentDocumentUpload'
 import { StudentDocumentData } from '@/lib/studentDocumentService'
 import { getUserBookings, Booking as ApiBooking, formatBookingDate, getBookingStatus, getStatusColor, calculateDuration } from '@/lib/bookingService'
@@ -98,10 +98,10 @@ export default function Dashboard() {
     firstName: '',
     lastName: '',
     contactNumber: '',
-    memberType: 'MEMBER' as 'STUDENT' | 'MEMBER' | 'TUTOR'
+    memberType: 'MEMBER' as 'STUDENT' | 'MEMBER' | 'TUTOR' | 'ADMIN'
   })
   const [studentDocument, setStudentDocument] = useState<StudentDocumentData | null>(null)
-  const [originalMemberType, setOriginalMemberType] = useState<'STUDENT' | 'MEMBER' | 'TUTOR'>('MEMBER')
+  const [originalMemberType, setOriginalMemberType] = useState<'STUDENT' | 'MEMBER' | 'TUTOR' | 'ADMIN'>('MEMBER')
   const [upcomingBookings, setUpcomingBookings] = useState<ApiBooking[]>([])
   const [isLoadingBookings, setIsLoadingBookings] = useState(false)
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
@@ -261,7 +261,7 @@ export default function Dashboard() {
   }
 
   // Handle member type change
-  const handleMemberTypeChange = (newMemberType: 'STUDENT' | 'MEMBER' | 'TUTOR') => {
+  const handleMemberTypeChange = (newMemberType: 'STUDENT' | 'MEMBER' | 'TUTOR' | 'ADMIN') => {
     setEditFormData(prev => ({ ...prev, memberType: newMemberType }))
 
     // If changing from student to another type, clear the document
@@ -603,10 +603,17 @@ export default function Dashboard() {
                           }
                         };
                         
-                        // Show notification if there are any status changes in history
-                        const hasStatusChanges = verificationHistory.some(h => h.newStatus === 'REJECTED' || h.newStatus === 'VERIFIED');
+                        // Check for verification expiry
+                        const verifiedAt = userProfile?.studentVerifiedAt || userProfile?.studentVerificationDate
+                        const daysRemaining = getDaysUntilVerificationExpiry(verifiedAt)
+                        const expired = isVerificationExpired(verifiedAt)
+                        const expiringSoon = isVerificationExpiringSoon(verifiedAt)
                         
-                        if (!hasStatusChanges) return null;
+                        // Show notification if there are any status changes in history OR verification is expiring/expired
+                        const hasStatusChanges = verificationHistory.some(h => h.newStatus === 'REJECTED' || h.newStatus === 'VERIFIED');
+                        const hasExpiryWarning = expired || expiringSoon;
+                        
+                        if (!hasStatusChanges && !hasExpiryWarning) return null;
                         
                         return (
                           <Popover onOpenChange={(open) => {
@@ -619,7 +626,7 @@ export default function Dashboard() {
                             <PopoverTrigger asChild>
                               <Button variant="outline" size="sm" className="relative">
                                 <Bell className="h-4 w-4" />
-                                {hasUnreadNotifications && (
+                                {(hasUnreadNotifications || hasExpiryWarning) && (
                                   <span className="absolute -top-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></span>
                                 )}
                               </Button>
@@ -628,10 +635,33 @@ export default function Dashboard() {
                               <div className="space-y-3">
                                 <div className="flex items-center space-x-2">
                                   <Bell className="h-4 w-4 text-orange-600" />
-                                  <h4 className="font-semibold text-orange-600">Verification History</h4>
+                                  <h4 className="font-semibold text-orange-600">Notifications</h4>
                                 </div>
                                 
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
+                                  {/* Verification Expiry Warning */}
+                                  {hasExpiryWarning && (
+                                    <div className={`${expired ? 'border-l-2 border-red-500 bg-red-50' : 'border-l-2 border-orange-500 bg-orange-50'} pl-3 py-2 rounded`}>
+                                      <div className="flex items-center space-x-2">
+                                        {expired ? (
+                                          <AlertCircle className="h-4 w-4 text-red-600" />
+                                        ) : (
+                                          <Clock className="h-4 w-4 text-orange-600" />
+                                        )}
+                                        <span className={`text-sm font-medium ${expired ? 'text-red-800' : 'text-orange-800'}`}>
+                                          {expired ? 'Student Verification Expired' : 'Verification Expiring Soon'}
+                                        </span>
+                                      </div>
+                                      <div className={`text-xs ${expired ? 'text-red-600' : 'text-orange-600'} mt-1`}>
+                                        {expired 
+                                          ? 'Your student verification has expired. Please verify again to maintain student status.'
+                                          : `Your verification will expire in ${daysRemaining} days. Please renew soon.`
+                                        }
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Verification History */}
                                   {verificationHistory.map((history, index) => (
                                     <div key={history.id} className="border-l-2 border-gray-200 pl-3 py-2">
                                       <div className="flex items-center space-x-2">
@@ -918,50 +948,53 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* View Student Document - Only show for students with uploaded documents */}
+                    {/* Student Verification Expiry Warning - Show for verified students */}
                     {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' &&
-                      (userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl) && (
+                      (userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus) === 'VERIFIED' && (
                         <div className="pt-6 border-t">
                           <div className="space-y-4">
                             <div>
-                              <h4 className="text-lg font-semibold text-gray-900 mb-2">Student Verification Document</h4>
-                              <p className="text-sm text-gray-600 mb-4">
-                                Your uploaded student verification document.
-                              </p>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">Student Verification Status</h4>
                             </div>
 
                             {(() => {
-                              const verificationStatus = userProfile?.studentVerificationStatus || databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus
-                              const isVerified = verificationStatus === 'VERIFIED'
+                              const verifiedAt = userProfile?.studentVerifiedAt || userProfile?.studentVerificationDate
+                              const daysRemaining = getDaysUntilVerificationExpiry(verifiedAt)
+                              const expired = isVerificationExpired(verifiedAt)
+                              const expiringSoon = isVerificationExpiringSoon(verifiedAt)
+                              const expiryMessage = getVerificationExpiryMessage(verifiedAt)
+                              
+                              // Determine colors based on status
+                              const bgColor = expired ? 'bg-red-100' : expiringSoon ? 'bg-orange-100' : 'bg-green-100'
+                              const textColor = expired ? 'text-red-800' : expiringSoon ? 'text-orange-800' : 'text-green-800'
+                              const borderColor = expired ? 'border-red-200' : expiringSoon ? 'border-orange-200' : 'border-green-200'
+                              const iconBg = expired ? 'bg-red-100' : expiringSoon ? 'bg-orange-100' : 'bg-green-100'
+                              const iconColor = expired ? 'text-red-600' : expiringSoon ? 'text-orange-600' : 'text-green-600'
                               
                               return (
-                                <div className={`${isVerified ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-100 text-orange-800 border-orange-200'} border rounded-lg p-4`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-10 h-10 ${isVerified ? 'bg-green-100' : 'bg-orange-100'} rounded-lg flex items-center justify-center`}>
-                                        <FileText className={`w-5 h-5 ${isVerified ? 'text-green-600' : 'text-orange-600'}`} />
-                                      </div>
-                                      <div>
-                                        <p className={`font-medium ${isVerified ? 'text-green-800' : 'text-orange-800'}`}>Student Verification Document</p>
-                                        <p className={`text-sm ${isVerified ? 'text-green-600' : 'text-orange-600'}`}>
-                                          Status: {userProfile ? getVerificationStatusDisplayName(userProfile.studentVerificationStatus) :
-                                            (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'VERIFIED' ? 'Verified Student' :
-                                              (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'PENDING' ? 'Verification Pending' :
-                                                (databaseUser?.studentVerificationStatus as string || sampleUserData.studentVerificationStatus) === 'REJECTED' ? 'Verification Rejected' :
-                                                  'Not Verified'}
-                                        </p>
-                                      </div>
+                                <div className={`${bgColor} ${textColor} ${borderColor} border rounded-lg p-4`}>
+                                  <div className="flex items-start gap-3">
+                                    <div className={`w-10 h-10 ${iconBg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                                      {expired ? (
+                                        <AlertCircle className={`w-5 h-5 ${iconColor}`} />
+                                      ) : expiringSoon ? (
+                                        <Clock className={`w-5 h-5 ${iconColor}`} />
+                                      ) : (
+                                        <CheckCircle className={`w-5 h-5 ${iconColor}`} />
+                                      )}
                                     </div>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => window.open(userProfile?.studentVerificationImageUrl || databaseUser?.studentVerificationImageUrl, '_blank')}
-                                        className={`bg-white ${isVerified ? 'hover:bg-green-50 border-green-300 text-green-700 hover:text-green-800' : 'hover:bg-orange-50 border-orange-300 text-orange-700 hover:text-orange-800'}`}
-                                      >
-                                        <Eye className="w-4 h-4 mr-2" />
-                                        View Document
-                                      </Button>
+                                    <div className="flex-1">
+                                      <p className={`font-medium ${textColor} mb-2`}>
+                                        {expired ? 'Verification Expired' : expiringSoon ? 'Verification Expiring Soon' : 'Verification Active'}
+                                      </p>
+                                      <p className={`text-sm ${expired ? 'text-red-600' : expiringSoon ? 'text-orange-600' : 'text-green-600'}`}>
+                                        {expiryMessage}
+                                      </p>
+                                      {(expired || expiringSoon) && (
+                                        <p className="text-sm mt-2 font-medium">
+                                          Please upload a new verification document to maintain your student status.
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
