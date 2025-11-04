@@ -2,6 +2,37 @@
 import { toast } from '@/hooks/use-toast'
 
 // Types
+export interface BookingDiscountHistory {
+  id: string
+  bookingId: string
+  userId?: string
+  discountType: 'CREDIT' | 'PASS' | 'PROMO_CODE'
+  actionType: 'ORIGINAL_BOOKING' | 'RESCHEDULE' | 'EXTENSION' | 'MODIFICATION'
+  promoCodeId?: string
+  userPassId?: string
+  creditId?: string
+  discountAmount: number
+  description?: string
+  appliedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BookingDiscountSummary {
+  totalDiscount: number
+  byType: {
+    CREDIT: number
+    PASS: number
+    PROMO_CODE: number
+  }
+  byAction: {
+    ORIGINAL_BOOKING: number
+    RESCHEDULE: number
+    EXTENSION: number
+    MODIFICATION: number
+  }
+}
+
 export interface Booking {
   id: string
   bookingRef: string
@@ -53,6 +84,8 @@ export interface Booking {
     code: string
     discountAmount: number
   }
+  discountHistory?: BookingDiscountHistory[]
+  discountSummary?: BookingDiscountSummary
 }
 
 export interface CreateBookingPayload {

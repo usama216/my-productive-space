@@ -731,6 +731,41 @@ export function UserBookings() {
                     <TableCell>
                       <div className="text-sm">
                         {(() => {
+                          // Check if discountHistory exists and has items
+                          if (booking.discountHistory && booking.discountHistory.length > 0) {
+                            // Get unique discount types from history
+                            const discountTypes = new Set(
+                              booking.discountHistory.map((d: any) => d.discountType)
+                            );
+                            
+                            // Convert to readable names
+                            const typeNames: string[] = [];
+                            if (discountTypes.has('CREDIT')) typeNames.push('Credit');
+                            if (discountTypes.has('PASS')) typeNames.push('Package Applied');
+                            if (discountTypes.has('PROMO_CODE')) typeNames.push('Promo Code');
+                            
+                            if (typeNames.length > 0) {
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {typeNames.map((name, idx) => (
+                                    <Badge 
+                                      key={idx} 
+                                      variant="outline" 
+                                      className={
+                                        name === 'Credit' ? 'bg-green-50 text-green-700 border-green-200' :
+                                        name === 'Package Applied' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                        'bg-blue-50 text-blue-700 border-blue-200'
+                                      }
+                                    >
+                                      {name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              );
+                            }
+                          }
+                          
+                          // Fallback to old logic if no discountHistory
                           if (booking.packageUsed && booking.packageId) {
                             return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Package</Badge>;
                           }
@@ -746,10 +781,17 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">
-                        {(booking.discountamount || booking.discountAmount || 0) > 0 
-                          ? `$${(booking.discountamount || booking.discountAmount || 0).toFixed(2)}`
-                          : <span className="text-gray-400 text-xs">$0.00</span>
-                        }
+                        {(() => {
+                          // Use discountSummary if available (new tracking system)
+                          if (booking.discountSummary && booking.discountSummary.totalDiscount > 0) {
+                            return `$${booking.discountSummary.totalDiscount.toFixed(2)}`;
+                          }
+                          // Fallback to old field
+                          if ((booking.discountamount || booking.discountAmount || 0) > 0) {
+                            return `$${(booking.discountamount || booking.discountAmount || 0).toFixed(2)}`;
+                          }
+                          return <span className="text-gray-400 text-xs">$0.00</span>;
+                        })()}
                       </div>
                     </TableCell>
                     <TableCell>
