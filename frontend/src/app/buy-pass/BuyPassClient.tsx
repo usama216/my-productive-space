@@ -649,8 +649,42 @@ export default function BuyNowPage() {
                       {/* Cost Summary */}
                       <div className="space-y-2 border-t pt-3">
                         {(() => {
+                          // Prefer data from API response if available
+                          if (confirmationData.baseAmount !== undefined) {
+                            const baseAmount = confirmationData.baseAmount
+                            const cardFee = confirmationData.cardFee || 0
+                            const payNowFee = confirmationData.payNowFee || 0
+                            const finalTotal = confirmationData.totalAmount
+                            
+                            return (
+                              <>
+                                <div className="flex justify-between text-sm">
+                                  <span>Package Amount</span>
+                                  <span>SGD ${baseAmount.toFixed(2)}</span>
+                                </div>
+                                {cardFee > 0 && (
+                                  <div className="flex justify-between text-sm text-orange-600">
+                                    <span>Credit Card Fee (5%)</span>
+                                    <span>SGD ${formatCurrency(cardFee)}</span>
+                                  </div>
+                                )}
+                                {payNowFee > 0 && (
+                                  <div className="flex justify-between text-sm text-blue-600">
+                                    <span>PayNow Fee</span>
+                                    <span>SGD ${formatCurrency(payNowFee)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between font-bold text-lg">
+                                  <span>Total Paid</span>
+                                  <span>SGD ${formatCurrency(finalTotal)}</span>
+                                </div>
+                              </>
+                            )
+                          }
+                          
+                          // Fallback to client-side calculation
                           const isCardPayment = confirmationData.paymentMethod === 'card'
-                          const isPayNowPayment = confirmationData.paymentMethod === 'paynow'
+                          const isPayNowPayment = confirmationData.paymentMethod?.toLowerCase().includes('paynow')
                           const baseAmount = confirmationData.totalAmount
                           
                           let fee = 0
@@ -661,7 +695,7 @@ export default function BuyNowPage() {
                             feeLabel = 'Credit Card Fee (5%)'
                           } else if (isPayNowPayment && baseAmount < 10) {
                             fee = 0.20
-                            feeLabel = 'PayNow Transaction Fee'
+                            feeLabel = 'PayNow Fee'
                           }
                           
                           const finalTotal = baseAmount + fee

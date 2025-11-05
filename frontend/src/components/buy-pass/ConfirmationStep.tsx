@@ -18,8 +18,11 @@ type ConfirmationData = {
   packageName: string
   packageType: string
   targetRole: string
+  baseAmount?: number
+  cardFee?: number
+  payNowFee?: number
   totalAmount: number
-  paymentMethod: string // Add payment method
+  paymentMethod?: string // Add payment method (optional for backward compatibility)
   activatedAt: string
   expiresAt: string
   userInfo: {
@@ -27,7 +30,7 @@ type ConfirmationData = {
     name: string
     memberType: string
   }
-  packageContents: {
+  packageContents?: {
     totalHours: number
     halfDayHours: number
     halfDayPasses: number
@@ -126,28 +129,47 @@ export default function ConfirmationStep({
 
   // Calculate amount breakdown based on payment method
   const calculateAmountBreakdown = (confirmationData: ConfirmationData) => {
-    if (!confirmationData) return { subtotal: 0, cardFee: 0, total: 0 }
+    if (!confirmationData) return { subtotal: 0, cardFee: 0, payNowFee: 0, total: 0 }
     
+    // Prefer data from API response if available
+    if (confirmationData.baseAmount !== undefined) {
+      const subtotal = confirmationData.baseAmount
+      const cardFee = confirmationData.cardFee || 0
+      const payNowFee = confirmationData.payNowFee || 0
+      const total = confirmationData.totalAmount
+      const showBreakdown = cardFee > 0 || payNowFee > 0
+      
+      return { subtotal, cardFee, payNowFee, total, showBreakdown, isPayNow: payNowFee > 0 }
+    }
+    
+    // Fallback to client-side calculation for old data
     const total = confirmationData.totalAmount
     const paymentMethod = confirmationData.paymentMethod
     
     // Handle old payments where paymentMethod might be null
     if (!paymentMethod) {
       // For old payments, show total amount as is (no breakdown)
-      return { subtotal: total, cardFee: 0, total, showBreakdown: false }
+      return { subtotal: total, cardFee: 0, payNowFee: 0, total, showBreakdown: false }
     }
     
-    const isCardPayment = paymentMethod === 'card'
+    const isCardPayment = paymentMethod.toLowerCase().includes('card')
+    const isPayNow = paymentMethod.toLowerCase().includes('paynow')
     
     if (isCardPayment) {
       // If card payment, totalAmount is the base amount, add 5% card fee
       const subtotal = total // Base amount (stored in database)
       const cardFee = total * 0.05 // 5% card fee
       const finalTotal = subtotal + cardFee // Total with card fee
-      return { subtotal, cardFee, total: finalTotal, showBreakdown: true }
+      return { subtotal, cardFee, payNowFee: 0, total: finalTotal, showBreakdown: true }
+    } else if (isPayNow && total < 10) {
+      // If PayNow payment and amount < 10, add 0.20 fee
+      const subtotal = total // Base amount (stored in database)
+      const payNowFee = 0.20 // PayNow flat fee
+      const finalTotal = subtotal + payNowFee // Total with PayNow fee
+      return { subtotal, cardFee: 0, payNowFee, total: finalTotal, showBreakdown: true, isPayNow: true }
     } else {
-      // If not card payment, show total amount as is (no breakdown)
-      return { subtotal: total, cardFee: 0, total, showBreakdown: false }
+      // If not card payment or PayNow, show total amount as is (no breakdown)
+      return { subtotal: total, cardFee: 0, payNowFee: 0, total, showBreakdown: false }
     }
   }
 
@@ -223,20 +245,28 @@ export default function ConfirmationStep({
                 <h4 className="font-medium mb-4">Payment Details</h4>
                 <div className="space-y-3">
                   {(() => {
-                    const { subtotal, cardFee, total, showBreakdown } = calculateAmountBreakdown(confirmationData)
+                    const { subtotal, cardFee, payNowFee, total, showBreakdown, isPayNow } = calculateAmountBreakdown(confirmationData)
                     
                     if (showBreakdown) {
-                      // Show breakdown for card payments
+                      // Show breakdown for card or PayNow payments
                       return (
                         <>
                           <div className="flex justify-between items-center">
                             <span>Package Amount</span>
                             <span>SGD ${subtotal.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-orange-600">
-                            <span>Credit Card Fee (5%)</span>
-                            <span>SGD ${formatCurrency(cardFee)}</span>
-                          </div>
+                          {cardFee > 0 && (
+                            <div className="flex justify-between items-center text-orange-600">
+                              <span>Credit Card Fee (5%)</span>
+                              <span>SGD ${formatCurrency(cardFee)}</span>
+                            </div>
+                          )}
+                          {payNowFee > 0 && (
+                            <div className="flex justify-between items-center text-blue-600">
+                              <span>PayNow Fee</span>
+                              <span>SGD ${formatCurrency(payNowFee)}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center font-bold border-t pt-3">
                             <span>Total Paid</span>
                             <span>SGD ${formatCurrency(total)}</span>
@@ -244,7 +274,7 @@ export default function ConfirmationStep({
                         </>
                       )
                     } else {
-                      // Show simple total for non-card payments
+                      // Show simple total for other payments
                       return (
                         <div className="flex justify-between items-center font-bold">
                           <span>Total Paid</span>
