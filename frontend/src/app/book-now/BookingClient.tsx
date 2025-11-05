@@ -672,6 +672,33 @@ export default function BookingClient() {
 
   const handleEndChange = (date: Date | null) => {
     const validDate = enforceStrict15Minutes(date);
+    
+    // If selecting same day as start date and start time is late (after 5 PM)
+    // automatically move to next day to prevent negative duration
+    if (validDate && startDate && isSameDay(validDate, startDate)) {
+      const startHour = startDate.getHours();
+      
+      // If start time is after 5 PM (17:00), force next day selection
+      if (startHour >= 17) {
+        const nextDay = addDays(startDate, 1);
+        const nextDayWithTime = new Date(nextDay);
+        // Set time to midnight + 1 hour (minimum gap)
+        nextDayWithTime.setHours(0, 0, 0, 0);
+        const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
+        
+        // If the calculated min end time is on next day, use it
+        if (minEndTime > startDate && !isSameDay(minEndTime, startDate)) {
+          setEndDate(minEndTime);
+          toast({
+            title: "End Date Auto-adjusted",
+            description: `Since start time is ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, end date moved to next day.`,
+            variant: "default"
+          });
+          return;
+        }
+      }
+    }
+    
     setEndDate(validDate)
   }
 
@@ -681,12 +708,56 @@ export default function BookingClient() {
     return minutes % 15 === 0; // Only allow :00, :15, :30, :45
   };
 
+  // Filter function for end time - ensures time is after start time + 1 hour
+  const filterEndTime = (time: Date): boolean => {
+    // First check 15-minute intervals
+    const minutes = time.getMinutes();
+    if (minutes % 15 !== 0) return false;
+
+    // If no start date selected, allow all valid intervals
+    if (!startDate) return true;
+
+    // If end date is not selected yet, we can't filter properly
+    if (!endDate) return true;
+
+    // Create a date object combining endDate's date with the time parameter's time
+    const potentialEndTime = new Date(endDate);
+    potentialEndTime.setHours(time.getHours(), time.getMinutes(), 0, 0);
+
+    // Calculate minimum end time (start time + 1 hour)
+    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    // If same day booking, time must be after start time + 1 hour
+    if (isSameDay(startDate, endDate)) {
+      return potentialEndTime >= minEndTime;
+    }
+
+    // If next day booking, check both time range AND minimum 1 hour gap
+    const nextDay = addDays(startDate, 1);
+    if (isSameDay(endDate, nextDay)) {
+      const hour = time.getHours();
+      // Must be within midnight to noon AND at least 1 hour after start time
+      const isWithinTimeRange = hour >= 0 && hour <= 12;
+      const meetsMinimumGap = potentialEndTime >= minEndTime;
+      return isWithinTimeRange && meetsMinimumGap;
+    }
+
+    return true;
+  };
+
   // Get constraints for end date selection
   const getEndDateConstraints = () => {
     if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
 
-    // End date can be same day or next day
-    const minEndDate = startDate
+    const startHour = startDate.getHours();
+    
+    // If start time is after 5 PM (17:00), minimum end date is next day
+    // This prevents selecting same day which would cause negative duration
+    let minEndDate = startDate;
+    if (startHour >= 17) {
+      minEndDate = addDays(startDate, 1);
+    }
+    
     const maxEndDate = addDays(startDate, 1) // Allow booking until next day
 
     return {
@@ -1450,7 +1521,7 @@ export default function BookingClient() {
                             maxDate={endMaxDate}
                             showTimeSelect
                             timeIntervals={15}
-                            filterTime={filterTime}
+                            filterTime={filterEndTime}
                             dateFormat="MMM d, h:mm aa"
                             placeholderText="Select end time"
                             className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
@@ -1465,6 +1536,7 @@ export default function BookingClient() {
                           )} */}
                         </div>
                       </div>
+                     
                      
                       <div className="flex flex-col mt-2">
                         <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All timezones are based on GMT+8</p>
