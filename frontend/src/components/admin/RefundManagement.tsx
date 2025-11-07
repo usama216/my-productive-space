@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { 
   RefreshCw, 
   Clock, 
@@ -29,7 +30,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Pencil,
+  Check
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { 
@@ -38,6 +41,7 @@ import {
   approveRefund, 
   rejectRefund, 
   getRefundStats,
+  updateUserCredits,
   RefundTransaction,
   UserCredit,
   UserCreditsResponse
@@ -63,6 +67,11 @@ export function RefundManagement() {
   const [selectedRefund, setSelectedRefund] = useState<RefundTransaction | null>(null)
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [editingUserEmail, setEditingUserEmail] = useState<string>('')
+  const [editingAmount, setEditingAmount] = useState<string>('')
+  const [isUpdatingCredits, setIsUpdatingCredits] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const { toast } = useToast()
 
   // Debounce search term
@@ -175,6 +184,60 @@ export function RefundManagement() {
       console.error('Error rejecting refund:', err)
     } finally {
       setIsRejecting(false)
+    }
+  }
+
+  const handleEditCredits = (userId: string, userEmail: string, currentRemaining: number) => {
+    setEditingUserId(userId)
+    setEditingUserEmail(userEmail)
+    setEditingAmount(currentRemaining.toFixed(2))
+    setIsEditDialogOpen(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditDialogOpen(false)
+    setEditingUserId(null)
+    setEditingUserEmail('')
+    setEditingAmount('')
+  }
+
+  const handleSaveCredits = async () => {
+    if (!editingUserId) return
+    
+    try {
+      setIsUpdatingCredits(true)
+      const newAmount = parseFloat(editingAmount)
+      
+      if (isNaN(newAmount) || newAmount < 0) {
+        toast({
+          title: "Invalid Amount",
+          description: "Please enter a valid positive number.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const result = await updateUserCredits(editingUserId, newAmount)
+      
+      toast({
+        title: "Credits Updated",
+        description: `Credits updated from ${formatCurrency(result.oldAmount)} to ${formatCurrency(result.newAmount)}`,
+      })
+      
+      setIsEditDialogOpen(false)
+      setEditingUserId(null)
+      setEditingUserEmail('')
+      setEditingAmount('')
+      fetchCredits()
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update credits. Please try again.",
+        variant: "destructive"
+      })
+      console.error('Error updating credits:', err)
+    } finally {
+      setIsUpdatingCredits(false)
     }
   }
 
@@ -463,7 +526,7 @@ export function RefundManagement() {
                 <p className="text-gray-500">No user credits found</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <Accordion type="multiple" className="w-full">
                 {(() => {
                   // Group credits by user
                   const grouped: Record<string, any> = {};
@@ -480,78 +543,97 @@ export function RefundManagement() {
                     grouped[c.userid].items.push(c);
                   });
                   const groups = Object.values(grouped);
-                  return groups.map((group: any, idx: number) => (
-                    <div key={idx} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">{group.userEmail}</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4 text-gray-500" />
-                            <span className="text-gray-600">Total:</span>
-                            <span className="font-medium">{formatCurrency(group.totalCredit)}</span>
+                  return groups.map((group: any, idx: number) => {
+                    const userId = group.items[0]?.userid;
+                    return (
+                    <AccordionItem key={idx} value={`user-${idx}`} className="border rounded-lg mb-3 px-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center justify-between w-full pr-4">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium">{group.userEmail}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="h-4 w-4 text-orange-500" />
-                            <span className="text-gray-600">Used:</span>
-                            <span className="text-orange-600 font-medium">{formatCurrency(group.usedCredit)}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Wallet className="h-4 w-4 text-green-500" />
-                            <span className="text-gray-600">Remaining:</span>
-                            <span className="text-green-600 font-medium">{formatCurrency(group.remainingCredit)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* User's individual credits */}
-                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {group.items.map((credit: any) => (
-                          <div key={credit.id} className="p-3 border rounded-md bg-white">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Badge
-                                  className={
-                                    credit.status === 'ACTIVE'
-                                      ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                      : 'bg-gray-200 text-gray-800'
-                                  }
-                                >
-                                  {credit.status}
-                                </Badge>
-                                <span className="font-medium">{formatCurrency(credit.amount)}</span>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-4 w-4 text-gray-500" />
+                              <span className="text-gray-600">Total:</span>
+                              <span className="font-medium">{formatCurrency(group.totalCredit)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <TrendingUp className="h-4 w-4 text-orange-500" />
+                              <span className="text-gray-600">Used:</span>
+                              <span className="text-orange-600 font-medium">{formatCurrency(group.usedCredit)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <Wallet className="h-4 w-4 text-green-500" />
+                                <span className="text-gray-600">Remaining:</span>
+                                <span className="text-green-600 font-medium">{formatCurrency(group.remainingCredit)}</span>
                               </div>
-                              {credit.Booking && (
-                                <div className="text-xs text-gray-500">{credit.Booking.bookingRef}</div>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div className="text-gray-500">Created</div>
-                              <div>{formatDate(credit.createdat)}</div>
-                              <div className="text-gray-500">Expires</div>
-                              <div>{formatDate(credit.expiresat)}</div>
-                              {typeof credit.creditUsed === 'number' && (
-                                <>
-                                  <div className="text-gray-500">Used (this credit)</div>
-                                  <div className="text-orange-600">{formatCurrency(credit.creditUsed)}</div>
-                                </>
-                              )}
-                              {typeof credit.creditRemaining === 'number' && (
-                                <>
-                                  <div className="text-gray-500">Remaining (this credit)</div>
-                                  <div className="text-green-600">{formatCurrency(credit.creditRemaining)}</div>
-                                </>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditCredits(userId, group.userEmail, group.remainingCredit);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ));
+                        </div>
+                      </AccordionTrigger>
+                      
+                      <AccordionContent>
+                        {/* User's individual credits */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                          {group.items.map((credit: any) => (
+                            <div key={credit.id} className="p-3 border rounded-md bg-gray-50">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    className={
+                                      credit.status === 'ACTIVE'
+                                        ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                        : 'bg-gray-200 text-gray-800'
+                                    }
+                                  >
+                                    {credit.status}
+                                  </Badge>
+                                  <span className="font-medium">{formatCurrency(credit.amount)}</span>
+                                </div>
+                                {credit.Booking && (
+                                  <div className="text-xs text-gray-500">{credit.Booking.bookingRef}</div>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="text-gray-500">Created</div>
+                                <div>{formatDate(credit.createdat)}</div>
+                                <div className="text-gray-500">Expires</div>
+                                <div>{formatDate(credit.expiresat)}</div>
+                                {typeof credit.creditUsed === 'number' && (
+                                  <>
+                                    <div className="text-gray-500">Used (this credit)</div>
+                                    <div className="text-orange-600">{formatCurrency(credit.creditUsed)}</div>
+                                  </>
+                                )}
+                                {typeof credit.creditRemaining === 'number' && (
+                                  <>
+                                    <div className="text-gray-500">Remaining (this credit)</div>
+                                    <div className="text-green-600">{formatCurrency(credit.creditRemaining)}</div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )});
                 })()}
-              </div>
+              </Accordion>
             )}
           </CardContent>
         </Card>
@@ -726,6 +808,70 @@ export function RefundManagement() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Credits Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User Credits</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-gray-700">User Email</Label>
+              <p className="text-sm text-gray-600 mt-1">{editingUserEmail}</p>
+            </div>
+            
+            <div>
+              <Label htmlFor="credit-amount" className="text-sm font-medium text-gray-700">
+                Remaining Credits (SGD)
+              </Label>
+              <Input
+                id="credit-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={editingAmount}
+                onChange={(e) => setEditingAmount(e.target.value)}
+                className="mt-1"
+                placeholder="Enter amount"
+                disabled={isUpdatingCredits}
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the new remaining credit amount for this user
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={handleCancelEdit}
+                disabled={isUpdatingCredits}
+                className="border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveCredits}
+                disabled={isUpdatingCredits}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                {isUpdatingCredits ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Update Credits
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

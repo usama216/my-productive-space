@@ -289,3 +289,23 @@ export const getRefundStats = async (): Promise<{ totalRefunded: number; totalTr
     throw error;
   }
 };
+
+export const updateUserCredits = async (userId: string, newAmount: number): Promise<{ message: string; oldAmount: number; newAmount: number }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/refund/credits/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ newAmount }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update user credits');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating user credits:', error);
+    throw error;
+  }
+};
