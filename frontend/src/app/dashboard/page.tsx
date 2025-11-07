@@ -836,22 +836,40 @@ export default function Dashboard() {
                                   ? 'Pending'
                                   : 'Not Verified';
 
+                            // Check expiry status for verified students
+                            const verifiedAt = userProfile?.studentVerifiedAt || userProfile?.studentVerificationDate;
+                            const expiringSoon = status === 'VERIFIED' ? isVerificationExpiringSoon(verifiedAt) : false;
+                            const daysRemaining = status === 'VERIFIED' ? getDaysUntilVerificationExpiry(verifiedAt) : 0;
+
+                            // Determine badge color based on expiry status
                             const badgeClass =
-                              userProfile
-                                ? getVerificationStatusColor(userProfile.studentVerificationStatus)
-                                : status === 'VERIFIED'
-                                  ? 'bg-green-50 text-green-700 border-green-200'
-                                  : status === 'PENDING'
-                                    ? 'bg-orange-50 text-orange-700 border-orange-200'
-                                    : 'bg-gray-50 text-gray-700 border-gray-200';
+                              status === 'VERIFIED'
+                                ? expiringSoon
+                                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                  : 'bg-green-50 text-green-700 border-green-200'
+                                : status === 'PENDING'
+                                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                  : 'bg-gray-50 text-gray-700 border-gray-200';
 
                             return (
-                              <Badge variant="outline" className={badgeClass}>
-                                {status === 'PENDING' 
-                                  ? 'Student status verification Pending - Please check back in a few days.'
-                                  : `Student Verification Status - ${statusText}`
-                                }
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className={badgeClass}>
+                                  {status === 'PENDING' 
+                                    ? 'Student status verification Pending - Please check back in a few days.'
+                                    : status === 'VERIFIED'
+                                    ? expiringSoon
+                                      ? `Expires in ${daysRemaining} days`
+                                      : 'Student Verification - Verified'
+                                    : `Student Verification Status - ${statusText}`
+                                  }
+                                </Badge>
+                                {status === 'VERIFIED' && expiringSoon && (
+                                  <div className="relative">
+                                    <Bell className="w-4 h-4 text-orange-600 animate-pulse" />
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-600 rounded-full"></span>
+                                  </div>
+                                )}
+                              </div>
                             );
                           })()}
 
