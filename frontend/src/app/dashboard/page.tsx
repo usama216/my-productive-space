@@ -462,17 +462,16 @@ export default function Dashboard() {
 
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-              <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-6">
-                <TabsTrigger value="overview" className="whitespace-nowrap">Overview</TabsTrigger>
-                <TabsTrigger value="mybookings" className="whitespace-nowrap">My Bookings</TabsTrigger>
-                <TabsTrigger value="profile" className="whitespace-nowrap">Profile</TabsTrigger>
-                <TabsTrigger value="passes" className="whitespace-nowrap">Packages</TabsTrigger>
-                <TabsTrigger value="promocodes" className="whitespace-nowrap">Promo Codes</TabsTrigger>
-                <TabsTrigger value="credits" className="whitespace-nowrap">Credits</TabsTrigger>
-                {/* <TabsTrigger value="refunds">Refund Requests</TabsTrigger> */}
-              </TabsList>
-            </div>
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="mybookings">My Bookings</TabsTrigger>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="passes">Packages</TabsTrigger>
+
+              <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
+              <TabsTrigger value="credits">Credits</TabsTrigger>
+              {/* <TabsTrigger value="refunds">Refund Requests</TabsTrigger> */}
+            </TabsList>
 
        
             <TabsContent value="overview" className="space-y-6">

@@ -1537,7 +1537,7 @@ export default function BookingClient() {
                         </div>
                       </div>
                      
-                            
+                     
                       <div className="flex flex-col mt-2">
                         <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All timezones are based on GMT+8</p>
                         </div>

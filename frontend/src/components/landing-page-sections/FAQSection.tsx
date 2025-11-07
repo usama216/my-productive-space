@@ -10,7 +10,7 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion'
 
-import { MapPin, HelpCircle, MessageCircle, ChevronDown } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 
 const faqs: { question: string, answer: React.ReactNode }[] = [
   {
@@ -73,123 +73,38 @@ const faqs: { question: string, answer: React.ReactNode }[] = [
 
 export default function FAQSection() {
   return (
-    <section id="FAQ" className="relative py-20 bg-gradient-to-br from-gray-50 via-white to-gray-50 overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-6">
-            <HelpCircle className="w-8 h-8 text-orange-600" />
-          </div>
-          <h2 className="text-5xl md:text-6xl font-serif font-bold text-gray-900 mb-4">
-             <span className="text-orange-600">FAQs</span>
-          </h2>
-          <p className="text-lg text-gray-600">
-            Everything you need to know about My Productive Space
-          </p>
-        </div>
-
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-            {/* Left Sidebar - CTA Section */}
-            <div className="lg:col-span-1">
-              <div className="sticky top-24 space-y-6">
-                {/* Still have questions card */}
-                <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-8 text-white shadow-xl">
-                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-4">
-                    <MessageCircle className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <h3 className="text-2xl font-bold mb-3">Still have questions?</h3>
-                  <p className="text-orange-50 mb-6 text-sm">
-                    Can't find the answer you're looking for? Our team is here to help!
-                  </p>
-                  <Link href="#ContactUs">
-                    <Button 
-                      className="w-full bg-white text-orange-600 hover:bg-orange-50 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      Contact Us
-                    </Button>
-                  </Link>
-                </div>
-
+    <section id="FAQ" className="py-12">
+      <div className="px-6 md:px-12 lg:px-16 xl:px-20">
+     
+        <div className="container mx-auto flex flex-col md:flex-row gap-12">
+          <div className="md:w-1/3 space-y-4">
+            <h2 className="text-4xl font-serif">FAQ’S</h2>
+            <p className="mt-2 text-gray-600">Answers to your most common questions</p>
+            <div className="flex flex-col space-y-3 mt-6">
+            <Link href="#ContactUs">
+              <Button variant="outline" className="w-40 bg-[#A15630] hover:bg-orange-600 text-white hover:text-white transition-colors duration-200">
+                Still have questions?
+              </Button>
+            </Link>
             
-              </div>
             </div>
-
-            {/* Right Content - FAQ Accordion */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-                <Accordion type="single" collapsible className="space-y-4">
-                  {faqs.map((item, i) => (
-                    <AccordionItem 
-                      key={i} 
-                      value={`faq-${i}`}
-                      className="border-none bg-gray-50 rounded-xl overflow-hidden hover:bg-gray-100 transition-colors duration-200"
-                    >
-                      <AccordionTrigger className="px-6 py-5 hover:no-underline text-left group">
-                        <div className="flex items-start gap-4 flex-1">
-                          <div className="flex-shrink-0 w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mt-0.5 group-hover:bg-orange-200 transition-colors duration-200">
-                            <span className="text-orange-600 font-bold text-sm">{i + 1}</span>
-                          </div>
-                          <span className="font-semibold text-gray-900 text-base flex-1 pr-4">
-                            {item.question}
-                          </span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-6 pb-6 pt-2">
-                        <div className="pl-12 text-gray-600 leading-relaxed">
-                          {item.answer}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-
-              {/* Bottom CTA */}
+            
            
-            </div>
+          </div>
+          <div className="md:w-2/3">
+            <Accordion type="single" collapsible>
+              {faqs.map((item, i) => (
+                <AccordionItem key={i} value={`faq-${i}`}>
+                  <AccordionTrigger>{item.question}</AccordionTrigger>
+                  <AccordionContent className="text-gray-700">
+                  {item.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         </div>
-      </div>
-      {/* <div className="mt-8 bg-gradient-to-r from-blue-50 to-orange-50 rounded-2xl p-6 md:p-8 text-center border border-orange-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Need More Information?
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Check out our detailed guides or get in touch with our support team
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="#ContactUs">
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white px-6">
-                      Contact Support
-                    </Button>
-                  </Link>
-                  <Link href="/pricing">
-                    <Button variant="outline" className="border-orange-600 text-orange-600 hover:bg-orange-50 px-6">
-                      View Pricing
-                    </Button>
-                  </Link>
-                </div>
-              </div> */}
-      <style jsx>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
-    </section>
+        </div>
+      </section>
   )
 }

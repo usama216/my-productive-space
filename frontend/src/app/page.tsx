@@ -20,7 +20,7 @@ export default function Home() {
 
   return (
 
-    <main className="space-y-0 md:space-y-0">
+    <main className="space-y-16 md:space-y-24">
       {/* NavBar */}
       <Navbar />
 
@@ -52,7 +52,7 @@ export default function Home() {
       {/* Section 8: Contact & Footer */}
       <ContactSection />
       <FooterSection />
-      {/* <OpenDoorExample /> */}
+      <OpenDoorExample />
 
     </main>
   );
