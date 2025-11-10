@@ -259,10 +259,12 @@ export function PeopleSelector({
                 onClick={() => updateBreakdown(type, breakdown[type] + 1)}
                 disabled={
                   total >= max ||
-                  // If tutor is selected, limit students to 4
-                  (type === 'coStudents' && breakdown.coTutors > 0 && breakdown[type] >= 4) ||
-                  // If tutor is selected, limit co-workers to 4
-                  (type === 'coWorkers' && breakdown.coTutors > 0 && breakdown[type] >= 4)
+                  // Limit tutors to maximum 1
+                  (type === 'coTutors' && breakdown.coTutors >= 1) ||
+                  // If tutor is selected, limit total others (students + co-workers) to 4
+                  (breakdown.coTutors > 0 && 
+                   (type === 'coStudents' || type === 'coWorkers') && 
+                   (breakdown.coStudents + breakdown.coWorkers) >= 4)
                 }
                 className="h-8 w-8 p-0"
               >
