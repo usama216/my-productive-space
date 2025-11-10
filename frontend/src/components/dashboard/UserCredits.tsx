@@ -194,7 +194,7 @@ export function UserCredits({ userId }: UserCreditsProps) {
                   
                   <div className="text-sm text-gray-600 space-y-1">
                     <p>
-                      <strong>Refunded from:</strong> {credit.Booking?.bookingRef || 'N/A'}
+                      <strong>Refunded from:</strong> {credit.Booking?.bookingRef || 'Adjusted by Admin'}
                     </p>
                     <p>
                       <strong>Refunded on:</strong> {formatDate(credit.refundedat)}

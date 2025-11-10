@@ -14,8 +14,9 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { BookingDetailsModal } from './BookingDetailsModal'
 import { 
   Booking, 
   BookingFilters, 
@@ -68,6 +69,10 @@ export function BookingManagement() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailData, setDetailData] = useState<any>(null)
+  
+  // Booking Timeline Modal state
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
+  const [selectedBookingRef, setSelectedBookingRef] = useState('')
   
   // Debounced search state
   const [searchInput, setSearchInput] = useState('')
@@ -700,27 +705,41 @@ export function BookingManagement() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            setIsDetailDialogOpen(true)
-                            setDetailLoading(true)
-                            setDetailData(null)
-                            try {
-                              const resp = await getAdminBookingDetails(booking.id || booking.bookingRef)
-                              if (resp && resp.success) {
-                                setDetailData(resp.data)
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              setIsDetailDialogOpen(true)
+                              setDetailLoading(true)
+                              setDetailData(null)
+                              try {
+                                const resp = await getAdminBookingDetails(booking.id || booking.bookingRef)
+                                if (resp && resp.success) {
+                                  setDetailData(resp.data)
+                                }
+                              } catch (e) {
+                                // no-op
+                              } finally {
+                                setDetailLoading(false)
                               }
-                            } catch (e) {
-                              // no-op
-                            } finally {
-                              setDetailLoading(false)
-                            }
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                            }}
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBookingRef(booking.bookingRef)
+                              setIsTimelineModalOpen(true)
+                            }}
+                            title="View Timeline & History"
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                       
                     </TableRow>
@@ -1041,6 +1060,13 @@ export function BookingManagement() {
       )}
     </DialogContent>
   </Dialog>
+
+      {/* Booking Timeline Modal */}
+      <BookingDetailsModal
+        isOpen={isTimelineModalOpen}
+        onClose={() => setIsTimelineModalOpen(false)}
+        bookingRef={selectedBookingRef}
+      />
     </div>
   )
 }

@@ -13,6 +13,7 @@ import PackageManagement from './PackageManagement'
 import PackageUsageTable from './PackageUsageTable'
 import { RefundManagement } from './RefundManagement'
 import { PricingManagement } from './PricingManagement'
+import { TuyaSettingsManagement } from './TuyaSettingsManagement'
 import OpenDoorExample from '@/components/OpenDoorExample'
 import AdminDoorUnlock from '../AdminDoorUnlock'
 
@@ -69,8 +70,10 @@ export default function AdminTabs({
         <TabsTrigger value="refunds">User Credits</TabsTrigger>
         <TabsTrigger value="pricing">Pricing</TabsTrigger>
         <TabsTrigger value="door-lock" className="flex items-center whitespace-nowrap">
-      
           Door Lock
+        </TabsTrigger>
+        <TabsTrigger value="tuya-settings" className="flex items-center whitespace-nowrap">
+          Tuya Settings
         </TabsTrigger>
 
       </TabsList>
@@ -277,6 +280,11 @@ export default function AdminTabs({
             <AdminDoorUnlock/>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* Tuya Settings Tab */}
+      <TabsContent value="tuya-settings" className="space-y-4">
+        <TuyaSettingsManagement />
       </TabsContent>
 
       {/* Settings Tab */}
