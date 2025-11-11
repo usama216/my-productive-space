@@ -48,6 +48,12 @@ export function UserBookings() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [refundReason, setRefundReason] = useState('')
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false)
+
+  // Dynamic payment fee settings state
+  const [feeSettings, setFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
   const [actualRefundAmount, setActualRefundAmount] = useState<number | null>(null)
   const [sendingTuyaLink, setSendingTuyaLink] = useState<string | null>(null)
   const [isCardPayment, setIsCardPayment] = useState(false)
@@ -177,12 +183,13 @@ export function UserBookings() {
         setTotalCost(originalCost)
         
         if (isCard) {
-          // Deduct 5% card fee
-          const actualAmount = paidAmount / 1.05
+          // Deduct dynamic % card fee
+          const multiplier = 1 + (feeSettings.creditCardFeePercentage / 100)
+          const actualAmount = paidAmount / multiplier
           setActualRefundAmount(actualAmount)
         } else if (payNowFee > 0) {
-          // Deduct $0.20 PayNow transaction fee
-          const actualAmount = paidAmount - 0.20
+          // Deduct dynamic PayNow transaction fee
+          const actualAmount = paidAmount - feeSettings.paynowFee
           setActualRefundAmount(Math.max(0, actualAmount))
         } else {
           setActualRefundAmount(paidAmount)
@@ -269,7 +276,22 @@ export function UserBookings() {
   useEffect(() => {
     loadBookings()
     loadUserStats()
+    loadPaymentFeeSettings()
   }, [])
+
+  // Load payment fee settings from database
+  const loadPaymentFeeSettings = async () => {
+    try {
+      const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+      const settings = await getPaymentSettings()
+      setFeeSettings({
+        paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+      })
+    } catch (error) {
+      console.error('Error loading payment fee settings:', error)
+    }
+  }
 
   // Filter bookings by status (using frontend local timezone)
   const now = new Date()

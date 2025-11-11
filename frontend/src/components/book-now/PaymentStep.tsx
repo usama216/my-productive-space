@@ -22,6 +22,10 @@ type Props = {
   onBack: () => void
   onComplete: () => void
   onPaymentMethodChange: (method: PaymentMethod, newTotal: number) => void
+  paymentFeeSettings?: {
+    paynowFee: number
+    creditCardFeePercentage: number
+  }
   // New props for booking creation
   onCreateBooking?: () => Promise<string | null> // Function to create booking and return booking ID
   onBookingCreated?: (bookingId: string) => void // Callback when booking is created
@@ -68,17 +72,49 @@ export default function PaymentStep({
   extensionData,
   isReschedule = false,
   rescheduleData,
-  isLoading = false
+  isLoading = false,
+  paymentFeeSettings
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
   
-  // Calculate totals based on payment method
-  const { fee: transactionFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
+  // Use provided settings or fetch defaults
+  const [feeSettings, setFeeSettings] = useState(paymentFeeSettings || {
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
+  // Load payment fee settings if not provided
+  useEffect(() => {
+    if (!paymentFeeSettings) {
+      const loadSettings = async () => {
+        try {
+          const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+          const settings = await getPaymentSettings()
+          setFeeSettings({
+            paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+            creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+          })
+        } catch (error) {
+          console.error('Error loading payment fee settings:', error)
+        }
+      }
+      loadSettings()
+    } else {
+      setFeeSettings(paymentFeeSettings)
+    }
+  }, [paymentFeeSettings])
+  
+  // Calculate totals based on payment method using dynamic fees
+  const transactionFee = selectedPaymentMethod === 'creditCard' 
+    ? total * (feeSettings.creditCardFeePercentage / 100)
+    : (total < 10 ? feeSettings.paynowFee : 0)  // PayNow fee only for < $10
+  const finalTotal = total + transactionFee
 
   // Notify parent component of initial payment method on mount
   useEffect(() => {
-    const { total: initialTotal } = calculatePaymentTotal(total, 'payNow')
+    const initialFee = total < 10 ? feeSettings.paynowFee : 0  // Only for < $10
+    const initialTotal = total + initialFee
     console.log('PaymentStep mounted - Initial method: payNow, Total:', initialTotal)
     onPaymentMethodChange('payNow', initialTotal)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,8 +247,8 @@ export default function PaymentStep({
                   </p>
                   <p>
                     {selectedPaymentMethod === 'creditCard' 
-                      ? 'A 5% processing fee will be added to your total amount when paying with credit card.'
-                      : 'A $0.20 transaction fee will be added for PayNow payments under $10.'
+                      ? `A ${feeSettings.creditCardFeePercentage}% processing fee will be added to your total amount when paying with credit card.`
+                      : `A $${feeSettings.paynowFee.toFixed(2)} transaction fee will be added for PayNow payments under $10.`
                     }
                   </p>
                 </div>
@@ -251,7 +287,7 @@ export default function PaymentStep({
           {transactionFee > 0 && (
             <div className="flex justify-between text-amber-600">
               <span>
-                {selectedPaymentMethod === 'creditCard' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+                {selectedPaymentMethod === 'creditCard' ? `Credit Card Fee (${feeSettings.creditCardFeePercentage}%)` : 'PayNow Transaction Fee'}
               </span>
               <span>${formatCurrency(transactionFee)}</span>
             </div>

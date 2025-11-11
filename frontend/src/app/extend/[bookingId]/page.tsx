@@ -63,6 +63,7 @@ export default function ExtendBookingPage() {
     if (typeof window !== 'undefined') {
       setUrlParams(new URLSearchParams(window.location.search))
     }
+    loadPaymentFeeSettings() // Load dynamic payment fees
   }, [])
   
   // Check if this is a payment confirmation
@@ -92,6 +93,27 @@ export default function ExtendBookingPage() {
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
   const [checkingSeats, setCheckingSeats] = useState(false)
   const [requiresSeatSelection, setRequiresSeatSelection] = useState(false)
+  
+  // Dynamic payment fee settings state
+  const [paymentFeeSettings, setPaymentFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
+  // Load payment fee settings from database
+  const loadPaymentFeeSettings = async () => {
+    try {
+      const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+      const settings = await getPaymentSettings()
+      setPaymentFeeSettings({
+        paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+      })
+    } catch (error) {
+      console.error('Error loading payment fee settings:', error)
+    }
+  }
+
   // If returning from payment, start with step 1 and let useEffect handle confirmation
   const [currentStep, setCurrentStep] = useState(1) // 1: Time Selection, 2: Payment, 3: Confirmation
   
@@ -1193,15 +1215,15 @@ export default function ExtendBookingPage() {
                         </div>
                         {(() => {
                           const paymentFee = selectedPaymentMethod === 'creditCard' 
-                            ? Math.round(finalCost * 0.05 * 100) / 100 
-                            : (finalCost < 10 ? 0.20 : 0)
+                            ? Math.round(finalCost * (paymentFeeSettings.creditCardFeePercentage / 100) * 100) / 100 
+                            : (finalCost < 10 ? paymentFeeSettings.paynowFee : 0)  // PayNow fee only for < $10
                           const finalTotal = Math.round((finalCost + paymentFee) * 100) / 100
                           
                           return (
                             <>
                               {selectedPaymentMethod === 'creditCard' ? (
                                 <div className="flex justify-between text-gray-600">
-                                  <span>Credit Card Fee (5%):</span>
+                                  <span>Credit Card Fee ({paymentFeeSettings.creditCardFeePercentage}%):</span>
                                   <span>+${paymentFee.toFixed(2)}</span>
                                 </div>
                               ) : finalCost < 10 ? (
@@ -1350,7 +1372,7 @@ export default function ExtendBookingPage() {
                           // Calculate fee - NO FEE if method is "Credits" (fully covered)
                           const isCreditsOnly = paymentMethod === 'Credits';
                           const isCard = !isCreditsOnly && paymentMethod.toLowerCase().includes('card');
-                          const fee = isCreditsOnly ? 0 : (isCard ? subtotal * 0.05 : (subtotal < 10 ? 0.20 : 0));
+                          const fee = isCreditsOnly ? 0 : (isCard ? subtotal * (paymentFeeSettings.creditCardFeePercentage / 100) : (subtotal < 10 ? paymentFeeSettings.paynowFee : 0));
                           const totalPaid = subtotal + fee;
                           
                           return (
@@ -1365,7 +1387,7 @@ export default function ExtendBookingPage() {
                                     <div className="text-green-600">Subtotal: ${subtotal.toFixed(2)}</div>
                                     {fee > 0 && (
                                       <div className="text-green-600">
-                                        {isCard ? 'Card Fee (5%)' : 'Transaction Fee'}: +${fee.toFixed(2)}
+                                        {isCard ? `Card Fee (${paymentFeeSettings.creditCardFeePercentage}%)` : 'Transaction Fee'}: +${fee.toFixed(2)}
                                       </div>
                                     )}
                                     <div className="font-semibold text-green-800 mt-1">Amount Paid: ${totalPaid.toFixed(2)}</div>

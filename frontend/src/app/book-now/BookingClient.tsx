@@ -92,6 +92,12 @@ export default function BookingClient() {
     tutor: { oneHourRate: 6.00, overOneHourRate: 5.00 }
   })
 
+  // Dynamic payment fee settings state
+  const [paymentFeeSettings, setPaymentFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
   // Load pricing from database (single API call)
   const loadPricing = async () => {
     try {
@@ -100,6 +106,21 @@ export default function BookingClient() {
     } catch (error) {
       console.error('Error loading pricing:', error)
       // Keep fallback pricing if database fetch fails
+    }
+  }
+
+  // Load payment fee settings from database
+  const loadPaymentFeeSettings = async () => {
+    try {
+      const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+      const settings = await getPaymentSettings()
+      setPaymentFeeSettings({
+        paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+      })
+    } catch (error) {
+      console.error('Error loading payment fee settings:', error)
+      // Keep fallback values if database fetch fails
     }
   }
 
@@ -141,6 +162,7 @@ export default function BookingClient() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
     loadPricing() // Load dynamic pricing on component mount
+    loadPaymentFeeSettings() // Load dynamic payment fees on component mount
     loadFreshUserProfile() // Load fresh user profile
   }, [searchParams, userId])
 
@@ -2141,7 +2163,7 @@ export default function BookingClient() {
                               {selectedPaymentMethod === 'payNow' ? 'Pay Now (Scan & Pay)' : 'Credit Card Payment'}
                             </span>
                             {selectedPaymentMethod === 'creditCard' && (
-                              <p className="text-xs text-amber-600">+5% processing fee</p>
+                              <p className="text-xs text-amber-600">+{paymentFeeSettings.creditCardFeePercentage}% processing fee</p>
                             )}
                           </div>
                         </div>
@@ -2324,17 +2346,17 @@ export default function BookingClient() {
                       </div>
 
                       {selectedPaymentMethod === 'creditCard' && (() => {
-                        const { fee } = calculatePaymentTotal(subtotal, 'creditCard')
+                        const fee = subtotal * (paymentFeeSettings.creditCardFeePercentage / 100)
                         return (
                           <div className="flex justify-between text-amber-600">
-                            <span>Credit Card Fee (5%)</span>
+                            <span>Credit Card Fee ({paymentFeeSettings.creditCardFeePercentage}%)</span>
                             <span>${formatCurrency(fee)}</span>
                           </div>
                         )
                       })()}
 
-                      {bookingStep >= 2 && selectedPaymentMethod === 'payNow' && (() => {
-                        const { fee } = calculatePaymentTotal(subtotal, 'payNow')
+                      {bookingStep >= 2 && selectedPaymentMethod === 'payNow' && subtotal < 10 && (() => {
+                        const fee = paymentFeeSettings.paynowFee
                         if (fee > 0) {
                           return (
                             <div className="flex justify-between text-orange-600">
@@ -2353,10 +2375,11 @@ export default function BookingClient() {
                               <span className="line-through text-gray-400">${(() => {
                                 if (bookingStep >= 2) {
                                   if (selectedPaymentMethod === 'creditCard') {
-                                    return (subtotal * 1.05).toFixed(2);
+                                    const multiplier = 1 + (paymentFeeSettings.creditCardFeePercentage / 100);
+                                    return (subtotal * multiplier).toFixed(2);
                                   } else if (selectedPaymentMethod === 'payNow') {
-                                    const { total } = calculatePaymentTotal(subtotal, 'payNow');
-                                    return total.toFixed(2);
+                                    const fee = subtotal < 10 ? paymentFeeSettings.paynowFee : 0;
+                                    return (subtotal + fee).toFixed(2);
                                   }
                                 }
                                 return subtotal.toFixed(2);
@@ -2368,10 +2391,11 @@ export default function BookingClient() {
                             `$${(() => {
                               if (bookingStep >= 2) {
                                 if (selectedPaymentMethod === 'creditCard') {
-                                  return (subtotal * 1.05).toFixed(2);
+                                  const multiplier = 1 + (paymentFeeSettings.creditCardFeePercentage / 100);
+                                  return (subtotal * multiplier).toFixed(2);
                                 } else if (selectedPaymentMethod === 'payNow') {
-                                  const { total } = calculatePaymentTotal(subtotal, 'payNow');
-                                  return total.toFixed(2);
+                                  const fee = subtotal < 10 ? paymentFeeSettings.paynowFee : 0;
+                                  return (subtotal + fee).toFixed(2);
                                 }
                               }
                               return subtotal.toFixed(2);

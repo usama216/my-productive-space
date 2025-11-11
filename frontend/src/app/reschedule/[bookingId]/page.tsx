@@ -191,6 +191,26 @@ export default function ReschedulePage() {
   const [originalEndDate, setOriginalEndDate] = useState<Date | null>(null)
   const [originalDuration, setOriginalDuration] = useState<number>(0)
 
+  // Dynamic payment fee settings state
+  const [feeSettings, setFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
+  // Load payment fee settings from database
+  const loadPaymentFeeSettings = async () => {
+    try {
+      const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+      const settings = await getPaymentSettings()
+      setFeeSettings({
+        paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+      })
+    } catch (error) {
+      console.error('Error loading payment fee settings:', error)
+    }
+  }
+
   // Step 1: Seat Selection
   const [availableSeats, setAvailableSeats] = useState<string[]>([])
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([])
@@ -288,6 +308,7 @@ export default function ReschedulePage() {
     }
 
     fetchUserInfo()
+    loadPaymentFeeSettings()
   }, [])
 
   // Load booking data
@@ -527,7 +548,8 @@ export default function ReschedulePage() {
   useEffect(() => {
     if (costDifference > 0 && paymentTotal === 0) {
       // Initialize with credit card calculation (default selected method)
-      const feeAmount = costDifference * 0.05
+      // For PayNow, fee only applies if < $10
+      const feeAmount = costDifference * (feeSettings.creditCardFeePercentage / 100)
       const totalWithFee = costDifference + feeAmount
       console.log('Initial calculation - Credit card total:', costDifference, '+', feeAmount, '=', totalWithFee)
       setPaymentTotal(totalWithFee)

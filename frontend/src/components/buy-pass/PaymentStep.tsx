@@ -1,7 +1,7 @@
 // src/components/buy-pass/PaymentStep.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CreditCard, Shield, QrCode, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,14 +43,43 @@ export default function PaymentStep({
   const [loading, setLoading] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('payNow')
 
-  // Calculate totals based on payment method
-  const { fee: transactionFee, total: finalTotal } = calculatePaymentTotal(total, selectedPaymentMethod)
+  // Dynamic payment fee settings state
+  const [feeSettings, setFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
+  // Load payment fee settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+        const settings = await getPaymentSettings()
+        setFeeSettings({
+          paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+          creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+        })
+      } catch (error) {
+        console.error('Error loading payment fee settings:', error)
+      }
+    }
+    loadSettings()
+  }, [])
+
+  // Calculate totals based on payment method using dynamic fees
+  const transactionFee = selectedPaymentMethod === 'creditCard' 
+    ? total * (feeSettings.creditCardFeePercentage / 100)
+    : (total < 10 ? feeSettings.paynowFee : 0)  // PayNow fee only for < $10
+  const finalTotal = total + transactionFee
 
 
 
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setSelectedPaymentMethod(method)
-    const { total: newTotal } = calculatePaymentTotal(total, method)
+    const newFee = method === 'creditCard' 
+      ? total * (feeSettings.creditCardFeePercentage / 100)
+      : (total < 10 ? feeSettings.paynowFee : 0)  // PayNow fee only for < $10
+    const newTotal = total + newFee
     console.log(`Payment method changed to: ${method}`)
     // Update the parent component's payment method
     onPaymentMethodChange(method === 'creditCard' ? 'card' : 'paynow')
@@ -143,10 +172,10 @@ export default function PaymentStep({
                 <CreditCard className="w-5 h-5 mr-2" />
                 <span>Credit/Debit Card</span>
                 {selectedPaymentMethod === 'creditCard' && (
-                  <span className="ml-2 text-sm text-gray-500">(+5% fee)</span>
+                  <span className="ml-2 text-sm text-gray-500">(+{feeSettings.creditCardFeePercentage}% fee)</span>
                 )}
-                {selectedPaymentMethod === 'payNow' && total > 10 && (
-                  <span className="ml-2 text-sm text-gray-500">(+$0.20 fee)</span>
+                {selectedPaymentMethod === 'payNow' && (
+                  <span className="ml-2 text-sm text-gray-500">(+${feeSettings.paynowFee.toFixed(2)} fee)</span>
                 )}
               </div>
             </label>
@@ -173,7 +202,7 @@ export default function PaymentStep({
           {transactionFee > 0 && (
             <div className="flex justify-between text-orange-600">
               <span>
-                {selectedPaymentMethod === 'creditCard' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+                {selectedPaymentMethod === 'creditCard' ? `Credit Card Fee (${feeSettings.creditCardFeePercentage}%)` : 'PayNow Transaction Fee'}
               </span>
               <span>${formatCurrency(transactionFee)}</span>
             </div>

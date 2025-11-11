@@ -88,6 +88,27 @@ export default function BuyNowPage() {
   const [freshUserProfile, setFreshUserProfile] = useState<UserProfile | null>(null)
   const [isLoadingUserProfile, setIsLoadingUserProfile] = useState(false)
 
+  // Dynamic payment fee settings state
+  const [paymentFeeSettings, setPaymentFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
+  // Load payment fee settings from database
+  const loadPaymentFeeSettings = async () => {
+    try {
+      const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+      const settings = await getPaymentSettings()
+      setPaymentFeeSettings({
+        paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+      })
+    } catch (error) {
+      console.error('Error loading payment fee settings:', error)
+      // Keep fallback values if database fetch fails
+    }
+  }
+
   // Fetch fresh user profile data
   const loadFreshUserProfile = async () => {
     if (!userId) return
@@ -117,6 +138,11 @@ export default function BuyNowPage() {
       loadFreshUserProfile()
     }
   }, [userId])
+
+  // Load payment fee settings on mount
+  useEffect(() => {
+    loadPaymentFeeSettings()
+  }, [])
 
   // Fallback: Try to load from localStorage if available
   useEffect(() => {
@@ -297,7 +323,11 @@ export default function BuyNowPage() {
   // Helper functions
   const isFormValid = customerName && customerEmail && customerPhone && agreedToTerms && user
   const subtotal = selectedPackage ? (selectedPackage.price + selectedPackage.outletFee) * quantity : 0
-  const { fee: cardFee, total } = calculatePaymentTotal(subtotal, paymentMethod === 'card' ? 'creditCard' : 'payNow')
+  // Calculate fees using local state (synchronous)
+  const cardFee = paymentMethod === 'card' 
+    ? subtotal * (paymentFeeSettings.creditCardFeePercentage / 100)
+    : (subtotal < 10 ? paymentFeeSettings.paynowFee : 0)  // PayNow fee only for < $10
+  const total = subtotal + cardFee
   
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
@@ -664,7 +694,7 @@ export default function BuyNowPage() {
                                 </div>
                                 {cardFee > 0 && (
                                   <div className="flex justify-between text-sm text-orange-600">
-                                    <span>Credit Card Fee (5%)</span>
+                                    <span>Credit Card Fee ({paymentFeeSettings.creditCardFeePercentage}%)</span>
                                     <span>SGD ${formatCurrency(cardFee)}</span>
                                   </div>
                                 )}
@@ -691,10 +721,10 @@ export default function BuyNowPage() {
                           let feeLabel = ''
                           
                           if (isCardPayment) {
-                            fee = baseAmount * 0.05
-                            feeLabel = 'Credit Card Fee (5%)'
+                            fee = baseAmount * (paymentFeeSettings.creditCardFeePercentage / 100)
+                            feeLabel = `Credit Card Fee (${paymentFeeSettings.creditCardFeePercentage}%)`
                           } else if (isPayNowPayment && baseAmount < 10) {
-                            fee = 0.20
+                            fee = paymentFeeSettings.paynowFee
                             feeLabel = 'PayNow Fee'
                           }
                           

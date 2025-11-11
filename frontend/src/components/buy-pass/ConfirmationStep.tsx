@@ -56,6 +56,29 @@ export default function ConfirmationStep({
   const [error, setError] = useState<string>('')
   const searchParams = useSearchParams()
 
+  // Dynamic payment fee settings state
+  const [feeSettings, setFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
+  // Load payment fee settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+        const settings = await getPaymentSettings()
+        setFeeSettings({
+          paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+          creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+        })
+      } catch (error) {
+        console.error('Error loading payment fee settings:', error)
+      }
+    }
+    loadSettings()
+  }, [])
+
   // Auto-trigger confirmation when component mounts
   useEffect(() => {
     if (userPackageId && orderId && status === 'idle') {
@@ -156,15 +179,15 @@ export default function ConfirmationStep({
     const isPayNow = paymentMethod.toLowerCase().includes('paynow')
     
     if (isCardPayment) {
-      // If card payment, totalAmount is the base amount, add 5% card fee
+      // If card payment, totalAmount is the base amount, add dynamic % card fee
       const subtotal = total // Base amount (stored in database)
-      const cardFee = total * 0.05 // 5% card fee
+      const cardFee = total * (feeSettings.creditCardFeePercentage / 100) // Dynamic % card fee
       const finalTotal = subtotal + cardFee // Total with card fee
       return { subtotal, cardFee, payNowFee: 0, total: finalTotal, showBreakdown: true }
-    } else if (isPayNow && total < 10) {
-      // If PayNow payment and amount < 10, add 0.20 fee
+    } else if (isPayNow) {
+      // If PayNow payment, add dynamic PayNow fee
       const subtotal = total // Base amount (stored in database)
-      const payNowFee = 0.20 // PayNow flat fee
+      const payNowFee = feeSettings.paynowFee // Dynamic PayNow flat fee
       const finalTotal = subtotal + payNowFee // Total with PayNow fee
       return { subtotal, cardFee: 0, payNowFee, total: finalTotal, showBreakdown: true, isPayNow: true }
     } else {
@@ -257,7 +280,7 @@ export default function ConfirmationStep({
                           </div>
                           {cardFee > 0 && (
                             <div className="flex justify-between items-center text-orange-600">
-                              <span>Credit Card Fee (5%)</span>
+                              <span>Credit Card Fee ({feeSettings.creditCardFeePercentage}%)</span>
                               <span>SGD ${formatCurrency(cardFee)}</span>
                             </div>
                           )}

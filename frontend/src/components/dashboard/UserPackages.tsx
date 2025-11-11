@@ -30,6 +30,12 @@ export function UserPackages({ userId }: UserPackagesProps) {
   const { toast } = useToast()
   const { user, databaseUser } = useAuth()
 
+  // Dynamic payment fee settings state
+  const [feeSettings, setFeeSettings] = useState({
+    paynowFee: 0.20,
+    creditCardFeePercentage: 5.0
+  })
+
   // Map targetRole to type parameter
   const getTypeFromRole = (targetRole: string): string => {
     const roleMapping: { [key: string]: string } = {
@@ -107,11 +113,11 @@ export function UserPackages({ userId }: UserPackagesProps) {
         postalCode: ''
       }
 
-      // Calculate total with credit card fee if applicable
-      const { fee: creditCardFee, total: finalAmount } = calculatePaymentTotal(
-        selectedPackage.totalAmount, 
-        selectedPaymentMethod === 'card' ? 'creditCard' : 'payNow'
-      )
+      // Calculate total with credit card fee if applicable (synchronous using state)
+      const creditCardFee = selectedPaymentMethod === 'card' 
+        ? selectedPackage.totalAmount * (feeSettings.creditCardFeePercentage / 100)
+        : (selectedPackage.totalAmount < 10 ? feeSettings.paynowFee : 0)  // PayNow fee only for < $10
+      const finalAmount = selectedPackage.totalAmount + creditCardFee
 
       console.log('Completing payment for package:', selectedPackage.id)
       const result = await completePackagePayment(selectedPackage.id, selectedPackage.orderId, customerInfo, finalAmount, selectedPaymentMethod)
@@ -137,7 +143,22 @@ export function UserPackages({ userId }: UserPackagesProps) {
 
   useEffect(() => {
     loadUserPackages()
+    loadPaymentFeeSettings()
   }, [userId])
+
+  // Load payment fee settings from database
+  const loadPaymentFeeSettings = async () => {
+    try {
+      const { getPaymentSettings } = await import('@/lib/paymentSettingsService')
+      const settings = await getPaymentSettings()
+      setFeeSettings({
+        paynowFee: settings.PAYNOW_TRANSACTION_FEE,
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+      })
+    } catch (error) {
+      console.error('Error loading payment fee settings:', error)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -551,7 +572,7 @@ export function UserPackages({ userId }: UserPackagesProps) {
                       <div className="flex items-center">
                         <CreditCard className="w-5 h-5 mr-2" />
                         <span>Credit/Debit Card</span>
-                        <span className="ml-2 text-sm text-gray-500">(+5% fee)</span>
+                        <span className="ml-2 text-sm text-gray-500">(+{feeSettings.creditCardFeePercentage}% fee)</span>
                       </div>
                     </label>
                   </div>
@@ -567,10 +588,10 @@ export function UserPackages({ userId }: UserPackagesProps) {
                     <span>SGD ${selectedPackage.totalAmount}</span>
                   </div>
                   {selectedPaymentMethod === 'card' && (() => {
-                    const { fee } = calculatePaymentTotal(selectedPackage.totalAmount, 'creditCard')
+                    const fee = selectedPackage.totalAmount * (feeSettings.creditCardFeePercentage / 100)
                     return (
                       <div className="flex justify-between text-orange-600">
-                        <span>Credit Card Fee (5%):</span>
+                        <span>Credit Card Fee ({feeSettings.creditCardFeePercentage}%):</span>
                         <span>SGD ${formatCurrency(fee)}</span>
                       </div>
                     )
@@ -578,7 +599,10 @@ export function UserPackages({ userId }: UserPackagesProps) {
                   <div className="flex justify-between font-medium border-t pt-2">
                     <span>Total:</span>
                     <span>SGD ${(() => {
-                      const { total } = calculatePaymentTotal(selectedPackage.totalAmount, selectedPaymentMethod === 'card' ? 'creditCard' : 'payNow')
+                      const fee = selectedPaymentMethod === 'card' 
+                        ? selectedPackage.totalAmount * (feeSettings.creditCardFeePercentage / 100)
+                        : (selectedPackage.totalAmount < 10 ? feeSettings.paynowFee : 0)  // PayNow fee only for < $10
+                      const total = selectedPackage.totalAmount + fee
                       return formatCurrency(total)
                     })()}</span>
                   </div>
