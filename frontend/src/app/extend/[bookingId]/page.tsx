@@ -38,7 +38,7 @@ import {
   formatLocalDateOnly,
   formatLocalTimeOnly 
 } from '@/lib/timezoneUtils'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 

@@ -50,7 +50,7 @@ import {
   formatBookingDateRange,
   toSingaporeTime
 } from '@/lib/timezoneUtils'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 
 
 const locations = [

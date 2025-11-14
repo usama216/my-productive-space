@@ -22,7 +22,7 @@ import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import PaymentStep from '@/components/buy-pass/PaymentStep'
 import ConfirmationStep from '@/components/buy-pass/ConfirmationStep'
 import { formatSingaporeDateOnly, getCurrentSingaporeTime } from '@/lib/timezoneUtils'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 
 export default function BuyNowPage() {
   const searchParams = useSearchParams()

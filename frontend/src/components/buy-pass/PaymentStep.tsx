@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 
 type PaymentMethod = 'payNow' | 'creditCard'
 

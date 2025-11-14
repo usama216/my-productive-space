@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { CreditCard, QrCode, AlertTriangle } from 'lucide-react'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 
 type PaymentMethod = 'payNow' | 'creditCard'
 
@@ -127,7 +127,12 @@ export default function PaymentStep({
 
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setSelectedPaymentMethod(method)
-    const { total: newTotal } = calculatePaymentTotal(total, method)
+    const transactionFee = method === 'creditCard'
+      ? total * (feeSettings.creditCardFeePercentage / 100)
+      : total < 10
+        ? feeSettings.paynowFee
+        : 0
+    const newTotal = total + transactionFee
     console.log(`Payment method changed to: ${method} (API value: ${getPaymentMethodForAPI(method)})`)
     onPaymentMethodChange(method, newTotal)
   }

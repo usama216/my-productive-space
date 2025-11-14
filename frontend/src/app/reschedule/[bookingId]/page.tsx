@@ -43,7 +43,7 @@ import {
   toLocalTime
 } from '@/lib/timezoneUtils'
 import { supabase } from '@/lib/supabaseClient'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 
@@ -1531,14 +1531,19 @@ export default function ReschedulePage() {
                         </div>
                       )}
                       {(() => {
-                        const { fee } = calculatePaymentTotal(finalCost, selectedPaymentMethod)
-                        if (fee > 0) {
+                        const transactionFee = selectedPaymentMethod === 'creditCard'
+                          ? finalCost * (feeSettings.creditCardFeePercentage / 100)
+                          : finalCost > 0 && finalCost < 10
+                            ? feeSettings.paynowFee
+                            : 0
+
+                        if (transactionFee > 0) {
                           return (
                             <div className="flex justify-between">
                               <span className="text-orange-700 text-sm font-medium">
-                                {selectedPaymentMethod === 'creditCard' ? 'Credit Card Fee (5%)' : 'PayNow Transaction Fee'}
+                                {selectedPaymentMethod === 'creditCard' ? `Credit Card Fee (${feeSettings.creditCardFeePercentage}%)` : 'PayNow Transaction Fee'}
                               </span>
-                              <span className="text-orange-700 text-sm font-medium">SGD ${formatCurrency(fee)}</span>
+                              <span className="text-orange-700 text-sm font-medium">SGD ${formatCurrency(transactionFee)}</span>
                             </div>
                           )
                         }
@@ -1548,8 +1553,12 @@ export default function ReschedulePage() {
                         <span className="text-orange-800 text-sm font-medium">Total payable:</span>
                         <span className="text-orange-900 text-sm font-medium">
                           SGD ${(() => {
-                            const { total } = calculatePaymentTotal(finalCost, selectedPaymentMethod)
-                            return formatCurrency(total)
+                            const transactionFee = selectedPaymentMethod === 'creditCard'
+                              ? finalCost * (feeSettings.creditCardFeePercentage / 100)
+                              : finalCost > 0 && finalCost < 10
+                                ? feeSettings.paynowFee
+                                : 0
+                            return formatCurrency(finalCost + transactionFee)
                           })()}
                         </span>
                       </div>

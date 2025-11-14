@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, CheckCircle, XCircle, AlertTriangle, RefreshCw, Package, Clock, Calendar } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 
 type ConfirmationStatus = 'idle' | 'loading' | 'success' | 'error'
 

@@ -13,7 +13,7 @@ import { Package, Clock, Calendar, CheckCircle, XCircle, Loader2, AlertTriangle,
 import { useToast } from '@/hooks/use-toast'
 import { getUserPackages, UserPackage, completePackagePayment, CustomerInfo } from '@/lib/services/packageService'
 import { useAuth } from '@/hooks/useAuth'
-import { calculatePaymentTotal, formatCurrency } from '@/lib/paymentUtils'
+import { formatCurrency } from '@/lib/paymentUtils'
 
 interface UserPackagesProps {
   userId: string
