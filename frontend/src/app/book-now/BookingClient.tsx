@@ -1874,7 +1874,7 @@ export default function BookingClient() {
                         {!user
                           ? 'Sign In Required'
                           : hasTutorWithTooManyPeople
-                            ? 'Tutors with >4 Students/Workers Not Allowed - Contact Admin'
+                            ? 'Tutors with more than 4 Students/Workers Not Allowed - Contact Admin'
                           : isOver24Hours
                             ? 'Booking Over 24 Hours Not Allowed'
                           : selectedSeats.length !== people
