@@ -328,7 +328,7 @@ export function getVerificationExpiryMessage(studentVerifiedAt?: string): string
   if (daysRemaining <= 0) {
     return 'Your student verification has expired. Please verify again to maintain student status.';
   } else if (daysRemaining <= 30) {
-    return `Your student verification will expire in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Please renew soon to maintain student benefits.`;
+    return `Your student verification will expire in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}.`;
   } else {
     const expiryDate = getVerificationExpiryDate(studentVerifiedAt);
     return `Your student verification is valid until ${expiryDate?.toLocaleDateString()}`;
