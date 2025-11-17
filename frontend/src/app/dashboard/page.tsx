@@ -655,7 +655,7 @@ export default function Dashboard() {
                                       <div className={`text-xs ${expired ? 'text-red-600' : 'text-orange-600'} mt-1`}>
                                         {expired 
                                           ? 'Your student verification has expired. Please verify again to maintain student status.'
-                                          : `Your verification will expire in ${daysRemaining} days. Please renew soon.`
+                                          : `Your verification will expire in ${daysRemaining} days.`
                                         }
                                       </div>
                                     </div>
