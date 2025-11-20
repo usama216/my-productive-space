@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Save, TestTube, Eye, EyeOff, Key, Link, Server, Lock, RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 interface TuyaSetting {
   id: number
@@ -31,6 +32,7 @@ export function TuyaSettingsManagement() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [showSecrets, setShowSecrets] = useState<{ [key: string]: boolean }>({})
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
   // Fetch settings on component mount
   useEffect(() => {
@@ -87,6 +89,7 @@ export function TuyaSettingsManagement() {
 
   const handleSaveSettings = async () => {
     try {
+      setShowConfirmDialog(false)
       setSaving(true)
 
       // Build settings array for bulk update (only visible settings)
@@ -254,7 +257,7 @@ export function TuyaSettingsManagement() {
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
           <Button
-            onClick={handleSaveSettings}
+            onClick={() => setShowConfirmDialog(true)}
             disabled={saving || testing}
             className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
           >
@@ -281,6 +284,27 @@ export function TuyaSettingsManagement() {
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
+
+        {/* Confirmation Dialog */}
+        <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Save Settings</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to save these Tuya settings? Changes will take effect immediately and may affect the smart lock integration.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleSaveSettings}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                Save Settings
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Help Section */}
         {/* <Alert className="mt-6">

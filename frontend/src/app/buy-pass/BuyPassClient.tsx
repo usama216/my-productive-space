@@ -1,14 +1,14 @@
 // src/app/buy-pass/BuyPassClient.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Package, AlertCircle, AlertTriangle, Loader2, Clock, CheckCircle } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { usePackages } from '@/hooks/useNewPackages'
 import { NewPackage } from '@/lib/services/packageService'
-import { getUserProfile, UserProfile } from '@/lib/userProfileService'
+import { getUserProfile, UserProfile, getEffectiveMemberType } from '@/lib/userProfileService'
 
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -29,7 +29,7 @@ export default function BuyNowPage() {
   const router = useRouter()
 
   // ALL HOOKS MUST BE CALLED FIRST - NO EARLY RETURNS
-  const { user, userId, loading: isLoadingAuth } = useAuth()
+  const { user, userId, databaseUser, loading: isLoadingAuth } = useAuth()
 
   // Get the target role from URL params first
   const typeParam = searchParams.get('type')
@@ -48,7 +48,101 @@ export default function BuyNowPage() {
   // For other steps, use the role from URL params or default to MEMBER
   const targetRole = stepParam === '3' ? null : (typeMapping[typeParam || ''] || 'MEMBER')
 
-  const { packages, loading: packagesLoading, error: packagesError, refetch } = usePackages(targetRole)
+  // Check if user came from a specific page (co-learn, costudy, cowork) or from dashboard
+  const hasTypeParam = !!typeParam // If typeParam exists, user came from specific page
+  const isFromDashboard = !hasTypeParam // If no typeParam, user came from dashboard
+
+  // Get user's effective memberType (checks verification status)
+  const userMemberType = databaseUser?.memberType || 'MEMBER'
+  const effectiveMemberType = getEffectiveMemberType(
+    userMemberType,
+    databaseUser?.studentVerificationStatus
+  )
+  const isStudent = effectiveMemberType === 'STUDENT'
+
+  // OLD FLOW: If user came from specific page (co-learn, costudy, cowork), use specific role packages
+  const { 
+    packages: roleSpecificPackages, 
+    loading: roleSpecificLoading, 
+    error: roleSpecificError, 
+    refetch: roleSpecificRefetch 
+  } = usePackages(hasTypeParam ? targetRole : null) // Only fetch if typeParam exists
+
+  // NEW FLOW: If user came from dashboard, fetch all packages and filter by user role
+  const [allPackages, setAllPackages] = useState<NewPackage[]>([])
+  const [packagesLoading, setPackagesLoading] = useState(false)
+  const [packagesError, setPackagesError] = useState<string | null>(null)
+
+  // Helper function to fetch and filter packages (for dashboard flow)
+  const fetchAllRolePackages = useCallback(async () => {
+    if (stepParam === '3') return // Skip fetching for confirmation step
+    if (hasTypeParam) return // Don't fetch if typeParam exists (use old flow)
+    
+    setPackagesLoading(true)
+    setPackagesError(null)
+    
+    try {
+      const { default: packageService } = await import('@/lib/services/packageService')
+      
+      // Fetch packages for all roles
+      const [memberPackages, tutorPackages, studentPackages] = await Promise.all([
+        packageService.getPackagesByRole('MEMBER'),
+        packageService.getPackagesByRole('TUTOR'),
+        packageService.getPackagesByRole('STUDENT')
+      ])
+      
+      // Combine all packages
+      let combinedPackages: NewPackage[] = []
+      
+      if (memberPackages.success && memberPackages.packages) {
+        combinedPackages.push(...memberPackages.packages)
+      }
+      if (tutorPackages.success && tutorPackages.packages) {
+        combinedPackages.push(...tutorPackages.packages)
+      }
+      if (studentPackages.success && studentPackages.packages) {
+        combinedPackages.push(...studentPackages.packages)
+      }
+      
+      // Filter based on user role
+      // If user is STUDENT: show all packages
+      // If user is NOT STUDENT: exclude STUDENT packages
+      const currentIsStudent = getEffectiveMemberType(
+        databaseUser?.memberType || 'MEMBER',
+        databaseUser?.studentVerificationStatus
+      ) === 'STUDENT'
+      
+      const filteredPackages = currentIsStudent 
+        ? combinedPackages 
+        : combinedPackages.filter(pkg => pkg.targetRole !== 'STUDENT')
+      
+      setAllPackages(filteredPackages)
+    } catch (error) {
+      console.error('Error fetching packages:', error)
+      setPackagesError(error instanceof Error ? error.message : 'Failed to fetch packages')
+    } finally {
+      setPackagesLoading(false)
+    }
+  }, [isStudent, stepParam, hasTypeParam, databaseUser?.memberType, databaseUser?.studentVerificationStatus])
+
+  // Fetch packages based on user role (only for dashboard flow)
+  useEffect(() => {
+    if (isFromDashboard) {
+      fetchAllRolePackages()
+    }
+  }, [fetchAllRolePackages, isFromDashboard])
+
+  // Use appropriate packages based on flow
+  const packages = hasTypeParam ? roleSpecificPackages : allPackages
+  const packagesLoadingState = hasTypeParam ? roleSpecificLoading : packagesLoading
+  const packagesErrorState = hasTypeParam ? roleSpecificError : packagesError
+  const refetch = () => {
+    if (hasTypeParam) {
+      roleSpecificRefetch()
+    } else {
+      fetchAllRolePackages()
+    }
+  }
   
 
   const [selectedPackage, setSelectedPackage] = useState<NewPackage | null>(null)
@@ -249,9 +343,10 @@ export default function BuyNowPage() {
   // Separate effect for localStorage restoration (runs once when packages load)
   useEffect(() => {
     const packageParam = searchParams.get('package')
+    const packageIdParam = searchParams.get('packageId')
     
     // Only restore if: no URL param, packages loaded, nothing selected yet, and haven't restored before
-    if (!packageParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
+    if (!packageParam && !packageIdParam && packages.length > 0 && !selectedPackage && !hasRestoredFromStorage.current) {
       // Add small delay to ensure localStorage is ready
       const timeoutId = setTimeout(() => {
         if (typeof window !== 'undefined') {
@@ -263,8 +358,8 @@ export default function BuyNowPage() {
               
               const { id, name, targetRole: savedRole } = parsedData
               
-              // Only restore if it matches current target role
-              if (savedRole === targetRole) {
+              // Only restore if it matches current target role (for old flow with typeParam)
+              if (hasTypeParam && savedRole === targetRole) {
                 
                 // Try ID first (for same environment), then name (for cross-environment)
                 let foundPackage = packages.find(pkg => pkg.id === id)
@@ -292,7 +387,23 @@ export default function BuyNowPage() {
 
       return () => clearTimeout(timeoutId)
     }
-  }, [packages, targetRole, searchParams])  // Runs when packages load
+  }, [packages, targetRole, searchParams, hasTypeParam, selectedPackage])  // Runs when packages load
+
+  // Auto-select first package when coming from dashboard (no typeParam)
+  useEffect(() => {
+    const packageParam = searchParams.get('package')
+    const packageIdParam = searchParams.get('packageId')
+    
+    // Only auto-select if:
+    // 1. Coming from dashboard (no typeParam) - this is mutually exclusive with localStorage restoration
+    // 2. Packages are loaded
+    // 3. No package is selected
+    // 4. No package param in URL
+    if (isFromDashboard && packages.length > 0 && !selectedPackage && !packageParam && !packageIdParam) {
+      // Select the first package
+      setSelectedPackage(packages[0])
+    }
+  }, [isFromDashboard, packages, selectedPackage, searchParams])
 
   // Handle step 3 - payment confirmation
   useEffect(() => {
@@ -387,7 +498,7 @@ export default function BuyNowPage() {
   }
 
 
-  if (isLoadingAuth || packagesLoading) {
+  if (isLoadingAuth || packagesLoadingState) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -399,7 +510,7 @@ export default function BuyNowPage() {
     )
   }
 
-  if (packagesError) {
+  if (packagesErrorState) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -407,9 +518,9 @@ export default function BuyNowPage() {
           <Alert className="max-w-md mx-auto">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error Loading Packages</AlertTitle>
-            <AlertDescription>{packagesError}</AlertDescription>
+            <AlertDescription>{packagesErrorState}</AlertDescription>
           </Alert>
-          <Button onClick={() => refetch(true)} className="mt-4">Try Again</Button>
+          <Button onClick={() => refetch()} className="mt-4">Try Again</Button>
         </div>
       </div>
     )
