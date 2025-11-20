@@ -52,7 +52,7 @@ export default function Home() {
       {/* Section 8: Contact & Footer */}
       <ContactSection />
       <FooterSection />
-      <OpenDoorExample />
+      {/* <OpenDoorExample /> */}
 
     </main>
   );
