@@ -35,7 +35,8 @@ import {
   formatSingaporeDate, 
   formatSingaporeDateOnly, 
   formatSingaporeTimeOnly,
-  formatBookingDateRange
+  formatBookingDateRange,
+  formatLocalDate
 } from '@/lib/timezoneUtils'
 
 export function BookingManagement() {
@@ -643,11 +644,11 @@ export function BookingManagement() {
                       <TableCell>
                         <div className="text-sm">
                           <div className="font-medium">${booking.totalCost || 0}</div>
-                          {booking.discountAmount && booking.discountAmount > 0 && (
+                          {(booking.discountAmount && booking.discountAmount > 0) ? (
                             <div className="text-xs text-green-600">
                               -${booking.discountAmount} off
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -973,11 +974,17 @@ export function BookingManagement() {
                 <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
                 <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
                 <div className="text-gray-500">Amount Paid</div><div>${detailData.booking.totalAmount}</div>
-                {detailData.booking.discountAmount ? (<><div className="text-gray-500">Discount</div><div>${detailData.booking.discountAmount}</div></>) : null}
+                {(detailData.booking.discountAmount && detailData.booking.discountAmount > 0) ? (<><div className="text-gray-500">Discount</div><div>${detailData.booking.discountAmount}</div></>) : null}
+                <div className="text-gray-500">Payment Method</div><div>{detailData.payment?.paymentMethod ? detailData.payment.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '-'}</div>
+                {detailData.booking.packageUsed && detailData.packageDiscount && detailData.packageDiscount > 0 ? (<><div className="text-gray-500">Package Discount Applied</div><div>${detailData.packageDiscount.toFixed(2)}</div></>) : null}
+                {detailData.booking.packageUsed && detailData.package?.packageName ? (<><div className="text-gray-500">Package Used</div><div>{detailData.package.packageName}</div></>) : null}
+                {detailData.paymentFee && detailData.paymentFee > 0 ? (<><div className="text-gray-500">Payment Fees</div><div>${detailData.paymentFee.toFixed(2)}</div></>) : null}
                 <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
                 {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
               </CardContent>
             </Card>
+           
+           
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">User</CardTitle>
@@ -1004,7 +1011,7 @@ export function BookingManagement() {
                 <div className="text-gray-500">Package Used</div><div>{detailData.booking.packageUsed ? 'Yes' : 'No'}</div>
                 {detailData.package ? (
                   <>
-                    <div className="text-gray-500">Plan</div><div>{detailData.package.packageId ? 'Count-based Pass' : '-'}</div>
+                    <div className="text-gray-500">Plan</div><div>{detailData.package.packageName || (detailData.package.packageId ? 'Count-based Pass' : '-')}</div>
                     <div className="text-gray-500">Quantity</div><div>{detailData.package.quantity ?? '-'}</div>
                     <div className="text-gray-500">Active</div><div>{detailData.package.isActive ? 'Yes' : 'No'}</div>
                     </>
@@ -1022,7 +1029,7 @@ export function BookingManagement() {
 
           {/* User Activity + Audit */}
           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-            <Card>
+            {/* <Card>
               <CardHeader>
                 <CardTitle className="text-sm">User Activity</CardTitle>
               </CardHeader>
@@ -1043,13 +1050,21 @@ export function BookingManagement() {
                   )}
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Audit</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div className="text-gray-500">Booked At</div><div>{formatBookingDate(detailData.booking.bookedAt || detailData.booking.createdAt)}</div>
+                {/* <div className="text-gray-500">Booked At</div><div>{formatBookingDate(detailData.booking.bookedAt || detailData.booking.createdAt)}</div> */}
+                <div className="text-gray-500">Booked At</div><div>{formatLocalDate(detailData.booking.bookedAt || detailData.booking.createdAt, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })}</div>
                 <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
               </CardContent>
             </Card>
