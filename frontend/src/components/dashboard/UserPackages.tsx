@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast'
 import { getUserPackages, UserPackage, completePackagePayment, CustomerInfo } from '@/lib/services/packageService'
 import { useAuth } from '@/hooks/useAuth'
 import { formatCurrency } from '@/lib/paymentUtils'
+import { getEffectiveMemberType } from '@/lib/userProfileService'
 
 interface UserPackagesProps {
   userId: string
@@ -48,12 +49,26 @@ export function UserPackages({ userId }: UserPackagesProps) {
 
   // Build URL for buy-pass page with package info
   const getBuyPassUrl = (pkg: UserPackage): string => {
-    const type = getTypeFromRole(pkg.targetRole)
+    // Check if user is a verified student
+    const userMemberType = databaseUser?.memberType || 'MEMBER'
+    const effectiveMemberType = getEffectiveMemberType(
+      userMemberType,
+      databaseUser?.studentVerificationStatus
+    )
+    const isStudent = effectiveMemberType === 'STUDENT'
+    
+    // If user is student, don't pass type parameter (so dashboard flow shows all packages)
+    // Otherwise, pass type parameter (old flow with specific role packages)
     const params = new URLSearchParams({
       package: pkg.packageName,
-      type: type,
       packageId: pkg.packageId
     })
+    
+    if (!isStudent) {
+      const type = getTypeFromRole(pkg.targetRole)
+      params.set('type', type)
+    }
+    
     return `/buy-pass?${params.toString()}`
   }
 
