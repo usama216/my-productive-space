@@ -290,7 +290,58 @@ export function BookingDetailsModal({ isOpen, onClose, bookingRef }: BookingDeta
                                   <div className="text-sm text-gray-600 mt-1">
                                     {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
                                       <div className="space-y-1.5">
-                                        {activity.activityDescription.includes('→') ? (
+                                        {/* Use metadata first if available (most reliable) */}
+                                        {activity.metadata && (activity.metadata.originalStartAt || activity.metadata.originalEndAt || activity.metadata.newStartAt || activity.metadata.newEndAt) ? (
+                                          <div className="flex flex-col gap-1.5">
+                                            {/* Old Time */}
+                                            {(activity.metadata.originalStartAt || activity.metadata.originalEndAt) && (
+                                              <div className="flex items-start gap-2">
+                                                <span className="text-xs font-medium text-gray-500">Old:</span>
+                                                <span className="font-mono text-xs">
+                                                  {activity.metadata.originalStartAt && activity.metadata.originalEndAt
+                                                    ? `${formatDateTime(activity.metadata.originalStartAt)} - ${formatDateTime(activity.metadata.originalEndAt)}`
+                                                    : activity.metadata.originalEndAt
+                                                    ? `End: ${formatDateTime(activity.metadata.originalEndAt)}`
+                                                    : formatDateTime(activity.metadata.originalStartAt)}
+                                                </span>
+                                              </div>
+                                            )}
+                                            {/* New Time */}
+                                            {(activity.metadata.newStartAt || activity.metadata.newEndAt) && (
+                                              <div className="flex items-start gap-2">
+                                                <span className="text-xs font-medium text-blue-600">New:</span>
+                                                <span className="font-mono text-xs">
+                                                  {activity.metadata.newStartAt && activity.metadata.newEndAt
+                                                    ? `${formatDateTime(activity.metadata.newStartAt)} - ${formatDateTime(activity.metadata.newEndAt)}`
+                                                    : activity.metadata.newEndAt
+                                                    ? `End: ${formatDateTime(activity.metadata.newEndAt)}`
+                                                    : formatDateTime(activity.metadata.newStartAt)}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : activity.oldValue && activity.newValue ? (
+                                          // Fallback to oldValue/newValue if metadata not available
+                                          <div className="flex flex-col gap-1.5">
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium text-gray-500">Old:</span>
+                                              <span className="font-mono text-xs">
+                                                {activity.oldValue.includes(' - ') 
+                                                  ? activity.oldValue.split(' - ').map((time: string) => formatDateTime(time.trim())).join(' - ')
+                                                  : formatDateTime(activity.oldValue)}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium text-blue-600">New:</span>
+                                              <span className="font-mono text-xs">
+                                                {activity.newValue.includes(' - ') 
+                                                  ? activity.newValue.split(' - ').map((time: string) => formatDateTime(time.trim())).join(' - ')
+                                                  : formatDateTime(activity.newValue)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ) : activity.activityDescription.includes('→') ? (
+                                          // Parse description with arrow format
                                           <div className="flex flex-col gap-1.5">
                                             {activity.activityDescription.split('→').map((part: string, idx: number) => (
                                               <div key={idx} className="flex items-start gap-2">

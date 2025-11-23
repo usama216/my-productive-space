@@ -1080,8 +1080,7 @@ export function BookingManagement() {
                 <CardTitle className="text-sm">Audit</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  {/* <div className="text-gray-500">Booked At</div><div>{formatBookingDate(detailData.booking.bookedAt || detailData.booking.createdAt)}</div> */}
+                {/* <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div className="text-gray-500">Booked At</div><div>{formatLocalDate(detailData.booking.bookedAt || detailData.booking.createdAt, {
                     year: 'numeric',
                     month: 'short',
@@ -1091,11 +1090,11 @@ export function BookingManagement() {
                     hour12: true
                   })}</div>
                   <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
-                </div>
+                </div> */}
                 
                 {/* Activity Timeline */}
-                <div className="mt-4 pt-4 border-t">
-                  <div className="text-sm font-medium mb-3">Activity Timeline</div>
+                <div className="">
+                  {/* <div className="text-sm font-medium mb-3">Activity Timeline</div> */}
                   {loadingActivities ? (
                     <div className="flex items-center justify-center py-4">
                       <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
@@ -1126,7 +1125,58 @@ export function BookingManagement() {
                                   <div className="text-xs text-gray-600 mt-0.5">
                                     {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
                                       <div className="space-y-1">
-                                        {activity.activityDescription.includes('→') ? (
+                                        {/* Use metadata first if available (most reliable) */}
+                                        {activity.metadata && (activity.metadata.originalStartAt || activity.metadata.originalEndAt || activity.metadata.newStartAt || activity.metadata.newEndAt) ? (
+                                          <div className="flex flex-col gap-1">
+                                            {/* Old Time */}
+                                            {(activity.metadata.originalStartAt || activity.metadata.originalEndAt) && (
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-gray-500">Old:</span>
+                                                <span className="font-mono text-xs">
+                                                  {activity.metadata.originalStartAt && activity.metadata.originalEndAt
+                                                    ? `${formatSingaporeDate(activity.metadata.originalStartAt)} - ${formatSingaporeDate(activity.metadata.originalEndAt)}`
+                                                    : activity.metadata.originalEndAt
+                                                    ? `End: ${formatSingaporeDate(activity.metadata.originalEndAt)}`
+                                                    : formatSingaporeDate(activity.metadata.originalStartAt)}
+                                                </span>
+                                              </div>
+                                            )}
+                                            {/* New Time */}
+                                            {(activity.metadata.newStartAt || activity.metadata.newEndAt) && (
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-blue-600 font-medium">New:</span>
+                                                <span className="font-mono text-xs">
+                                                  {activity.metadata.newStartAt && activity.metadata.newEndAt
+                                                    ? `${formatSingaporeDate(activity.metadata.newStartAt)} - ${formatSingaporeDate(activity.metadata.newEndAt)}`
+                                                    : activity.metadata.newEndAt
+                                                    ? `End: ${formatSingaporeDate(activity.metadata.newEndAt)}`
+                                                    : formatSingaporeDate(activity.metadata.newStartAt)}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : activity.oldValue && activity.newValue ? (
+                                          // Fallback to oldValue/newValue if metadata not available
+                                          <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-gray-500">Old:</span>
+                                              <span className="font-mono text-xs">
+                                                {activity.oldValue.includes(' - ') 
+                                                  ? activity.oldValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
+                                                  : formatSingaporeDate(activity.oldValue)}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-blue-600 font-medium">New:</span>
+                                              <span className="font-mono text-xs">
+                                                {activity.newValue.includes(' - ') 
+                                                  ? activity.newValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
+                                                  : formatSingaporeDate(activity.newValue)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ) : activity.activityDescription.includes('→') ? (
+                                          // Parse description with arrow format
                                           <div className="flex flex-col gap-1">
                                             {activity.activityDescription.split('→').map((part: string, idx: number) => (
                                               <div key={idx} className="flex items-center gap-1">
