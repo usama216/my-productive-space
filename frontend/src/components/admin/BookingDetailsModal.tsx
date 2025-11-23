@@ -284,12 +284,74 @@ export function BookingDetailsModal({ isOpen, onClose, bookingRef }: BookingDeta
                           </div>
                           <div className="flex-1 pb-4">
                             <div className="flex items-start justify-between">
-                              <div>
+                              <div className="flex-1">
                                 <p className="font-medium text-sm">{activity.activityTitle}</p>
                                 {activity.activityDescription && (
-                                  <p className="text-sm text-gray-600 mt-1">{activity.activityDescription}</p>
+                                  <div className="text-sm text-gray-600 mt-1">
+                                    {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
+                                      <div className="space-y-1.5">
+                                        {activity.activityDescription.includes('→') ? (
+                                          <div className="flex flex-col gap-1.5">
+                                            {activity.activityDescription.split('→').map((part: string, idx: number) => (
+                                              <div key={idx} className="flex items-start gap-2">
+                                                <span className={`text-xs font-medium ${idx === 0 ? 'text-gray-500' : 'text-blue-600'}`}>
+                                                  {idx === 0 ? 'Old:' : 'New:'}
+                                                </span>
+                                                <span className="font-mono text-xs">{part.trim()}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : activity.activityDescription.includes('Old:') && activity.activityDescription.includes('New:') ? (
+                                          // Handle format: "Old: ... New: ..."
+                                          <div className="flex flex-col gap-1.5">
+                                            {activity.activityDescription.split(/(?=New:)/).map((part: string, idx: number) => {
+                                              const isOld = part.includes('Old:')
+                                              const isNew = part.includes('New:')
+                                              const label = isOld ? 'Old:' : isNew ? 'New:' : ''
+                                              const content = part.replace(/^(Old:|New:)\s*/, '').trim()
+                                              return (
+                                                <div key={idx} className="flex items-start gap-2">
+                                                  <span className={`text-xs font-medium ${isOld ? 'text-gray-500' : 'text-blue-600'}`}>
+                                                    {label}
+                                                  </span>
+                                                  <span className="font-mono text-xs">{content}</span>
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+                                        ) : activity.activityDescription.includes('from') && activity.activityDescription.includes('to') ? (
+                                          // Handle old format: "Booking rescheduled from X to Y"
+                                          <div className="flex flex-col gap-1.5">
+                                            {(() => {
+                                              const fromMatch = activity.activityDescription.match(/from\s+(.+?)\s+to\s+(.+?)$/i)
+                                              if (fromMatch) {
+                                                return (
+                                                  <>
+                                                    <div className="flex items-start gap-2">
+                                                      <span className="text-xs font-medium text-gray-500">Old:</span>
+                                                      <span className="font-mono text-xs">{fromMatch[1].trim()}</span>
+                                                    </div>
+                                                    <div className="flex items-start gap-2">
+                                                      <span className="text-xs font-medium text-blue-600">New:</span>
+                                                      <span className="font-mono text-xs">{fromMatch[2].trim()}</span>
+                                                    </div>
+                                                  </>
+                                                )
+                                              }
+                                              return <p className="text-gray-600">{activity.activityDescription}</p>
+                                            })()}
+                                          </div>
+                                        ) : (
+                                          // Fallback for any other format
+                                          <p className="text-gray-600">{activity.activityDescription}</p>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p>{activity.activityDescription}</p>
+                                    )}
+                                  </div>
                                 )}
-                                {activity.amount && (
+                                {activity.amount && activity.amount > 0 && (
                                   <p className="text-sm text-green-600 font-medium mt-1">
                                     Amount: {formatCurrency(activity.amount)}
                                   </p>

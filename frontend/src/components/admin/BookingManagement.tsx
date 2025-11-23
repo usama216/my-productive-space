@@ -70,6 +70,8 @@ export function BookingManagement() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailData, setDetailData] = useState<any>(null)
+  const [activities, setActivities] = useState<any[]>([])
+  const [loadingActivities, setLoadingActivities] = useState(false)
   
   // Booking Timeline Modal state
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
@@ -719,6 +721,22 @@ export function BookingManagement() {
                                 if (resp && resp.success) {
                                   setDetailData(resp.data)
                                 }
+                                // Fetch activities separately
+                                setLoadingActivities(true)
+                                try {
+                                  const activityResp = await fetch(
+                                    `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking-activity/comprehensive/${booking.bookingRef}`
+                                  )
+                                  const activityData = await activityResp.json()
+                                  if (activityData.success && activityData.data?.activities) {
+                                    setActivities(activityData.data.activities)
+                                  }
+                                } catch (activityError) {
+                                  console.error('Error fetching activities:', activityError)
+                                  setActivities([])
+                                } finally {
+                                  setLoadingActivities(false)
+                                }
                               } catch (e) {
                                 // no-op
                               } finally {
@@ -940,7 +958,13 @@ export function BookingManagement() {
       </Dialog>
 
   {/* Booking Details Dialog */}
-  <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+      <Dialog open={isDetailDialogOpen} onOpenChange={(open) => {
+        setIsDetailDialogOpen(open)
+        if (!open) {
+          setDetailData(null)
+          setActivities([])
+        }
+      }}>
     <DialogContent className="min-w-3xl max-w-4xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Booking Details</DialogTitle>
@@ -1055,17 +1079,138 @@ export function BookingManagement() {
               <CardHeader>
                 <CardTitle className="text-sm">Audit</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                {/* <div className="text-gray-500">Booked At</div><div>{formatBookingDate(detailData.booking.bookedAt || detailData.booking.createdAt)}</div> */}
-                <div className="text-gray-500">Booked At</div><div>{formatLocalDate(detailData.booking.bookedAt || detailData.booking.createdAt, {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })}</div>
-                <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {/* <div className="text-gray-500">Booked At</div><div>{formatBookingDate(detailData.booking.bookedAt || detailData.booking.createdAt)}</div> */}
+                  <div className="text-gray-500">Booked At</div><div>{formatLocalDate(detailData.booking.bookedAt || detailData.booking.createdAt, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}</div>
+                  <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
+                </div>
+                
+                {/* Activity Timeline */}
+                <div className="mt-4 pt-4 border-t">
+                  <div className="text-sm font-medium mb-3">Activity Timeline</div>
+                  {loadingActivities ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                    </div>
+                  ) : activities && activities.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {activities.map((activity: any, index: number) => (
+                        <div key={activity.id || index} className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
+                              {activity.activityType === 'BOOKING_CREATED' && <Calendar className="w-3 h-3 text-blue-500" />}
+                              {activity.activityType === 'PAYMENT_CONFIRMED' && <DollarSign className="w-3 h-3 text-green-500" />}
+                              {activity.activityType === 'RESCHEDULE_APPROVED' && <Clock className="w-3 h-3 text-blue-500" />}
+                              {activity.activityType === 'EXTEND_APPROVED' && <Clock className="w-3 h-3 text-teal-500" />}
+                              {activity.activityType === 'CREDIT_USED' && <DollarSign className="w-3 h-3 text-orange-500" />}
+                              {activity.activityType === 'REFUND_APPROVED' && <DollarSign className="w-3 h-3 text-yellow-500" />}
+                              {!['BOOKING_CREATED', 'PAYMENT_CONFIRMED', 'RESCHEDULE_APPROVED', 'EXTEND_APPROVED', 'CREDIT_USED', 'REFUND_APPROVED'].includes(activity.activityType) && <FileText className="w-3 h-3 text-gray-500" />}
+                            </div>
+                            {index < activities.length - 1 && (
+                              <div className="w-0.5 h-full bg-gray-200 mt-1 min-h-[40px]"></div>
+                            )}
+                          </div>
+                          <div className="flex-1 pb-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <p className="font-medium text-xs">{activity.activityTitle}</p>
+                                {activity.activityDescription && (
+                                  <div className="text-xs text-gray-600 mt-0.5">
+                                    {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
+                                      <div className="space-y-1">
+                                        {activity.activityDescription.includes('→') ? (
+                                          <div className="flex flex-col gap-1">
+                                            {activity.activityDescription.split('→').map((part: string, idx: number) => (
+                                              <div key={idx} className="flex items-center gap-1">
+                                                <span className={idx === 0 ? 'text-gray-500' : 'text-blue-600 font-medium'}>
+                                                  {idx === 0 ? 'Old:' : 'New:'}
+                                                </span>
+                                                <span className="font-mono text-xs">{part.trim()}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : activity.activityDescription.includes('Old:') && activity.activityDescription.includes('New:') ? (
+                                          // Handle format: "Old: ... New: ..."
+                                          <div className="flex flex-col gap-1">
+                                            {activity.activityDescription.split(/(?=New:)/).map((part: string, idx: number) => {
+                                              const isOld = part.includes('Old:')
+                                              const isNew = part.includes('New:')
+                                              const label = isOld ? 'Old:' : isNew ? 'New:' : ''
+                                              const content = part.replace(/^(Old:|New:)\s*/, '').trim()
+                                              return (
+                                                <div key={idx} className="flex items-center gap-1">
+                                                  <span className={isOld ? 'text-gray-500' : 'text-blue-600 font-medium'}>
+                                                    {label}
+                                                  </span>
+                                                  <span className="font-mono text-xs">{content}</span>
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+                                        ) : activity.activityDescription.includes('from') && activity.activityDescription.includes('to') ? (
+                                          // Handle old format: "Booking rescheduled from X to Y"
+                                          <div className="flex flex-col gap-1">
+                                            {(() => {
+                                              const fromMatch = activity.activityDescription.match(/from\s+(.+?)\s+to\s+(.+?)$/i)
+                                              if (fromMatch) {
+                                                return (
+                                                  <>
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Old:</span>
+                                                      <span className="font-mono text-xs">{fromMatch[1].trim()}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-blue-600 font-medium">New:</span>
+                                                      <span className="font-mono text-xs">{fromMatch[2].trim()}</span>
+                                                    </div>
+                                                  </>
+                                                )
+                                              }
+                                              return <p className="text-gray-600">{activity.activityDescription}</p>
+                                            })()}
+                                          </div>
+                                        ) : (
+                                          // Fallback for any other format
+                                          <p className="text-gray-600">{activity.activityDescription}</p>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p>{activity.activityDescription}</p>
+                                    )}
+                                  </div>
+                                )}
+                                {activity.amount && activity.amount > 0 && (
+                                  <p className="text-xs text-green-600 font-medium mt-0.5">
+                                    ${activity.amount.toFixed(2)}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-500 whitespace-nowrap">
+                                {formatLocalDate(activity.createdAt, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-2">No activities recorded yet</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
