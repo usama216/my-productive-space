@@ -909,32 +909,36 @@ export function UserBookings() {
                           </>
                         )}
 
-                        {activeTab === 'upcoming' && canExtendBooking(booking) && (
-                           <>
-                           <Button
-                           size="sm"
-                           variant="outline"
-                           onClick={() => handleSendTuyaLink(booking)}
-                           disabled={sendingTuyaLink === booking.bookingRef}
-                           className="hover:bg-green-50 border-green-200 text-green-700"
-                         >
-                           {sendingTuyaLink === booking.bookingRef ? (
-                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                           ) : (
-                             <Key className="h-4 w-4 mr-1" />
-                           )}
-                           {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Tuya'}
-                         </Button>
-
+                        {/* Tuya button shows in upcoming tab when reschedule is NOT available (less than 5 hours before) */}
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && 
+                         (!canEditBooking(booking) || (booking.rescheduleCount || 0) >= 1) && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleExtend(booking)}
-                            className="hover:bg-blue-50 border-blue-200 text-blue-700"
+                            onClick={() => handleSendTuyaLink(booking)}
+                            disabled={sendingTuyaLink === booking.bookingRef}
+                            className="hover:bg-green-50 border-green-200 text-green-700"
                           >
-                            <Timer className="h-4 w-4 mr-1" />
-                            Extend
+                            {sendingTuyaLink === booking.bookingRef ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <Key className="h-4 w-4 mr-1" />
+                            )}
+                            {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Tuya'}
                           </Button>
+                        )}
+
+                        {activeTab === 'upcoming' && canExtendBooking(booking) && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleExtend(booking)}
+                              className="hover:bg-blue-50 border-blue-200 text-blue-700"
+                            >
+                              <Timer className="h-4 w-4 mr-1" />
+                              Extend
+                            </Button>
                           </>
                         )}
 
