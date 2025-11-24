@@ -339,6 +339,14 @@ export function UserBookings() {
     })
     .sort((a, b) => new Date(b.endAt).getTime() - new Date(a.endAt).getTime()) // Most recent first
 
+  const cancelledBookings = bookings
+    .filter(booking => booking.status === 'refunded' || booking.refundstatus === 'APPROVED')
+    .sort((a, b) => {
+      const aDate = new Date(a.updatedAt || a.createdAt || a.startAt).getTime()
+      const bDate = new Date(b.updatedAt || b.createdAt || b.startAt).getTime()
+      return bDate - aDate // Most recent first
+    })
+
   // Update stats when bookings change
   useEffect(() => {
     setUserStats({
@@ -450,7 +458,7 @@ export function UserBookings() {
         tabBookings = pastBookings
         break
       case 'cancelled':
-        tabBookings = bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED')
+        tabBookings = cancelledBookings
         break
       default:
         return []
@@ -542,7 +550,7 @@ export function UserBookings() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{userStats.pastBookings}</div>
+            <div className="text-2xl font-bold">{cancelledBookings.length}</div>
             <p className="text-xs text-muted-foreground">
               Cancelled
             </p>

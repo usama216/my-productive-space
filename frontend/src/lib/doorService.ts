@@ -1,4 +1,6 @@
 // Door service for generating door access links
+import { getAuthHeaders } from './apiClient'
+
 export interface GenerateOpenLinkResponse {
     success: boolean;
     data?: {
@@ -51,11 +53,10 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive
  */
 export async function generateOpenLink(bookingRef: string): Promise<GenerateOpenLinkResponse> {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE}/door/generate-open-link`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({ bookingRef }),
         });
         return handleResponse(response);
@@ -81,11 +82,10 @@ export async function adminGenerateOpenLink(
     endTime: string
 ): Promise<AdminGenerateOpenLinkResponse> {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE}/door/admin-generate-open-link`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({ seatNumber, startTime, endTime }),
         });
         return handleAdminResponse(response);
@@ -155,11 +155,10 @@ const handleAdminResponse = async (response: Response): Promise<AdminGenerateOpe
 
 export async function sendDoorAccessLink(bookingRef: string): Promise<GenerateOpenLinkResponse> {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE}/door/send-access-link`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({ bookingRef }),
         });
         return handleResponse(response);
@@ -190,11 +189,10 @@ export async function sendAdminDoorAccessLink(
     endTime: string
 ): Promise<{ success: boolean; message?: string }> {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE}/door/send-admin-access-link`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({ token, recipientEmail, userName, seatNumber, startTime, endTime }),
         });
         
