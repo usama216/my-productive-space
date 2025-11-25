@@ -174,9 +174,7 @@ export default function PaymentStep({
                 {selectedPaymentMethod === 'creditCard' && (
                   <span className="ml-2 text-sm text-gray-500">(+{feeSettings.creditCardFeePercentage}% fee)</span>
                 )}
-                {selectedPaymentMethod === 'payNow' && (
-                  <span className="ml-2 text-sm text-gray-500">(+${feeSettings.paynowFee.toFixed(2)} fee)</span>
-                )}
+               
               </div>
             </label>
           </div>

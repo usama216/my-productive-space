@@ -1010,7 +1010,7 @@ export default function Dashboard() {
                                       </p>
                                       {(expired || expiringSoon) && (
                                         <p className="text-sm mt-2 font-medium">
-                                          Please upload a new verification document to maintain your student status.
+Please click 'Edit profile' and upload a new verification document to maintain your student status.
                                         </p>
                                       )}
                                     </div>
