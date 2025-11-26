@@ -932,7 +932,7 @@ export function UserBookings() {
                             ) : (
                               <Key className="h-4 w-4 mr-1" />
                             )}
-                            {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Tuya'}
+                            {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Door Access Link'}
                           </Button>
                         )}
 
@@ -1017,7 +1017,7 @@ export function UserBookings() {
                               ) : (
                                 <Key className="h-4 w-4 mr-1" />
                               )}
-                              {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Tuya'}
+                              {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Door Access Link'}
                             </Button>
                         
                             
