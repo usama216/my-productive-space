@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { authenticatedFetch } from '@/lib/apiClient'
 import { Loader2, Save, TestTube, Eye, EyeOff, Key, Link, Server, Lock, RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -42,7 +43,7 @@ export function TuyaSettingsManagement() {
   const fetchSettings = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/tuya-settings`)
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/tuya-settings`)
       const data = await response.json()
 
       if (data.success) {
@@ -104,7 +105,7 @@ export function TuyaSettingsManagement() {
         settingValue: '-1'
       })
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/tuya-settings/bulk-update`,
         {
           method: 'POST',
@@ -142,7 +143,7 @@ export function TuyaSettingsManagement() {
     try {
       setTesting(true)
       
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/tuya-settings/test-connection`,
         {
           method: 'POST',

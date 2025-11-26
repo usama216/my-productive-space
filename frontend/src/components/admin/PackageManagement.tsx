@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Edit, Trash2, Eye, Package, FilterX } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
+import { authenticatedFetch } from '@/lib/apiClient';
 
 interface Package {
   id: string;
@@ -95,7 +96,7 @@ const PackageManagement: React.FC = () => {
       const queryString = params.toString();
       const url = `${API_BASE_URL}/admin/packages${queryString ? `?${queryString}` : ''}`;
 
-      const response = await fetch(url);
+      const response = await authenticatedFetch(url);
       if (response.ok) {
         const data = await response.json();
         setPackages(data.packages || []);
@@ -169,7 +170,7 @@ const PackageManagement: React.FC = () => {
       const url = editingPackage ? `${API_BASE_URL}/admin/packages/${editingPackage.id}` : `${API_BASE_URL}/admin/packages`;
       const method = editingPackage ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -231,7 +232,7 @@ const PackageManagement: React.FC = () => {
         ? `${API_BASE_URL}/admin/packages/${packageId}?force=true`
         : `${API_BASE_URL}/admin/packages/${packageId}`;
       
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: 'DELETE',
       });
 

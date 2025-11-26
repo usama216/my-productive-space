@@ -2,6 +2,7 @@
 // TESTING MODE: Student verification expiry set to 2 days with 1-day warning for testing
 // PRODUCTION: Change back to 6-month expiry with 14-day warning (uncomment production lines)
 import { supabase } from './supabaseClient'
+import { authenticatedFetch } from './apiClient'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
 
@@ -30,7 +31,7 @@ export interface UserProfileResponse {
 // Get current user's profile information
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/user/${userId}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/user/${userId}`);
     const data: UserProfileResponse = await response.json();
     
     if (response.ok && data.success) {
@@ -69,7 +70,7 @@ export async function updateUserProfile(userId: string, profileData: Partial<Use
 
     // Step 2: Update custom User table via your backend API
     console.log('Updating custom User table...')
-    const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/user/${userId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

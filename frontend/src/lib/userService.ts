@@ -70,6 +70,8 @@ export interface UpdateUserPayload {
   studentVerificationStatus?: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED'
 }
 
+import { authenticatedFetch } from './apiClient'
+
 // API Base URL
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app/api'
 
@@ -119,7 +121,7 @@ export const getAllUsers = async (filters: UserFilters = {}): Promise<UserRespon
     const queryString = buildQueryString(filters)
     const url = `${API_BASE}/booking/admin/users${queryString ? `?${queryString}` : ''}`
     
-    const response = await fetch(url)
+    const response = await authenticatedFetch(url)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get All Users Error:', error)
@@ -133,7 +135,7 @@ export const getAllUsers = async (filters: UserFilters = {}): Promise<UserRespon
 
 export const getUserById = async (id: string): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/${id}`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get User Error:', error)
@@ -147,11 +149,8 @@ export const getUserById = async (id: string): Promise<UserResponse> => {
 
 export const updateUser = async (id: string, payload: UpdateUserPayload): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/${id}`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(payload),
     })
     
@@ -168,11 +167,8 @@ export const updateUser = async (id: string, payload: UpdateUserPayload): Promis
 
 export const suspendUser = async (id: string, reason: string): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/${id}/suspend`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/suspend`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ reason }),
     })
     
@@ -189,11 +185,8 @@ export const suspendUser = async (id: string, reason: string): Promise<UserRespo
 
 export const activateUser = async (id: string): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/${id}/activate`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/activate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     })
     
     return await handleResponse(response)
@@ -209,11 +202,8 @@ export const activateUser = async (id: string): Promise<UserResponse> => {
 
 export const deleteUser = async (id: string): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/${id}`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     })
     
     return await handleResponse(response)
@@ -229,7 +219,7 @@ export const deleteUser = async (id: string): Promise<UserResponse> => {
 
 export const getUserStats = async (): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/dashboard`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/dashboard`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get User Stats Error:', error)
@@ -243,7 +233,7 @@ export const getUserStats = async (): Promise<UserResponse> => {
 
 export const getUserAnalytics = async (period: 'week' | 'month' | 'quarter' | 'year' = 'month'): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/analytics?period=${period}`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/analytics?period=${period}`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get User Analytics Error:', error)
@@ -255,14 +245,18 @@ export const getUserAnalytics = async (period: 'week' | 'month' | 'quarter' | 'y
   }
 }
 
-export const updateStudentVerification = async (id: string, status: 'VERIFIED' | 'REJECTED'): Promise<UserResponse> => {
+export const updateStudentVerification = async (
+  id: string,
+  status: 'VERIFIED' | 'REJECTED',
+  rejectionReason?: string
+): Promise<UserResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/users/${id}/verify`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/verify`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ studentVerificationStatus: status }),
+      body: JSON.stringify({
+        studentVerificationStatus: status,
+        ...(status === 'REJECTED' && rejectionReason ? { rejectionReason } : {})
+      }),
     })
     
     return await handleResponse(response)

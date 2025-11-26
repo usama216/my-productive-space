@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Package, Users, Calendar, TrendingUp, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { authenticatedFetch } from '@/lib/apiClient'
 import { formatSingaporeDateOnly } from '@/lib/timezoneUtils'
 
 interface PackageUsage {
@@ -77,7 +78,7 @@ export default function PackageUsageTable() {
         sortOrder: sortOrder
       })
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/packages/usage?${params}`)
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/packages/usage?${params}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch package usage data')

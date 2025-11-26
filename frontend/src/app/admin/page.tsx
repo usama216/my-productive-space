@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { getAllUsers } from '@/lib/userService'
+import { getAllUsers, updateStudentVerification } from '@/lib/userService'
 import { getAllRefundRequests, RefundTransaction } from '@/lib/refundService'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
@@ -227,22 +227,15 @@ export default function AdminDashboard() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/admin/users/${user.id}/verify`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentVerificationStatus: action === 'verify' ? 'VERIFIED' : 'REJECTED',
-          ...(action === 'reject' && rejectionReason && { rejectionReason })
-        })
-      })
+      const result = await updateStudentVerification(
+        user.id,
+        action === 'verify' ? 'VERIFIED' : 'REJECTED',
+        rejectionReason
+      )
 
-      if (!response.ok) {
-        throw new Error(`API call failed: ${response.statusText}`)
+      if (!result.success) {
+        throw new Error(result.error || 'API call failed')
       }
-
-      const result = await response.json()
 
       setUsers(prev => prev.map(u =>
         u.id === user.id

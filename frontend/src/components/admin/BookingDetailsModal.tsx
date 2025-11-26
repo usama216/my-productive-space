@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
+import { authenticatedFetch } from '@/lib/apiClient'
 import {
   Loader2,
   Calendar,
@@ -80,7 +81,7 @@ export function BookingDetailsModal({ isOpen, onClose, bookingRef }: BookingDeta
   const fetchBookingDetails = async () => {
     try {
       setLoading(true)
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking-activity/comprehensive/${bookingRef}`
       )
       const result = await response.json()

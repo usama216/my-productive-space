@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/apiClient';
 
 export const ApiResponseDebugger: React.FC = () => {
   const [apiResponse, setApiResponse] = useState<any>(null);
@@ -22,7 +23,7 @@ export const ApiResponseDebugger: React.FC = () => {
     try {
       console.log('🧪 Testing API call to admin packages endpoint...');
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app'}/new-packages/admin/all`);
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app'}/new-packages/admin/all`);
       
       console.log('📡 Response status:', response.status, response.ok);
       

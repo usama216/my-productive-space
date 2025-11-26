@@ -2,6 +2,7 @@
  * Payment Settings Service
  * Fetches dynamic payment fee settings from backend
  */
+import { authenticatedFetch } from './apiClient'
 
 interface PaymentSettings {
   PAYNOW_TRANSACTION_FEE: number
@@ -39,7 +40,7 @@ export async function getPaymentSettings(): Promise<PaymentSettings> {
       return cachedSettings
     }
 
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings`
     )
     

@@ -23,6 +23,7 @@ import {
   User
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { authenticatedFetch } from '@/lib/apiClient';
 
 interface PackageUsageData {
   id: string;
@@ -85,7 +86,7 @@ export const PackageUsageTracking: React.FC = () => {
       const queryString = params.toString();
       const url = `${API_BASE_URL}/packages/admin/usage${queryString ? `?${queryString}` : ''}`;
       
-      const response = await fetch(url);
+      const response = await authenticatedFetch(url);
       
       if (!response.ok) {
         throw new Error('Failed to fetch package usage data');

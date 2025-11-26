@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { authenticatedFetch } from '@/lib/apiClient'
 import { Loader2, Save, Calculator, DollarSign, CreditCard, Smartphone, RefreshCw, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
@@ -42,7 +43,7 @@ export function PaymentSettingsManagement() {
   const fetchSettings = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings`)
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings`)
       const data = await response.json()
 
       if (data.success) {
@@ -86,7 +87,7 @@ export function PaymentSettingsManagement() {
         settingValue: formData[setting.settingKey] || ''
       }))
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings/bulk-update`,
         {
           method: 'POST',
@@ -133,7 +134,7 @@ export function PaymentSettingsManagement() {
       }
 
       // Calculate PayNow fee
-      const paynowResponse = await fetch(
+      const paynowResponse = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings/calculate-fee`,
         {
           method: 'POST',
@@ -145,7 +146,7 @@ export function PaymentSettingsManagement() {
       )
 
       // Calculate Credit Card fee
-      const creditCardResponse = await fetch(
+      const creditCardResponse = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings/calculate-fee`,
         {
           method: 'POST',

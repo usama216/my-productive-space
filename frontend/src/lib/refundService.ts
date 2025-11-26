@@ -1,4 +1,6 @@
 // Refund Credit System Service
+import { authenticatedFetch } from './apiClient'
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000';
 
 export interface UserCredit {
@@ -85,7 +87,7 @@ export interface PaymentCalculation {
 // User Credit Functions
 export const getUserCredits = async (userId: string): Promise<{ credits: UserCredit[]; totalCredit: number; count: number }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/refund/credits?userid=${userId}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/refund/credits?userid=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch user credits');
     }
@@ -98,7 +100,7 @@ export const getUserCredits = async (userId: string): Promise<{ credits: UserCre
 
 export const getUserRefundRequests = async (userId: string): Promise<RefundTransaction[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/refund/requests?userid=${userId}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/refund/requests?userid=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch refund requests');
     }
@@ -111,7 +113,7 @@ export const getUserRefundRequests = async (userId: string): Promise<RefundTrans
 
 export const getUserCreditUsage = async (userId: string): Promise<CreditUsage[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/refund/credit-usage?userid=${userId}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/refund/credit-usage?userid=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch credit usage');
     }
@@ -125,7 +127,7 @@ export const getUserCreditUsage = async (userId: string): Promise<CreditUsage[]>
 export const requestRefund = async (bookingId: string, reason: string, userId: string): Promise<{ message: string; bookingId: string; creditid?: string; creditamount?: number; expiresat?: string }> => {
   try {
     // First, create the refund request
-    const response = await fetch(`${API_BASE_URL}/refund/request`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/refund/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,7 +153,7 @@ export const requestRefund = async (bookingId: string, reason: string, userId: s
     if (latestRefund) {
       // Auto-approve the refund immediately
       try {
-        const approveResponse = await fetch(`${API_BASE_URL}/admin/refund/refunds/${latestRefund.id}/approve`, {
+        const approveResponse = await authenticatedFetch(`${API_BASE_URL}/admin/refund/refunds/${latestRefund.id}/approve`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -184,7 +186,7 @@ export const requestRefund = async (bookingId: string, reason: string, userId: s
 
 export const calculatePayment = async (bookingAmount: number, userId: string): Promise<PaymentCalculation> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/credit/calculate-payment`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/credit/calculate-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -208,7 +210,7 @@ export const calculatePayment = async (bookingAmount: number, userId: string): P
 // Admin Functions
 export const getAllRefundRequests = async (): Promise<RefundTransaction[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/refund/refunds`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/refund/refunds`);
     if (!response.ok) {
       throw new Error('Failed to fetch refund requests');
     }
@@ -226,7 +228,7 @@ export const getAllUserCredits = async (params?: { page?: number; limit?: number
     if (params?.limit) q.push(`limit=${params.limit}`);
     if (params?.search && params.search.trim()) q.push(`search=${encodeURIComponent(params.search.trim())}`);
     const qs = q.length ? `?${q.join('&')}` : '';
-    const response = await fetch(`${API_BASE_URL}/admin/refund/credits${qs}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/refund/credits${qs}`);
     if (!response.ok) {
       throw new Error('Failed to fetch user credits');
     }
@@ -239,7 +241,7 @@ export const getAllUserCredits = async (params?: { page?: number; limit?: number
 
 export const approveRefund = async (refundId: string): Promise<{ message: string; creditid: string; creditamount: number; expiresat: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/refund/refunds/${refundId}/approve`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/refund/refunds/${refundId}/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -259,7 +261,7 @@ export const approveRefund = async (refundId: string): Promise<{ message: string
 
 export const rejectRefund = async (refundId: string): Promise<{ message: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/refund/refunds/${refundId}/reject`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/refund/refunds/${refundId}/reject`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -279,7 +281,7 @@ export const rejectRefund = async (refundId: string): Promise<{ message: string 
 
 export const getRefundStats = async (): Promise<{ totalRefunded: number; totalTransactions: number; averageRefund: number }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/refund/stats`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/refund/stats`);
     if (!response.ok) {
       throw new Error('Failed to fetch refund stats');
     }
@@ -292,7 +294,7 @@ export const getRefundStats = async (): Promise<{ totalRefunded: number; totalTr
 
 export const updateUserCredits = async (userId: string, newAmount: number): Promise<{ message: string; oldAmount: number; newAmount: number }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/refund/credits/${userId}`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/refund/credits/${userId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

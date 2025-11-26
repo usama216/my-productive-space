@@ -38,6 +38,7 @@ import {
   formatBookingDateRange,
   formatLocalDate
 } from '@/lib/timezoneUtils'
+import { authenticatedFetch } from '@/lib/apiClient'
 
 export function BookingManagement() {
   const { toast } = useToast()
@@ -724,7 +725,7 @@ export function BookingManagement() {
                                 // Fetch activities separately
                                 setLoadingActivities(true)
                                 try {
-                                  const activityResp = await fetch(
+                                  const activityResp = await authenticatedFetch(
                                     `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking-activity/comprehensive/${booking.bookingRef}`
                                   )
                                   const activityData = await activityResp.json()

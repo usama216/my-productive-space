@@ -1,4 +1,6 @@
 // src/lib/rescheduleService.ts - Reschedule booking service
+import { authenticatedFetch } from './apiClient'
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000'
 
 export interface RescheduleRequest {
@@ -29,11 +31,8 @@ export const rescheduleBooking = async (
   rescheduleData: RescheduleRequest
 ): Promise<RescheduleResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/reschedule/booking/${bookingId}`, {
+    const response = await authenticatedFetch(`${API_BASE}/reschedule/booking/${bookingId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(rescheduleData),
     })
 
@@ -68,7 +67,7 @@ export const getAvailableSeatsForReschedule = async (
       endAt
     })
 
-    const response = await fetch(`${API_BASE}/reschedule/booking/${bookingId}/available-seats?${params}`)
+    const response = await authenticatedFetch(`${API_BASE}/reschedule/booking/${bookingId}/available-seats?${params}`)
 
     const result = await response.json()
 
@@ -96,7 +95,7 @@ export const getBookingForReschedule = async (bookingId: string): Promise<{
   error?: string
 }> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/${bookingId}`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/${bookingId}`)
     const result = await response.json()
 
     if (!response.ok) {

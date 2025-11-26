@@ -1,4 +1,5 @@
 // Edit Booking Service - API calls for edit booking functionality
+import { authenticatedFetch } from './apiClient'
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api'
 
@@ -55,11 +56,8 @@ export interface BookingForEditResponse {
 // Get booking details for editing
 export const getBookingForEdit = async (bookingId: string): Promise<BookingForEditResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/edit-booking/booking/${bookingId}`, {
+    const response = await authenticatedFetch(`${API_BASE}/edit-booking/booking/${bookingId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     })
 
     const result = await response.json()
@@ -87,11 +85,8 @@ export const calculatePriceDifference = async (
   changes: PriceDifferenceRequest
 ): Promise<PriceDifferenceResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/edit-booking/booking/${bookingId}/calculate-price`, {
+    const response = await authenticatedFetch(`${API_BASE}/edit-booking/booking/${bookingId}/calculate-price`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(changes),
     })
 
@@ -132,11 +127,8 @@ export const updateBooking = async (
   editData: EditBookingRequest
 ): Promise<EditBookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/edit-booking/booking/${bookingId}`, {
+    const response = await authenticatedFetch(`${API_BASE}/edit-booking/booking/${bookingId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(editData),
     })
 
@@ -162,11 +154,8 @@ export const updateBooking = async (
 // Get booking details from reschedule API (for backward compatibility)
 export const getBookingFromReschedule = async (bookingId: string): Promise<any> => {
   try {
-    const response = await fetch(`${API_BASE}/reschedule/booking/${bookingId}`, {
+    const response = await authenticatedFetch(`${API_BASE}/reschedule/booking/${bookingId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     })
 
     if (!response.ok) {

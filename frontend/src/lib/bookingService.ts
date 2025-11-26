@@ -1,5 +1,6 @@
 // src/lib/bookingService.ts - Booking API service
 import { toast } from '@/hooks/use-toast'
+import { authenticatedFetch } from './apiClient'
 
 // Types
 export interface BookingDiscountHistory {
@@ -218,11 +219,8 @@ const buildQueryString = (filters: BookingFilters): string => {
 // User/Client APIs
 export const createBooking = async (payload: CreateBookingPayload): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/create`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(payload),
     })
     
@@ -239,7 +237,7 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
 
 export const getAllBookings = async (): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/all`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/all`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get All Bookings Error:', error)
@@ -266,11 +264,8 @@ export const getUserBookings = async (): Promise<BookingResponse> => {
       console.warn('Failed to parse auth_user from localStorage:', parseError)
     }
     
-    const response = await fetch(`${API_BASE}/booking/user/bookings`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/user/bookings`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ userId }),
     })
     
@@ -287,7 +282,7 @@ export const getUserBookings = async (): Promise<BookingResponse> => {
 
 export const getBookingById = async (id: string): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/getById/${id}`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/getById/${id}`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get Booking Error:', error)
@@ -301,11 +296,8 @@ export const getBookingById = async (id: string): Promise<BookingResponse> => {
 
 export const confirmBookingPayment = async (bookingId: string): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/confirmBooking`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/confirmBooking`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ bookingId }),
     })
     
@@ -322,11 +314,8 @@ export const confirmBookingPayment = async (bookingId: string): Promise<BookingR
 
 export const getBookedSeats = async (location: string, startAt: string, endAt: string): Promise<SeatAvailabilityResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/getBookedSeats`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/getBookedSeats`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ location, startAt, endAt }),
     })
     
@@ -340,11 +329,8 @@ export const getBookedSeats = async (location: string, startAt: string, endAt: s
 
 export const getUserStats = async (userId: string): Promise<UserStatsResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/userStats`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/userStats`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ userId }),
     })
     
@@ -362,7 +348,7 @@ export const getAdminBookings = async (filters: BookingFilters = {}): Promise<Bo
     const queryString = buildQueryString(filters)
     const url = `${API_BASE}/booking/admin/all${queryString ? `?${queryString}` : ''}`
     
-    const response = await fetch(url)
+    const response = await authenticatedFetch(url)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get Admin Bookings Error:', error)
@@ -376,7 +362,7 @@ export const getAdminBookings = async (filters: BookingFilters = {}): Promise<Bo
 
 export const getBookingAnalytics = async (period: 'week' | 'month' | 'quarter' | 'year' = 'month'): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/analytics?period=${period}`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/analytics?period=${period}`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get Analytics Error:', error)
@@ -390,7 +376,7 @@ export const getBookingAnalytics = async (period: 'week' | 'month' | 'quarter' |
 
 export const getDashboardSummary = async (): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/dashboard`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/dashboard`)
     return await handleResponse(response)
   } catch (error) {
     console.error('Get Dashboard Error:', error)
@@ -416,7 +402,7 @@ export interface BookingDetailResponse {
 
 export const getAdminBookingDetails = async (idOrRef: string): Promise<BookingDetailResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/details/${idOrRef}`)
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/details/${idOrRef}`)
     const data = await response.json()
     return data
   } catch (error) {
@@ -427,11 +413,8 @@ export const getAdminBookingDetails = async (idOrRef: string): Promise<BookingDe
 
 export const updateAdminBooking = async (id: string, payload: UpdateBookingPayload): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/${id}`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(payload),
     })
     
@@ -448,11 +431,8 @@ export const updateAdminBooking = async (id: string, payload: UpdateBookingPaylo
 
 export const cancelAdminBooking = async (id: string, payload: CancelBookingPayload): Promise<BookingResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/booking/admin/${id}`, {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(payload),
     })
     

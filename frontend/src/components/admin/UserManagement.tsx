@@ -331,24 +331,11 @@ export function UserManagement() {
     try {
       setIsSubmitting(true)
       
-      // Call your API with rejection reason if provided
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/admin/users/${userId}/verify`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentVerificationStatus: status,
-          ...(status === 'REJECTED' && rejectionReason && { rejectionReason })
-        })
-      })
+      const result = await updateStudentVerification(userId, status, rejectionReason)
 
-      if (!response.ok) {
-        throw new Error(`API call failed: ${response.statusText}`)
+      if (!result.success) {
+        throw new Error(result.error || 'API call failed')
       }
-
-      const result = await response.json()
-      console.log('API Response:', result)
       
       toast({
         title: "Success",
