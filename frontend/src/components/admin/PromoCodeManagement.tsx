@@ -25,6 +25,7 @@ import {
   getPromoCodeStatusBadge
 } from '@/lib/promoCodeService'
 import { UserSelector } from './UserSelector'
+import { formatLocalDate } from '@/lib/timezoneUtils'
 
 export function PromoCodeManagement() {
   const { toast } = useToast()
@@ -72,6 +73,18 @@ export function PromoCodeManagement() {
     category: '',
     priority: 1
   })
+
+  const formatPromoDateTime = (date?: string | null) => {
+    if (!date) return null
+    return formatLocalDate(date, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
 
   // Debounce search term
   useEffect(() => {
@@ -868,22 +881,19 @@ export function PromoCodeManagement() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                <span>
-                                  {promo.activeFrom 
-                                    ? new Date(promo.activeFrom).toLocaleDateString()
-                                    : 'Always'
-                                  }
-                                </span>
-                              </div>
-                              {promo.activeTo && (
-                                <div className="text-xs text-gray-500">
-                                  to {new Date(promo.activeTo).toLocaleDateString()}
-                                </div>
-                              )}
+                        <div className="text-sm">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>
+                              {formatPromoDateTime(promo.activefrom) || 'Always'}
+                            </span>
+                          </div>
+                          {promo.activeto && (
+                            <div className="text-xs text-gray-500">
+                              to {formatPromoDateTime(promo.activeto)}
                             </div>
+                          )}
+                        </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -1039,8 +1049,8 @@ export function PromoCodeManagement() {
                 <div>
                   <Label className="text-sm font-medium">Active From</Label>
                   <p className="text-sm text-gray-600">
-                    {viewingPromo.activeFrom 
-                      ? new Date(viewingPromo.activeFrom).toLocaleString()
+                    {viewingPromo.activefrom 
+                      ? formatPromoDateTime(viewingPromo.activefrom)
                       : 'Always'
                     }
                   </p>
@@ -1048,8 +1058,8 @@ export function PromoCodeManagement() {
                 <div>
                   <Label className="text-sm font-medium">Active Until</Label>
                   <p className="text-sm text-gray-600">
-                    {viewingPromo.activeTo 
-                      ? new Date(viewingPromo.activeTo).toLocaleString()
+                    {viewingPromo.activeto 
+                      ? formatPromoDateTime(viewingPromo.activeto)
                       : 'No expiration'
                     }
                   </p>

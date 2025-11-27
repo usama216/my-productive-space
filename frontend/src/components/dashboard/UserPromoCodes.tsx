@@ -230,7 +230,7 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
         <TabsContent value="available" className="space-y-4">
           {availablePromos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availablePromos.map((promo) => {
+              {availablePromos.map((promo:any) => {
                 const eligibilityStatus = getEligibilityStatus(promo)
                 return (
                   <Card key={promo.id} className="relative">
@@ -298,17 +298,17 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           <span>
-                            {promo.activeFrom 
-                              ? `Active from ${new Date(promo.activeFrom).toLocaleDateString()}`
+                            {promo.activefrom 
+                              ? `Active from ${new Date(promo.activefrom).toLocaleDateString()}`
                               : 'Always active'
                             }
                           </span>
                         </div>
-                        {promo.activeTo && (
+                        {promo.activeto && (
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             <span>
-                              Expires {new Date(promo.activeTo).toLocaleDateString()}
+                              Expires {new Date(promo.activeto).toLocaleDateString()}
                             </span>
                           </div>
                         )}

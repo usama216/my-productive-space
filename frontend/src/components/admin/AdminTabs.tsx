@@ -114,7 +114,7 @@ export default function AdminTabs({
                       </div>
                       <div className="text-right">
                         <StatusBadge status={refund.refundstatus} />
-                        <p className="text-xs text-gray-600 mt-1">${refund.refundamount}</p>
+                        <p className="text-xs text-gray-600 mt-1">${refund.refundamount?.toFixed(2)}</p>
                       </div>
                     </div>
                   ))}
