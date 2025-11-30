@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, Eye, Calendar, Users, Target, Gift, Globe, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, Calendar, Users, Target, Gift, Globe, ChevronLeft, ChevronRight, Filter, X, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +25,7 @@ import {
   getPromoCodeStatusBadge
 } from '@/lib/promoCodeService'
 import { UserSelector } from './UserSelector'
-import { formatLocalDate } from '@/lib/timezoneUtils'
+import { formatLocalDate, fromDatePickerToUTC, toDateTimeInputValue } from '@/lib/timezoneUtils'
 
 export function PromoCodeManagement() {
   const { toast } = useToast()
@@ -52,6 +52,9 @@ export function PromoCodeManagement() {
   const [promoToDelete, setPromoToDelete] = useState<PromoCode | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   
+  // Form submission loading state
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   // Form fields
   const [formData, setFormData] = useState({
     code: '',
@@ -76,14 +79,37 @@ export function PromoCodeManagement() {
 
   const formatPromoDateTime = (date?: string | null) => {
     if (!date) return null
-    return formatLocalDate(date, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
+    
+    try {
+      // Backend se jo UTC date aa rahi hai, usko current timezone mein convert karo
+      let dateStr = date.trim()
+      
+      // Ensure date is treated as UTC (add 'Z' if not present)
+      if (!dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+        dateStr = dateStr + 'Z' // Treat as UTC
+      }
+      
+      const dateObj = new Date(dateStr)
+      
+      if (isNaN(dateObj.getTime())) {
+        console.error('Invalid date:', date)
+        return date
+      }
+      
+      // UTC ko current timezone mein convert karke format karo
+      return dateObj.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      })
+    } catch (error) {
+      console.error('Error formatting date:', error, date)
+      return date
+    }
   }
 
   // Debounce search term
@@ -163,6 +189,7 @@ export function PromoCodeManagement() {
     })
     setEditingPromo(null)
     setIsEditing(false)
+    setIsSubmitting(false)
   }
 
   const validateForm = (): string[] => {
@@ -218,7 +245,23 @@ export function PromoCodeManagement() {
       return
     }
     
+    setIsSubmitting(true)
+    
     try {
+      // User ne jo local time select kiya, usko UTC mein convert karke backend ko bhejo
+      let activefromUTC: string | undefined = undefined
+      let activetoUTC: string | undefined = undefined
+      
+      if (formData.activefrom && formData.activefrom.trim()) {
+        // datetime-local input se local time milta hai, isko UTC mein convert karo
+        activefromUTC = fromDatePickerToUTC(formData.activefrom)
+      }
+      
+      if (formData.activeto && formData.activeto.trim()) {
+        // datetime-local input se local time milta hai, isko UTC mein convert karo
+        activetoUTC = fromDatePickerToUTC(formData.activeto)
+      }
+      
       const promoData = {
         code: formData.code,
         name: formData.name,
@@ -228,8 +271,8 @@ export function PromoCodeManagement() {
         maxDiscountAmount: formData.maxDiscountAmount,
         minimumamount: formData.minimumamount,
         minimum_hours: formData.minimum_hours,
-        activefrom: formData.activefrom && formData.activefrom.trim() ? formData.activefrom : undefined,
-        activeto: formData.activeto && formData.activeto.trim() ? formData.activeto : undefined,
+        activefrom: activefromUTC,
+        activeto: activetoUTC,
         promoType: formData.promoType,
         targetGroup: formData.promoType === 'GROUP_SPECIFIC' && formData.targetGroup ? formData.targetGroup : undefined,
         targetUserIds: formData.promoType === 'USER_SPECIFIC' ? formData.targetUserIds : undefined,
@@ -255,19 +298,22 @@ export function PromoCodeManagement() {
         setIsCreateDialogOpen(false)
         resetForm()
         fetchPromoCodes()
+        setIsSubmitting(false)
       } else {
         toast({
-          title: "Error",
-          description: response.message || "Failed to save promo code",
+          title: response.error || "Error",
+          description: response.message || response.error || "Failed to save promo code",
           variant: "destructive"
         })
+        setIsSubmitting(false)
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to save promo code",
+        description: error?.message || error?.error || "Failed to save promo code",
         variant: "destructive"
       })
+      setIsSubmitting(false)
     }
   }
 
@@ -278,6 +324,18 @@ export function PromoCodeManagement() {
     console.log('minimumHours:', promo.minimumHours)
     setEditingPromo(promo)
     setIsEditing(true)
+    
+    // Backend se aayi UTC date ko local timezone mein convert karo for edit input
+    const activefromValue = promo.activefrom || promo.activeFrom
+    const activetoValue = promo.activeto || promo.activeTo
+    
+    const activefromLocal = activefromValue 
+      ? toDateTimeInputValue(activefromValue) 
+      : ''
+    const activetoLocal = activetoValue 
+      ? toDateTimeInputValue(activetoValue) 
+      : ''
+    
     setFormData({
       code: promo.code,
       name: promo.name,
@@ -287,8 +345,8 @@ export function PromoCodeManagement() {
       maxDiscountAmount: promo.maxDiscountAmount || 0,
       minimumamount: promo.minimumamount || promo.minimumAmount || 0,
       minimum_hours: promo.minimum_hours || promo.minimumhours || promo.minimumHours || 0,
-      activefrom: promo.activefrom ? new Date(promo.activefrom).toISOString().slice(0, 16) : (promo.activeFrom ? new Date(promo.activeFrom).toISOString().slice(0, 16) : ''),
-      activeto: promo.activeto ? new Date(promo.activeto).toISOString().slice(0, 16) : (promo.activeTo ? new Date(promo.activeTo).toISOString().slice(0, 16) : ''),
+      activefrom: activefromLocal,
+      activeto: activetoLocal,
       promoType: promo.promoType,
       targetGroup: promo.targetGroup || '',
       targetUserIds: promo.targetUserIds || [],
@@ -310,15 +368,15 @@ export function PromoCodeManagement() {
         setIsViewing(true)
       } else {
         toast({
-          title: "Error",
-          description: "Failed to fetch promo code details",
+          title: response.error || "Error",
+          description: response.error || "Failed to fetch promo code details",
           variant: "destructive"
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to fetch promo code details",
+        description: error?.message || error?.error || "Failed to fetch promo code details",
         variant: "destructive"
       })
     }
@@ -345,15 +403,15 @@ export function PromoCodeManagement() {
         setPromoToDelete(null)
       } else {
         toast({
-          title: "Error",
-          description: response.message || "Failed to delete promo code",
+          title: response.error || "Error",
+          description: response.message || response.error || "Failed to delete promo code",
           variant: "destructive"
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to delete promo code",
+        description: error?.message || error?.error || "Failed to delete promo code",
         variant: "destructive"
       })
     } finally {
@@ -716,11 +774,25 @@ export function PromoCodeManagement() {
                     setIsCreateDialogOpen(false)
                     resetForm()
                   }}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" style={{ backgroundColor: '#ff6900' }}>
-                  {isEditing ? 'Update' : 'Create'} Promo Code
+                <Button 
+                  type="submit" 
+                  style={{ backgroundColor: '#ff6900' }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    <>
+                      {isEditing ? 'Update' : 'Create'} Promo Code
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
@@ -885,12 +957,12 @@ export function PromoCodeManagement() {
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
                             <span>
-                              {formatPromoDateTime(promo.activefrom) || 'Always'}
+                              {formatPromoDateTime(promo.activefrom || promo.activeFrom) || 'Always'}
                             </span>
                           </div>
-                          {promo.activeto && (
+                          {(promo.activeto || promo.activeTo) && (
                             <div className="text-xs text-gray-500">
-                              to {formatPromoDateTime(promo.activeto)}
+                              to {formatPromoDateTime(promo.activeto || promo.activeTo)}
                             </div>
                           )}
                         </div>
@@ -1049,8 +1121,8 @@ export function PromoCodeManagement() {
                 <div>
                   <Label className="text-sm font-medium">Active From</Label>
                   <p className="text-sm text-gray-600">
-                    {viewingPromo.activefrom 
-                      ? formatPromoDateTime(viewingPromo.activefrom)
+                    {(viewingPromo.activefrom || viewingPromo.activeFrom)
+                      ? formatPromoDateTime(viewingPromo.activefrom || viewingPromo.activeFrom)
                       : 'Always'
                     }
                   </p>
@@ -1058,8 +1130,8 @@ export function PromoCodeManagement() {
                 <div>
                   <Label className="text-sm font-medium">Active Until</Label>
                   <p className="text-sm text-gray-600">
-                    {viewingPromo.activeto 
-                      ? formatPromoDateTime(viewingPromo.activeto)
+                    {(viewingPromo.activeto || viewingPromo.activeTo)
+                      ? formatPromoDateTime(viewingPromo.activeto || viewingPromo.activeTo)
                       : 'No expiration'
                     }
                   </p>

@@ -286,7 +286,7 @@ export const createPromoCode = async (promoData: {
     if (!response.ok) {
       return {
         success: false,
-        message: 'Failed to create promo code',
+        message: result.message || result.error || 'Failed to create promo code',
         error: result.error || 'Failed to create promo code',
       };
     }
@@ -339,8 +339,8 @@ export const updatePromoCode = async (id: string, promoData: Partial<{
     if (!response.ok) {
       return {
         success: false,
+        message: result.message || result.error || 'Failed to update promo code',
         error: result.error || 'Failed to update promo code',
-        message: 'Failed to update promo code',
       };
     }
 
@@ -373,8 +373,8 @@ export const deletePromoCode = async (id: string): Promise<{ success: boolean; m
     if (!response.ok) {
       return {
         success: false,
+        message: result.message || result.error || 'Failed to delete promo code',
         error: result.error || 'Failed to delete promo code',
-        message: 'Failed to delete promo code',
       };
     }
 
