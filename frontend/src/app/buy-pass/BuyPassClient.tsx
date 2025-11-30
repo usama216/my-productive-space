@@ -949,10 +949,7 @@ export default function BuyNowPage() {
                           <span>Package Price</span>
                           <span>${selectedPackage.price}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span>Outlet Fee</span>
-                          <span>${selectedPackage.outletFee}</span>
-                        </div>
+                    
                         {selectedPackage.originalPrice && selectedPackage.originalPrice > selectedPackage.price && (
                           <div className="flex justify-between text-green-600">
                             <span>Discount</span>

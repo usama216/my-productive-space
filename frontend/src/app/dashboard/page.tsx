@@ -838,15 +838,18 @@ export default function Dashboard() {
 
                             // Check expiry status for verified students
                             const verifiedAt = userProfile?.studentVerifiedAt || userProfile?.studentVerificationDate;
+                            const expired = status === 'VERIFIED' ? isVerificationExpired(verifiedAt) : false;
                             const expiringSoon = status === 'VERIFIED' ? isVerificationExpiringSoon(verifiedAt) : false;
                             const daysRemaining = status === 'VERIFIED' ? getDaysUntilVerificationExpiry(verifiedAt) : 0;
 
                             // Determine badge color based on expiry status
                             const badgeClass =
                               status === 'VERIFIED'
-                                ? expiringSoon
-                                  ? 'bg-orange-50 text-orange-700 border-orange-200'
-                                  : 'bg-green-50 text-green-700 border-green-200'
+                                ? expired
+                                  ? 'bg-red-50 text-red-700 border-red-200'
+                                  : expiringSoon
+                                    ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                    : 'bg-green-50 text-green-700 border-green-200'
                                 : status === 'PENDING'
                                   ? 'bg-orange-50 text-orange-700 border-orange-200'
                                   : 'bg-gray-50 text-gray-700 border-gray-200';
@@ -857,9 +860,11 @@ export default function Dashboard() {
                                   {status === 'PENDING' 
                                     ? 'Student status verification Pending - Please check back in a few days.'
                                     : status === 'VERIFIED'
-                                    ? expiringSoon
-                                      ? `Expires in ${daysRemaining} days`
-                                      : 'Student Verification - Verified'
+                                    ? expired
+                                      ? 'Student Verification - Expired'
+                                      : expiringSoon
+                                        ? `Expires in ${daysRemaining} days`
+                                        : 'Student Verification - Verified'
                                     : `Student Verification Status - ${statusText}`
                                   }
                                 </Badge>

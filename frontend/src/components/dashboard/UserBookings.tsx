@@ -300,14 +300,9 @@ export function UserBookings() {
     .filter(booking => {
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
-      const endAt = new Date(booking.endAt)
       
-      // Upcoming: bookings that haven't started yet AND are not within 15 minutes of starting
-      const GRACE_PERIOD_MS = 15 * 60 * 1000 // 15 minutes
-      const enableAt = new Date(startAt.getTime() - GRACE_PERIOD_MS)
-      const isWithinGracePeriod = now >= enableAt && startAt > now
-      
-      return startAt > now && !isWithinGracePeriod
+      // Upcoming: bookings that haven't started yet
+      return startAt > now
     })
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) // Earliest first
 
@@ -317,13 +312,8 @@ export function UserBookings() {
       const startAt = new Date(booking.startAt)
       const endAt = new Date(booking.endAt)
       
-      // Ongoing: bookings that are currently in progress OR within 15 minutes of starting
-      const GRACE_PERIOD_MS = 15 * 60 * 1000 // 15 minutes
-      const enableAt = new Date(startAt.getTime() - GRACE_PERIOD_MS)
-      const isOngoing = startAt <= now && endAt > now
-      const isWithinGracePeriod = now >= enableAt && startAt > now
-      
-      return isOngoing || isWithinGracePeriod
+      // Ongoing: bookings that are currently in progress (started and not ended)
+      return startAt <= now && endAt > now
     })
     .sort((a, b) => {
       // Sort by earliest start time first (most recent ongoing booking)
@@ -919,7 +909,7 @@ export function UserBookings() {
 
                         {/* Tuya button shows in upcoming tab when reschedule is NOT available (less than 5 hours before) */}
                         {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && 
-                         (!canEditBooking(booking) || (booking.rescheduleCount || 0) >= 1) && (
+                         (!canEditBooking(booking)) && (
                           <Button
                             size="sm"
                             variant="outline"

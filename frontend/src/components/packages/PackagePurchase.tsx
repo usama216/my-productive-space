@@ -149,10 +149,7 @@ export const PackagePurchase: React.FC<PackagePurchaseProps> = ({
               <span>Price per package:</span>
               <strong>SGD {pkg.price.toFixed(2)}</strong>
             </div>
-            <div className="flex justify-between text-sm">
-              <span>Outlet fee:</span>
-              <span>SGD {pkg.outletFee.toFixed(2)}</span>
-            </div>
+        
             <hr />
             <div className="flex justify-between text-lg font-semibold">
               <span>Total:</span>

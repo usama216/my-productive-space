@@ -1,6 +1,5 @@
 // User Profile Service - API calls for user profile management
-// TESTING MODE: Student verification expiry set to 2 days with 1-day warning for testing
-// PRODUCTION: Change back to 6-month expiry with 14-day warning (uncomment production lines)
+// PRODUCTION: Student verification expiry set to 6 months with 14-day warning
 import { supabase } from './supabaseClient'
 import { authenticatedFetch } from './apiClient'
 
@@ -17,7 +16,7 @@ export interface UserProfile {
   updatedAt: string;
   studentVerificationImageUrl?: string;
   studentVerificationDate?: string;
-  studentVerifiedAt?: string;  // When student was verified (TESTING: 2-day expiry | PRODUCTION: 6-month expiry)
+  studentVerifiedAt?: string;  // When student was verified (6-month expiry)
   studentRejectionReason?: string | null;
   studentVerificationStatus: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 }
@@ -254,18 +253,15 @@ export async function getCurrentAuthUser() {
   }
 }
 
-// Calculate days until verification expires (TESTING: 2 days | PRODUCTION: 6 months)
+// Calculate days until verification expires (6 months expiry)
 export function getDaysUntilVerificationExpiry(studentVerifiedAt?: string): number {
   if (!studentVerifiedAt) return 0;
   
   const verifiedDate = new Date(studentVerifiedAt);
   const expiryTime = new Date(verifiedDate);
   
-  // TESTING: 2 days expiry for testing purposes
-  expiryTime.setDate(expiryTime.getDate() + 2);
-  
-  // PRODUCTION: 6 months expiry (uncomment when ready for production)
-  // expiryTime.setMonth(expiryTime.getMonth() + 6);
+  // 6 months expiry
+  expiryTime.setMonth(expiryTime.getMonth() + 6);
   
   const now = new Date();
   const diffTime = expiryTime.getTime() - now.getTime();
@@ -279,41 +275,32 @@ export function isVerificationExpired(studentVerifiedAt?: string): boolean {
   return getDaysUntilVerificationExpiry(studentVerifiedAt) <= 0;
 }
 
-// Check if verification is expiring soon (TESTING: 1 day | PRODUCTION: 2 weeks)
+// Check if verification is expiring soon (2 weeks / 14 days warning)
 export function isVerificationExpiringSoon(studentVerifiedAt?: string): boolean {
   if (!studentVerifiedAt) return false;
   
   const verifiedDate = new Date(studentVerifiedAt);
   const expiryTime = new Date(verifiedDate);
   
-  // TESTING: 2 days expiry for testing purposes
-  expiryTime.setDate(expiryTime.getDate() + 2);
-  
-  // PRODUCTION: 6 months expiry (uncomment when ready for production)
-  // expiryTime.setMonth(expiryTime.getMonth() + 6);
+  // 6 months expiry
+  expiryTime.setMonth(expiryTime.getMonth() + 6);
   
   const now = new Date();
   const daysRemaining = (expiryTime.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
   
-  // TESTING: Show "expiring soon" warning if less than 1 day remaining
-  return daysRemaining > 0 && daysRemaining <= 1;
-  
-  // PRODUCTION: Show "expiring soon" if less than 2 weeks (14 days) remaining (uncomment when ready)
-  // return daysRemaining > 0 && daysRemaining <= 14;
+  // Show "expiring soon" warning if less than 2 weeks (14 days) remaining
+  return daysRemaining > 0 && daysRemaining <= 14;
 }
 
-// Get verification expiry date (TESTING: 2 days | PRODUCTION: 6 months)
+// Get verification expiry date (6 months expiry)
 export function getVerificationExpiryDate(studentVerifiedAt?: string): Date | null {
   if (!studentVerifiedAt) return null;
   
   const verifiedDate = new Date(studentVerifiedAt);
   const expiryTime = new Date(verifiedDate);
   
-  // TESTING: 2 days expiry for testing purposes
-  expiryTime.setDate(expiryTime.getDate() + 2);
-  
-  // PRODUCTION: 6 months expiry (uncomment when ready for production)
-  // expiryTime.setMonth(expiryTime.getMonth() + 6);
+  // 6 months expiry
+  expiryTime.setMonth(expiryTime.getMonth() + 6);
   
   return expiryTime;
 }
@@ -328,7 +315,7 @@ export function getVerificationExpiryMessage(studentVerifiedAt?: string): string
   
   if (daysRemaining <= 0) {
     return 'Your student verification has expired. Please verify again to maintain student status.';
-  } else if (daysRemaining <= 30) {
+  } else if (daysRemaining <= 14) {
     return `Your student verification will expire in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}.`;
   } else {
     const expiryDate = getVerificationExpiryDate(studentVerifiedAt);

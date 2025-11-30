@@ -156,9 +156,7 @@ export const PackageRecommendations: React.FC<PackageRecommendationsProps> = ({
                     {formatPrice(rec.package.originalPrice)}
                   </div>
                 )}
-                <div className="text-xs text-muted-foreground">
-                  +{formatPrice(rec.package.outletFee)} outlet fee
-                </div>
+             
               </div>
 
               {/* Features */}
