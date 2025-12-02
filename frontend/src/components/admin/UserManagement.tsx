@@ -14,11 +14,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
-import { 
-  Users, 
-  Search, 
-  Edit, 
-  Trash2, 
+import {
+  Users,
+  Search,
+  Edit,
+  Trash2,
   UserCheck,
   UserX,
   ShieldCheck,
@@ -31,18 +31,21 @@ import {
   ChevronsRight,
   Download,
   AlertCircle,
-  Loader2
+  Loader2,
+  UserPlus
 } from 'lucide-react'
-import { 
-  User, 
-  UserFilters, 
-  getAllUsers, 
-  updateUser, 
-  deleteUser, 
+import {
+  User,
+  UserFilters,
+  getAllUsers,
+  updateUser,
+  deleteUser,
   getUserStats,
   getUserAnalytics,
   updateStudentVerification,
+  createAdminUser,
   formatUserDate,
+  formatVerificationDate,
   getMemberTypeColor,
   getVerificationStatusColor,
   getVerificationStatusText
@@ -61,7 +64,7 @@ export function UserManagement() {
     total: 0,
     totalPages: 0
   })
-  
+
   // Filter states
   const [filters, setFilters] = useState<UserFilters>({
     search: '',
@@ -69,12 +72,13 @@ export function UserManagement() {
     page: 1,
     limit: 20
   })
-  
+
   // Dialog states
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
+  const [isCreateAdminDialogOpen, setIsCreateAdminDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [selectedUserForReview, setSelectedUserForReview] = useState<User | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -85,10 +89,14 @@ export function UserManagement() {
     contactNumber: '',
     studentVerificationStatus: 'NA' as 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED'
   })
-  
+  const [adminFormData, setAdminFormData] = useState({
+    email: '',
+    password: ''
+  })
+
   // Loading states
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   // Debounced search state
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -123,7 +131,7 @@ export function UserManagement() {
     try {
       setLoading(true)
       const response = await getAllUsers(filters)
-      
+
       if (response.success && response.users) {
         setUsers(response.users)
         if (response.pagination) {
@@ -188,12 +196,12 @@ export function UserManagement() {
       // Call the same API but with limit 1000 to get all records
       const exportFilters = { ...filters, limit: 1000, page: 1 }
       const response = await getAllUsers(exportFilters)
-      
+
       if (response.success && response.users) {
         // Convert users data to CSV format
         const csvData = convertUsersToCSV(response.users)
         downloadCSV(csvData, 'users-export.csv')
-        
+
         toast({
           title: "Success",
           description: `Exported ${response.users.length} users to Excel`,
@@ -219,7 +227,7 @@ export function UserManagement() {
     const headers = [
       'ID',
       'First Name',
-      'Last Name', 
+      'Last Name',
       'Email',
       'Member Type',
       'Contact Number',
@@ -228,7 +236,7 @@ export function UserManagement() {
       'Total Spent',
       'Created At'
     ]
-    
+
     const rows = users.map(user => [
       user.id,
       user.firstName || '',
@@ -241,7 +249,7 @@ export function UserManagement() {
       user.stats?.totalSpent || 0,
       formatUserDate(user.createdAt)
     ])
-    
+
     return [headers, ...rows]
       .map(row => row.map(field => `"${field}"`).join(','))
       .join('\n')
@@ -273,11 +281,11 @@ export function UserManagement() {
 
   const handleUpdate = async () => {
     if (!selectedUser) return
-    
+
     try {
       setIsSubmitting(true)
       const response = await updateUser(selectedUser.id, editFormData)
-      
+
       if (response.success) {
         toast({
           title: "Success",
@@ -321,7 +329,7 @@ export function UserManagement() {
       })
       return
     }
-    
+
     await handleVerifyStudent(selectedUser.id, 'REJECTED', rejectionReason.trim())
     setIsRejectDialogOpen(false)
     setRejectionReason('')
@@ -330,19 +338,19 @@ export function UserManagement() {
   const handleVerifyStudent = async (userId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
     try {
       setIsSubmitting(true)
-      
+
       const result = await updateStudentVerification(userId, status, rejectionReason)
 
       if (!result.success) {
         throw new Error(result.error || 'API call failed')
       }
-      
+
       toast({
         title: "Success",
         description: `Student ${status === 'VERIFIED' ? 'approved' : 'rejected'} successfully`,
       })
       loadUsers()
-      
+
     } catch (error) {
       console.error('Error updating student verification:', error)
       toast({
@@ -364,11 +372,11 @@ export function UserManagement() {
 
   const handleDelete = async () => {
     if (!selectedUser) return
-    
+
     try {
       setIsSubmitting(true)
       const response = await deleteUser(selectedUser.id)
-      
+
       if (response.success) {
         toast({
           title: "Success",
@@ -395,16 +403,79 @@ export function UserManagement() {
     }
   }
 
+  const handleCreateAdmin = async () => {
+    // Validation
+    if (!adminFormData.email || !adminFormData.password) {
+      toast({
+        title: "Validation Error",
+        description: "Email and password are required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(adminFormData.email)) {
+      toast({
+        title: "Validation Error",
+        description: "Invalid email format",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Password strength validation
+    if (adminFormData.password.length < 8) {
+      toast({
+        title: "Validation Error",
+        description: "Password must be at least 8 characters long",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      const response = await createAdminUser(adminFormData.email, adminFormData.password)
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Admin user created successfully",
+        })
+        setIsCreateAdminDialogOpen(false)
+        setAdminFormData({ email: '', password: '' })
+        loadUsers()
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to create admin user",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error creating admin:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create admin user",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const filteredUsers = users.filter(user => {
-    const searchMatch = !filters.search || 
+    const searchMatch = !filters.search ||
       (user.firstName && user.firstName.toLowerCase().includes(filters.search.toLowerCase())) ||
       (user.lastName && user.lastName.toLowerCase().includes(filters.search.toLowerCase())) ||
       user.email.toLowerCase().includes(filters.search.toLowerCase())
-    
+
     const memberTypeMatch = !filters.memberType || user.memberType === filters.memberType
-    
+
     const verificationStatusMatch = !(filters as any).studentVerificationStatus || user.studentVerificationStatus === (filters as any).studentVerificationStatus
-    
+
     return searchMatch && memberTypeMatch && verificationStatusMatch
   })
 
@@ -412,18 +483,26 @@ export function UserManagement() {
 
   return (
     <div className="space-y-6">
-             {/* Header */}
-       <div className="flex items-center justify-between">
-         <div>
-           <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
-                      <p className="text-muted-foreground">
-              Manage all registered users, their member types, and student verification status
-            </p>
-         </div>
-         {/* <Button onClick={exportToExcel} className="flex items-center gap-2">
-           <Download className="h-4 w-4" />
-           Export to Excel
-         </Button> */}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
+          <p className="text-muted-foreground">
+            Manage all registered users, their member types, and student verification status
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setAdminFormData({ email: '', password: '' })
+              setIsCreateAdminDialogOpen(true)
+            }}
+            className="flex items-center space-x-2"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>Create Admin</span>
+          </Button>
           <Button
             variant="outline"
             onClick={exportToExcel}
@@ -432,7 +511,8 @@ export function UserManagement() {
             <Download className="h-4 w-4" />
             <span>Export to Excel</span>
           </Button>
-       </div>
+        </div>
+      </div>
 
       {/* Stats Cards */}
       {stats && (
@@ -446,7 +526,7 @@ export function UserManagement() {
               <div className="text-2xl font-bold">{stats.totalUsers}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Students</CardTitle>
@@ -456,7 +536,7 @@ export function UserManagement() {
               <div className="text-2xl font-bold text-blue-600">{stats.memberTypeBreakdown?.STUDENT || 0}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Members</CardTitle>
@@ -466,7 +546,7 @@ export function UserManagement() {
               <div className="text-2xl font-bold text-green-600">{stats.memberTypeBreakdown?.MEMBER || 0}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending Verifications</CardTitle>
@@ -483,7 +563,7 @@ export function UserManagement() {
 
       {/* Search and Filters */}
       <Card>
-       
+
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Search Input */}
@@ -508,8 +588,8 @@ export function UserManagement() {
             {/* Member Type Filter */}
             <div className="space-y-2">
               <Label htmlFor="memberType">Member Type</Label>
-              <Select 
-                value={filters.memberType || 'all'} 
+              <Select
+                value={filters.memberType || 'all'}
                 onValueChange={(value) => handleFilterChange('memberType', value === 'all' ? undefined : value)}
               >
                 <SelectTrigger className="w-full">
@@ -527,8 +607,8 @@ export function UserManagement() {
             {/* Verification Status Filter */}
             <div className="space-y-2">
               <Label htmlFor="verificationStatus">Verification Status</Label>
-              <Select 
-                value={(filters as any).studentVerificationStatus || 'all'} 
+              <Select
+                value={(filters as any).studentVerificationStatus || 'all'}
                 onValueChange={(value) => handleFilterChange('studentVerificationStatus' as any, value === 'all' ? undefined : value)}
               >
                 <SelectTrigger className="w-full">
@@ -570,16 +650,16 @@ export function UserManagement() {
 
       {/* Users Table */}
       <Card>
-                 <CardHeader>
-           <CardTitle>
-             All Users ({pagination.total})
-             {pagination.totalPages > 1 && (
-               <span className="text-sm font-normal text-muted-foreground ml-2">
-                 Page {pagination.page} of {pagination.totalPages}
-               </span>
-             )}
-           </CardTitle>
-         </CardHeader>
+        <CardHeader>
+          <CardTitle>
+            All Users ({pagination.total})
+            {pagination.totalPages > 1 && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -597,84 +677,93 @@ export function UserManagement() {
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
-                                     <TableRow>
-                     <TableHead>User</TableHead>
-                     <TableHead>Contact</TableHead>
-                     <TableHead>Member Type</TableHead>
-                     <TableHead>Student Verification Status</TableHead>
-                     <TableHead>Total Bookings</TableHead>
-                     <TableHead>Total Spent</TableHead>
-                     <TableHead>Joined</TableHead>
-                     <TableHead>Actions</TableHead>
-                   </TableRow>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Member Type</TableHead>
+                    <TableHead>Student Verification Status</TableHead>
+                    <TableHead>Verification Date</TableHead>
+                    <TableHead>Total Bookings</TableHead>
+                    <TableHead>Total Spent</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                                             <TableCell>
-                         <div>
-                           <div className="font-medium">
-                             {user.firstName && user.lastName 
-                               ? `${user.firstName} ${user.lastName}` 
-                               : user.email.split('@')[0]
-                             }
-                           </div>
-                           <div className="text-sm text-muted-foreground">{user.email}</div>
-                         </div>
-                       </TableCell>
-                       <TableCell>
-                         <div className="space-y-1">
-                           {user.contactNumber && (
-                             <div className="flex items-center gap-2 text-sm">
-                               <Phone className="h-3 w-3" />
-                               {user.contactNumber}
-                             </div>
-                           )}
-                         </div>
-                       </TableCell>
-                                               <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className={getMemberTypeColor(getEffectiveMemberType(user.memberType, user.studentVerificationStatus))}>
-                              {getMemberTypeDisplayName(user.memberType, user.studentVerificationStatus)}
-                            </Badge>
-                            {user.studentVerificationImageUrl && user.memberType === 'STUDENT' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => user.studentVerificationImageUrl && window.open(user.studentVerificationImageUrl, '_blank')}
-                                className="h-6 w-6 p-0 hover:bg-blue-50"
-                                title="View verification document"
-                              >
-                                <Eye className="h-4 w-4 text-blue-600" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getVerificationStatusColor(user.studentVerificationStatus)}>
-                            {getVerificationStatusText(user.studentVerificationStatus)}
-                          </Badge>
-                        </TableCell>
-                       <TableCell>
-                         <div className="text-sm font-medium">
-                           {user.stats?.totalBookings || 0}
-                         </div>
-                       </TableCell>
-                       <TableCell>
-                         <div className="text-sm font-medium">
-                           ${user.stats?.totalSpent.toFixed(2) || 0}
-                         </div>
-                       </TableCell>
-                       <TableCell>
-                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                           <Calendar className="h-3 w-3" />
-                           {formatUserDate(user.createdAt)}
-                         </div>
-                       </TableCell>
                       <TableCell>
-                                                 <div className="flex items-center gap-2">
-                         
-                           
+                        <div>
+                          <div className="font-medium">
+                            {user.firstName && user.lastName
+                              ? `${user.firstName} ${user.lastName}`
+                              : user.email.split('@')[0]
+                            }
+                          </div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {user.contactNumber && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="h-3 w-3" />
+                              {user.contactNumber}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className={getMemberTypeColor(getEffectiveMemberType(user.memberType, user.studentVerificationStatus))}>
+                            {getMemberTypeDisplayName(user.memberType, user.studentVerificationStatus)}
+                          </Badge>
+                          {user.studentVerificationImageUrl && user.memberType === 'STUDENT' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => user.studentVerificationImageUrl && window.open(user.studentVerificationImageUrl, '_blank')}
+                              className="h-6 w-6 p-0 hover:bg-blue-50"
+                              title="View verification document"
+                            >
+                              <Eye className="h-4 w-4 text-blue-600" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getVerificationStatusColor(user.studentVerificationStatus)}>
+                          {getVerificationStatusText(user.studentVerificationStatus)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {user.studentVerificationStatus === 'VERIFIED' && user.studentVerificationDate
+                            ? formatVerificationDate(user.studentVerificationDate)
+                            : 'No Date Found'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">
+                          {user.stats?.totalBookings || 0}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">
+                          ${user.stats?.totalSpent.toFixed(2) || 0}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatUserDate(user.createdAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+
+
                           {user.memberType === 'STUDENT' && user.studentVerificationStatus === 'PENDING' && user.studentVerificationImageUrl && (
                             <>
                               <Button
@@ -687,128 +776,128 @@ export function UserManagement() {
                                 <Eye className="h-4 w-4 mr-1" />
                                 Review
                               </Button>
-                            
+
                             </>
                           )}
-                           
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => {
-                               setSelectedUser(user)
-                               setIsDeleteDialogOpen(true)
-                             }}
-                             disabled={isSubmitting}
-                           >
-                             <Trash2 className="h-4 w-4" />
-                           </Button>
-                         </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedUser(user)
+                              setIsDeleteDialogOpen(true)
+                            }}
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-                     )}
-         </CardContent>
-       </Card>
+          )}
+        </CardContent>
+      </Card>
 
-       {/* Pagination */}
-       {pagination.totalPages > 1 && (
-         <Card>
-           <CardContent className="py-4">
-             <div className="flex items-center justify-between">
-               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                 <span>
-                   Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                   {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                   {pagination.total} users
-                 </span>
-               </div>
-               
-               <div className="flex items-center space-x-2">
-                 <div className="flex items-center space-x-2">
-                   <span className="text-sm text-muted-foreground">Rows per page:</span>
-                   <Select value={pagination.limit.toString()} onValueChange={(value) => handleLimitChange(parseInt(value))}>
-                     <SelectTrigger className="w-20">
-                       <SelectValue />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="10">10</SelectItem>
-                       <SelectItem value="20">20</SelectItem>
-                       <SelectItem value="50">50</SelectItem>
-                       <SelectItem value="100">100</SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 
-                 <div className="flex items-center space-x-2">
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => handlePageChange(1)}
-                     disabled={pagination.page === 1}
-                   >
-                     <ChevronsLeft className="h-4 w-4" />
-                   </Button>
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => handlePageChange(pagination.page - 1)}
-                     disabled={pagination.page === 1}
-                   >
-                     <ChevronLeft className="h-4 w-4" />
-                   </Button>
-                   
-                   <div className="flex items-center space-x-1">
-                     {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                       let pageNum: number
-                       if (pagination.totalPages <= 5) {
-                         pageNum = i + 1
-                       } else if (pagination.page <= 3) {
-                         pageNum = i + 1
-                       } else if (pagination.page >= pagination.totalPages - 2) {
-                         pageNum = pagination.totalPages - 4 + i
-                       } else {
-                         pageNum = pagination.page - 2 + i
-                       }
-                       
-                       return (
-                         <Button
-                           key={pageNum}
-                           variant={pagination.page === pageNum ? "default" : "outline"}
-                           size="sm"
-                           onClick={() => handlePageChange(pageNum)}
-                           className="w-8 h-8 p-0"
-                         >
-                           {pageNum}
-                         </Button>
-                       )
-                     })}
-                   </div>
-                   
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => handlePageChange(pagination.page + 1)}
-                     disabled={pagination.page === pagination.totalPages}
-                   >
-                     <ChevronRight className="h-4 w-4" />
-                   </Button>
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => handlePageChange(pagination.totalPages)}
-                     disabled={pagination.page === pagination.totalPages}
-                   >
-                     <ChevronsRight className="h-4 w-4" />
-                   </Button>
-                 </div>
-               </div>
-             </div>
-           </CardContent>
-         </Card>
-       )}
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                  {pagination.total} users
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+                  <Select value={pagination.limit.toString()} onValueChange={(value) => handleLimitChange(parseInt(value))}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (pagination.totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (pagination.page <= 3) {
+                        pageNum = i + 1
+                      } else if (pagination.page >= pagination.totalPages - 2) {
+                        pageNum = pagination.totalPages - 4 + i
+                      } else {
+                        pageNum = pagination.page - 2 + i
+                      }
+
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pagination.page === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -816,73 +905,73 @@ export function UserManagement() {
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
           </DialogHeader>
-                     <div className="grid gap-4 py-4">
-             <div className="grid grid-cols-2 gap-4">
-               <div className="space-y-2">
-                 <Label htmlFor="firstName">First Name</Label>
-                 <Input
-                   id="firstName"
-                   value={editFormData.firstName}
-                   onChange={(e) => setEditFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                   placeholder="Enter first name"
-                 />
-               </div>
-               <div className="space-y-2">
-                 <Label htmlFor="lastName">Last Name</Label>
-                 <Input
-                   id="lastName"
-                   value={editFormData.lastName}
-                   onChange={(e) => setEditFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                   placeholder="Enter last name"
-                 />
-               </div>
-             </div>
-             
-             <div className="space-y-2">
-               <Label htmlFor="memberType">Member Type</Label>
-               <Select value={editFormData.memberType} onValueChange={(value) => setEditFormData(prev => ({ ...prev, memberType: value }))}>
-                 <SelectTrigger>
-                   <SelectValue />
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="MEMBER">Member</SelectItem>
-                   <SelectItem value="STUDENT">Student</SelectItem>
-                 </SelectContent>
-               </Select>
-             </div>
-             
-             <div className="space-y-2">
-               <Label htmlFor="contactNumber">Phone Number</Label>
-               <Input
-                 id="contactNumber"
-                 value={editFormData.contactNumber}
-                 onChange={(e) => setEditFormData(prev => ({ ...prev, contactNumber: e.target.value }))}
-                 placeholder="+1234567890"
-               />
-             </div>
-             
-             {selectedUser?.memberType === 'STUDENT' && (
-               <div className="space-y-2">
-                 <Label htmlFor="studentVerificationStatus">Student Verification Status</Label>
-                 <Select 
-                   value={editFormData.studentVerificationStatus || 'NA'} 
-                   onValueChange={(value: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED') => 
-                     setEditFormData(prev => ({ ...prev, studentVerificationStatus: value }))
-                   }
-                 >
-                   <SelectTrigger>
-                     <SelectValue />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="NA">Not Applicable</SelectItem>
-                     <SelectItem value="PENDING">Pending</SelectItem>
-                     <SelectItem value="VERIFIED">Verified</SelectItem>
-                     <SelectItem value="REJECTED">Rejected</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-             )}
-           </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  value={editFormData.firstName}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  placeholder="Enter first name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  value={editFormData.lastName}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  placeholder="Enter last name"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memberType">Member Type</Label>
+              <Select value={editFormData.memberType} onValueChange={(value) => setEditFormData(prev => ({ ...prev, memberType: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MEMBER">Member</SelectItem>
+                  <SelectItem value="STUDENT">Student</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contactNumber">Phone Number</Label>
+              <Input
+                id="contactNumber"
+                value={editFormData.contactNumber}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, contactNumber: e.target.value }))}
+                placeholder="+1234567890"
+              />
+            </div>
+
+            {selectedUser?.memberType === 'STUDENT' && (
+              <div className="space-y-2">
+                <Label htmlFor="studentVerificationStatus">Student Verification Status</Label>
+                <Select
+                  value={editFormData.studentVerificationStatus || 'NA'}
+                  onValueChange={(value: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED') =>
+                    setEditFormData(prev => ({ ...prev, studentVerificationStatus: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NA">Not Applicable</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="VERIFIED">Verified</SelectItem>
+                    <SelectItem value="REJECTED">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
@@ -923,7 +1012,7 @@ export function UserManagement() {
               Confirm Rejection
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedUser && (
             <div className="space-y-4">
               <Alert className="border-red-200 bg-red-50">
@@ -946,20 +1035,20 @@ export function UserManagement() {
                   className="min-h-[100px] resize-none"
                   disabled={isSubmitting}
                 />
-              
+
               </div>
 
               <div className="flex space-x-3 pt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setIsRejectDialogOpen(false)}
                   disabled={isSubmitting}
                   className="flex-1"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   onClick={handleConfirmRejection}
                   disabled={isSubmitting || !rejectionReason.trim()}
                   className="flex-1"
@@ -980,6 +1069,48 @@ export function UserManagement() {
         isLoading={isSubmitting}
         onRefresh={loadUsers}
       />
+
+      {/* Create Admin Dialog */}
+      <Dialog open={isCreateAdminDialogOpen} onOpenChange={setIsCreateAdminDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create Admin User</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="adminEmail">Email Address</Label>
+              <Input
+                id="adminEmail"
+                type="email"
+                placeholder="admin@example.com"
+                value={adminFormData.email}
+                onChange={(e) => setAdminFormData(prev => ({ ...prev, email: e.target.value }))}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adminPassword">Password</Label>
+              <Input
+                id="adminPassword"
+                type="password"
+                placeholder="Minimum 8 characters"
+                value={adminFormData.password}
+                onChange={(e) => setAdminFormData(prev => ({ ...prev, password: e.target.value }))}
+                disabled={isSubmitting}
+              />
+              <p className="text-xs text-muted-foreground">Password must be at least 8 characters long</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsCreateAdminDialogOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateAdmin} disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Admin'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

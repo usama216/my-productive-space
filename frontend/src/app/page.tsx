@@ -2,6 +2,7 @@
 
 import BookingForm from '@/components/landing-page-sections/BookingForm'
 import Navbar from '@/components/Navbar'
+import LatestAnnouncementSection from '@/components/landing-page-sections/LatestAnnouncementSection'
 import AboutSection from '@/components/landing-page-sections/AboutSection'
 import WhatIsItUsedForSection from '@/components/landing-page-sections/WhatIsItUsedFor'
 import BookingGuideSection from '@/components/landing-page-sections/BookingGuideSection'
@@ -12,7 +13,7 @@ import FAQSection from '@/components/landing-page-sections/FAQSection'
 
 
 import { ContactSection } from '@/components/landing-page-sections/ContactSection'
-import {FooterSection} from '@/components/landing-page-sections/FooterSection'
+import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import OpenDoorExample from '@/components/OpenDoorExample'
 
 
@@ -27,26 +28,29 @@ export default function Home() {
       {/* Section 1: Quick Booking */}
       <BookingForm />
 
-      {/* Section 2: About Us Carousel */}
+      {/* Section 2: Latest Announcements */}
+      <LatestAnnouncementSection />
+
+      {/* Section 3: About Us Carousel */}
       <AboutSection />
 
-      {/* Section 3: What Is It Used For */}
-      <WhatIsItUsedForSection /> 
+      {/* Section 4: What Is It Used For */}
+      <WhatIsItUsedForSection />
 
-      {/* Section 4: How to Book */}
+      {/* Section 5: How to Book */}
       <BookingGuideSection />
 
-      {/* Section 5: Locations */}
-      <LocationsSection />  
-      
-      {/* Section 5: Rates & Price */}
+      {/* Section 6: Locations */}
+      <LocationsSection />
+
+      {/* Section 7: Rates & Price */}
       <PricingSection />
 
-      {/* Section 6: Feedback */}
+      {/* Section 8: Feedback */}
       <FeedbackSection />
-      
 
-      {/* Section 7: FAQ */}
+
+      {/* Section 9: FAQ */}
       <FAQSection />
 
       {/* Section 8: Contact & Footer */}

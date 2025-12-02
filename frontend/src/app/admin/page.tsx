@@ -125,14 +125,8 @@ const mockUsers: UserAccount[] = [
 
 export default function AdminDashboard() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState(() => {
-    // Initialize from URL hash if available
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.replace('#', '')
-      return hash || 'overview'
-    }
-    return 'overview'
-  })
+  // Always start with 'overview' on both server and client to avoid hydration mismatch
+  const [activeTab, setActiveTab] = useState('overview')
   const [refundRequests, setRefundRequests] = useState<RefundTransaction[]>([])
   const [users, setUsers] = useState<UserAccount[]>(mockUsers)
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null)
@@ -142,6 +136,14 @@ export default function AdminDashboard() {
   const [pendingStudents, setPendingStudents] = useState<any[]>([])
   const [isLoadingPendingStudents, setIsLoadingPendingStudents] = useState(false)
   const [isLoadingRefunds, setIsLoadingRefunds] = useState(false)
+
+  // Initialize from URL hash after component mounts (client-side only)
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '')
+    if (hash) {
+      setActiveTab(hash)
+    }
+  }, [])
 
   const fetchPendingStudents = async () => {
     setIsLoadingPendingStudents(true)

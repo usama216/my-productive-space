@@ -20,6 +20,7 @@ export interface User {
   memberType: string
   contactNumber: string | null
   studentVerificationStatus: 'NA' | 'PENDING' | 'VERIFIED' | 'REJECTED'
+  studentVerificationDate: string | null
   createdAt: string
   updatedAt: string
   studentVerificationImageUrl: string | null
@@ -79,7 +80,7 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive
 const handleResponse = async (response: Response): Promise<UserResponse> => {
   try {
     const data = await response.json()
-    
+
     if (!response.ok) {
       return {
         success: false,
@@ -87,7 +88,7 @@ const handleResponse = async (response: Response): Promise<UserResponse> => {
         message: data.message || data.error || `HTTP ${response.status}`
       }
     }
-    
+
     return {
       success: true,
       ...data
@@ -105,13 +106,13 @@ const handleResponse = async (response: Response): Promise<UserResponse> => {
 // Helper function to build query string
 const buildQueryString = (filters: UserFilters): string => {
   const params = new URLSearchParams()
-  
+
   Object.entries(filters).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       params.append(key, value.toString())
     }
   })
-  
+
   return params.toString()
 }
 
@@ -120,7 +121,7 @@ export const getAllUsers = async (filters: UserFilters = {}): Promise<UserRespon
   try {
     const queryString = buildQueryString(filters)
     const url = `${API_BASE}/booking/admin/users${queryString ? `?${queryString}` : ''}`
-    
+
     const response = await authenticatedFetch(url)
     return await handleResponse(response)
   } catch (error) {
@@ -147,13 +148,13 @@ export const getUserById = async (id: string): Promise<UserResponse> => {
   }
 }
 
-export const updateUser = async (id: string, payload: UpdateUserPayload): Promise<UserResponse> => {
+export const updateUser = async (id: string, updates: Partial<User>): Promise<UserResponse> => {
   try {
     const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
     })
-    
     return await handleResponse(response)
   } catch (error) {
     console.error('Update User Error:', error)
@@ -165,13 +166,31 @@ export const updateUser = async (id: string, payload: UpdateUserPayload): Promis
   }
 }
 
+export const createAdminUser = async (email: string, password: string): Promise<UserResponse> => {
+  try {
+    const response = await fetch(`${API_BASE}/admin/users/create-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+    return await handleResponse(response)
+  } catch (error) {
+    console.error('Create Admin User Error:', error)
+    return {
+      success: false,
+      error: 'Failed to create admin user',
+      message: 'Failed to create admin user'
+    }
+  }
+}
+
 export const suspendUser = async (id: string, reason: string): Promise<UserResponse> => {
   try {
     const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/suspend`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Suspend User Error:', error)
@@ -188,7 +207,7 @@ export const activateUser = async (id: string): Promise<UserResponse> => {
     const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/activate`, {
       method: 'POST',
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Activate User Error:', error)
@@ -205,7 +224,7 @@ export const deleteUser = async (id: string): Promise<UserResponse> => {
     const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}`, {
       method: 'DELETE',
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Delete User Error:', error)
@@ -258,7 +277,7 @@ export const updateStudentVerification = async (
         ...(status === 'REJECTED' && rejectionReason ? { rejectionReason } : {})
       }),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Update Student Verification Error:', error)
@@ -270,18 +289,72 @@ export const updateStudentVerification = async (
   }
 }
 
-// Utility functions
+// Utility functions - Client-safe date formatting to avoid hydration errors
 export const formatUserDate = (dateString: string): string => {
-  // Ensure dates are treated as UTC by adding 'Z' if not present
-  const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
-  return new Date(utcDateString).toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  })
+  if (!dateString) return '-'
+
+  try {
+    // Parse the date directly - handles both Z format and timezone offsets
+    const date = new Date(dateString)
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString)
+      return 'Invalid Date'
+    }
+
+    // Convert to GMT+8 (Asia/Singapore) by adding 8 hours to UTC
+    const gmt8Date = new Date(date.getTime() + (8 * 60 * 60 * 1000))
+
+    // Format manually to avoid hydration issues
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const month = months[gmt8Date.getUTCMonth()]
+    const day = gmt8Date.getUTCDate()
+    const year = gmt8Date.getUTCFullYear()
+    let hours = gmt8Date.getUTCHours()
+    const minutes = gmt8Date.getUTCMinutes().toString().padStart(2, '0')
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    hours = hours % 12 || 12
+
+    return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`
+  } catch (error) {
+    console.error('Error formatting date:', error, dateString)
+    return 'Invalid Date'
+  }
+}
+
+// Format date specifically for verification date display
+export const formatVerificationDate = (dateString: string | null): string => {
+  if (!dateString) return '-'
+
+  try {
+    // Parse the date directly - it already has timezone info
+    const date = new Date(dateString)
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString)
+      return '-'
+    }
+
+    // Convert to GMT+8 (Asia/Singapore) by adding 8 hours to UTC
+    const gmt8Date = new Date(date.getTime() + (8 * 60 * 60 * 1000))
+
+    // Format manually to avoid hydration issues
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const month = months[gmt8Date.getUTCMonth()]
+    const day = gmt8Date.getUTCDate()
+    const year = gmt8Date.getUTCFullYear()
+    let hours = gmt8Date.getUTCHours()
+    const minutes = gmt8Date.getUTCMinutes().toString().padStart(2, '0')
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    hours = hours % 12 || 12
+
+    return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`
+  } catch (error) {
+    console.error('Error formatting verification date:', error, dateString)
+    return '-'
+  }
 }
 
 // Removed unused utility functions

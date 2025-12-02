@@ -15,6 +15,7 @@ import { RefundManagement } from './RefundManagement'
 import { PricingManagement } from './PricingManagement'
 import { TuyaSettingsManagement } from './TuyaSettingsManagement'
 import { PaymentSettingsManagement } from './PaymentSettingsManagement'
+import { AnnouncementManagement } from './AnnouncementManagement'
 import OpenDoorExample from '@/components/OpenDoorExample'
 import AdminDoorUnlock from '../AdminDoorUnlock'
 
@@ -62,7 +63,8 @@ export default function AdminTabs({
             </span>
           )}
         </TabsTrigger>
-      
+        <TabsTrigger value="announcements">Latest Announcement</TabsTrigger>
+
         <TabsTrigger value="bookings">Bookings</TabsTrigger>
         <TabsTrigger value="user-management">User Management</TabsTrigger>
         <TabsTrigger value="packages">Packages</TabsTrigger>
@@ -151,8 +153,8 @@ export default function AdminTabs({
                     <div key={student.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
                       <div>
                         <p className="font-medium text-sm">
-                          {student.firstName && student.lastName 
-                            ? `${student.firstName} ${student.lastName}` 
+                          {student.firstName && student.lastName
+                            ? `${student.firstName} ${student.lastName}`
                             : student.email.split('@')[0]
                           }
                         </p>
@@ -160,8 +162,8 @@ export default function AdminTabs({
                       </div>
                       <div className="flex items-center gap-2">
                         <StatusBadge status={student.studentVerificationStatus} />
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => setSelectedUser(student)}
                           className="h-7 px-2 text-xs"
@@ -184,6 +186,11 @@ export default function AdminTabs({
             </CardContent>
           </Card>
         </div>
+      </TabsContent>
+
+      {/* Latest Announcement Tab */}
+      <TabsContent value="announcements" className="space-y-4">
+        <AnnouncementManagement />
       </TabsContent>
 
 
@@ -281,12 +288,12 @@ export default function AdminTabs({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              
+
               Door Access Management
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AdminDoorUnlock/>
+            <AdminDoorUnlock />
           </CardContent>
         </Card>
       </TabsContent>
