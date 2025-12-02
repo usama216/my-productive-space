@@ -298,20 +298,28 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           <span>
-                            {promo.activefrom 
-                              ? `Active from ${new Date(promo.activefrom).toLocaleDateString()}`
+                            {promo.activeFrom 
+                              ? `Active from ${new Date(promo.activeFrom).toLocaleDateString()}`
                               : 'Always active'
                             }
                           </span>
                         </div>
-                        {promo.activeto && (
+                        {promo.activeTo && promo.activeTo !== 'null' ? (
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             <span>
-                              Expires {new Date(promo.activeto).toLocaleDateString()}
+                              Expires {new Date(promo.activeTo).toLocaleDateString()}
+                              
                             </span>
                           </div>
-                        )}
+                        ):(
+                          <span className='flex gap-1 items-center'>
+                                <Clock className="w-3 h-3" />
+                                Always active
+                          </span>
+                          
+                          
+                          )}
                       </div>
 
                       {/* Priority */}
@@ -383,7 +391,14 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
                       <div>
                         <span className="text-gray-600">Used On:</span>
                         <span className="font-medium ml-2">
-                          {new Date(usage.usedat).toLocaleDateString()}
+                          {new Date(usage.usedat).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                          })}
                         </span>
                       </div>
                     </div>

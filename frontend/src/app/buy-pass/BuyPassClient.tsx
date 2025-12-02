@@ -526,21 +526,21 @@ export default function BuyNowPage() {
     )
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="pt-32 text-center">
-          <Alert className="max-w-md mx-auto">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Package Not Found</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <Button onClick={() => router.push('/pricing')} className="mt-4">View All Packages</Button>
-        </div>
-      </div>
-    )
-  }
+  // if (error) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50">
+  //       <Navbar />
+  //       <div className="pt-32 text-center">
+  //         <Alert className="max-w-md mx-auto">
+  //           <AlertTriangle className="h-4 w-4" />
+  //           <AlertTitle>Package Not Found</AlertTitle>
+  //           <AlertDescription>{error}</AlertDescription>
+  //         </Alert>
+  //         <Button onClick={() => router.push('/pricing')} className="mt-4">View All Packages</Button>
+  //       </div>
+  //     </div>
+  //   )
+  // }
 
   
 

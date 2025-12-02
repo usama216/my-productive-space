@@ -490,6 +490,15 @@ export const getPromoCodeDetails = async (id: string): Promise<{ success: boolea
   }
 };
 
+// Helper function to convert UTC time to Singapore timezone by adding 8 hours
+const convertToSingaporeTime = (utcDate: string | null | undefined): Date | null => {
+  if (!utcDate) return null;
+  const date = new Date(utcDate);
+  // Add 8 hours for Singapore timezone (UTC+8)
+  date.setHours(date.getHours() + 8);
+  return date;
+};
+
 // Local Utility Functions
 export const validatePromoCodeLocally = (promoCode: PromoCode, amount: number): { isValid: boolean; message: string } => {
   // Check if promo code is active
@@ -498,18 +507,20 @@ export const validatePromoCodeLocally = (promoCode: PromoCode, amount: number): 
     return { isValid: false, message: 'Promo code is not active' };
   }
 
-  // Check date validity
+  // Check date validity with Singapore timezone (UTC+8)
   const now = new Date();
   if (promoCode.activeFrom) {
-    const activeFrom = new Date(promoCode.activeFrom);
-    if (activeFrom > now) {
+    // Convert UTC time to Singapore time by adding 8 hours
+    const activeFromSGT = convertToSingaporeTime(promoCode.activeFrom);
+    if (activeFromSGT && activeFromSGT > now) {
       return { isValid: false, message: 'Promo code is not yet active' };
     }
   }
   
   if (promoCode.activeTo) {
-    const activeTo = new Date(promoCode.activeTo);
-    if (activeTo < now) {
+    // Convert UTC time to Singapore time by adding 8 hours
+    const activeToSGT = convertToSingaporeTime(promoCode.activeTo);
+    if (activeToSGT && activeToSGT < now) {
       return { isValid: false, message: 'Promo code has expired' };
     }
   }

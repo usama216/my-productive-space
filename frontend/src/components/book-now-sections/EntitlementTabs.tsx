@@ -155,6 +155,7 @@ export function EntitlementTabs({
   const [promoFeedback, setPromoFeedback] = useState<{ isValid: boolean; message: string } | null>(null)
   const [availablePromos, setAvailablePromos] = useState<PromoCode[]>([])
   const [isLoadingPromos, setIsLoadingPromos] = useState(false)
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false)
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null)
   const [discountCalculation, setDiscountCalculation] = useState<{
     discountAmount: number
@@ -305,6 +306,7 @@ export function EntitlementTabs({
       return;
     }
 
+    setIsApplyingPromo(true);
     try {
       const foundPromo = availablePromos.find(promo =>
         promo.code.toLowerCase() === codeToApply.toLowerCase()
@@ -375,8 +377,10 @@ export function EntitlementTabs({
         description: "Error applying promo code. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsApplyingPromo(false);
     }
-  }, [localPromo, userId, bookingAmount, availablePromos, onChange, toast]);
+  }, [localPromo, userId, bookingAmount, availablePromos, onChange, toast, bookingDuration]);
 
   const handleRemovePromo = useCallback(() => {
     setLocalPromo('');
@@ -1084,13 +1088,18 @@ const getRemainingPasses = (pkg: ApiUserPackage) => {
                                 setLocalPromo(promo.code);
                                 handleValidatePromo(promo.code);
                               }}
-                              disabled={!!selectedPromoCode || !isEligible}
+                              disabled={!!selectedPromoCode || !isEligible || isApplyingPromo}
                               className={`${selectedPromoCode?.id === promo.id
                                   ? 'bg-green-600 hover:bg-green-700'
                                   : 'bg-orange-500 hover:bg-orange-600'
                                 } text-white`}
                             >
-                              {selectedPromoCode?.id === promo.id ? (
+                              {isApplyingPromo ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  Applying...
+                                </>
+                              ) : selectedPromoCode?.id === promo.id ? (
                                 <>
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   Applied
