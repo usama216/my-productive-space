@@ -490,13 +490,17 @@ export const getPromoCodeDetails = async (id: string): Promise<{ success: boolea
   }
 };
 
-// Helper function to convert UTC time to Singapore timezone by adding 8 hours
-const convertToSingaporeTime = (utcDate: string | null | undefined): Date | null => {
-  if (!utcDate) return null;
-  const date = new Date(utcDate);
-  // Add 8 hours for Singapore timezone (UTC+8)
-  date.setHours(date.getHours() + 8);
-  return date;
+// Helper function to ensure date string is treated as UTC
+const parseUTCDate = (dateString: string | null | undefined): Date | null => {
+  if (!dateString) return null;
+  
+  // Ensure the date is treated as UTC by appending 'Z' if not present
+  let utcString = dateString;
+  if (!utcString.endsWith('Z') && !utcString.match(/[+-]\d{2}:\d{2}$/)) {
+    utcString = utcString + 'Z';
+  }
+  
+  return new Date(utcString);
 };
 
 // Local Utility Functions
@@ -507,20 +511,20 @@ export const validatePromoCodeLocally = (promoCode: PromoCode, amount: number): 
     return { isValid: false, message: 'Promo code is not active' };
   }
 
-  // Check date validity with Singapore timezone (UTC+8)
+  // Check date validity with current timezone
+  // Backend sends UTC dates - ensure they're parsed as UTC, then JS converts to local
   const now = new Date();
+  
   if (promoCode.activeFrom) {
-    // Convert UTC time to Singapore time by adding 8 hours
-    const activeFromSGT = convertToSingaporeTime(promoCode.activeFrom);
-    if (activeFromSGT && activeFromSGT > now) {
+    const activeFrom = parseUTCDate(promoCode.activeFrom);
+    if (activeFrom && activeFrom > now) {
       return { isValid: false, message: 'Promo code is not yet active' };
     }
   }
   
   if (promoCode.activeTo) {
-    // Convert UTC time to Singapore time by adding 8 hours
-    const activeToSGT = convertToSingaporeTime(promoCode.activeTo);
-    if (activeToSGT && activeToSGT < now) {
+    const activeTo = parseUTCDate(promoCode.activeTo);
+    if (activeTo && activeTo < now) {
       return { isValid: false, message: 'Promo code has expired' };
     }
   }

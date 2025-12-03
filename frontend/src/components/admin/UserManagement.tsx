@@ -597,6 +597,7 @@ export function UserManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Member Types</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="STUDENT">Student</SelectItem>
                   <SelectItem value="MEMBER">Member</SelectItem>
                   <SelectItem value="TUTOR">Tutor</SelectItem>
@@ -989,15 +990,51 @@ export function UserManagement() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this user? This action cannot be undone and will permanently remove all user data.
+            <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Permanently Delete User
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p className="font-semibold text-red-600">
+                ⚠️ WARNING: This action cannot be undone!
+              </p>
+              <p>
+                Deleting this user will <strong>permanently remove</strong> the following data:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>User account and profile information</li>
+                <li>All purchased packages and passes</li>
+                <li>All credits (used and unused)</li>
+                <li>All payment records</li>
+                <li>All refund transactions</li>
+                <li>All promo code usage history</li>
+              </ul>
+              <p className="text-sm text-green-600 font-medium">
+                ✓ Note: Booking history will be preserved for records.
+              </p>
+              <p className="text-sm text-amber-600 font-medium">
+                ⚠️ Users with active or future bookings cannot be deleted. Cancel those bookings first.
+              </p>
+              <p className="font-semibold">
+                Are you absolutely sure you want to delete <span className="text-red-600">{selectedUser?.email}</span>?
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isSubmitting}>
-              {isSubmitting ? 'Deleting...' : 'Delete User'}
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Yes, Permanently Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -299,7 +299,13 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
                           <Calendar className="w-3 h-3" />
                           <span>
                             {promo.activeFrom 
-                              ? `Active from ${new Date(promo.activeFrom).toLocaleDateString()}`
+                              ? `Active from ${new Date(promo.activeFrom.endsWith('Z') ? promo.activeFrom : promo.activeFrom + 'Z').toLocaleString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}`
                               : 'Always active'
                             }
                           </span>
@@ -308,8 +314,13 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             <span>
-                              Expires {new Date(promo.activeTo).toLocaleDateString()}
-                              
+                              Expires {new Date(promo.activeTo.endsWith('Z') ? promo.activeTo : promo.activeTo + 'Z').toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
                             </span>
                           </div>
                         ):(
@@ -317,9 +328,7 @@ export function UserPromoCodes({ userId }: UserPromoCodesProps) {
                                 <Clock className="w-3 h-3" />
                                 Always active
                           </span>
-                          
-                          
-                          )}
+                        )}
                       </div>
 
                       {/* Priority */}

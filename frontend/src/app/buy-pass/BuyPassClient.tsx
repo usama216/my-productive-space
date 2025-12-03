@@ -898,7 +898,7 @@ export default function BuyNowPage() {
                           <div className="flex items-center space-x-2 mb-2">
                             <CheckCircle className="w-5 h-5 text-orange-600" />
                             <span className="text-sm font-medium text-orange-900">
-                              {selectedPackage.passCount} {selectedPackage.passCount === 1 ? 'Package' : 'Packages'}
+                              {selectedPackage.passCount} {selectedPackage.passCount === 1 ? 'Count' : 'Counts'}
                             </span>
                             <span className="text-xs text-orange-700">(1 pass per booking)</span>
                           </div>
