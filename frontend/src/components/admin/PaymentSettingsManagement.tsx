@@ -48,7 +48,7 @@ export function PaymentSettingsManagement() {
 
       if (data.success) {
         setSettings(data.data)
-        
+
         // Initialize form data with current values
         const initialFormData: FormData = {}
         data.data.forEach((setting: PaymentSetting) => {
@@ -203,8 +203,8 @@ export function PaymentSettingsManagement() {
   const feeSettings = settings.filter(s => s.settingKey.includes('FEE'))
   const enableSettings = settings.filter(s => s.settingKey.includes('ENABLED'))
   // Filter out minimum amount settings (not needed)
-  const otherSettings = settings.filter(s => 
-    !s.settingKey.includes('FEE') && 
+  const otherSettings = settings.filter(s =>
+    !s.settingKey.includes('FEE') &&
     !s.settingKey.includes('ENABLED') &&
     !s.settingKey.includes('MINIMUM')
   )
@@ -226,7 +226,7 @@ export function PaymentSettingsManagement() {
           <Alert>
             <AlertCircle className="w-4 h-4" />
             <AlertDescription>
-              <strong>Important:</strong> Transaction fees will be calculated automatically based on these settings. 
+              <strong>Important:</strong> Transaction fees will be calculated automatically based on these settings.
               PayNow uses a fixed fee, while Credit Card uses a percentage fee.
             </AlertDescription>
           </Alert>
@@ -268,6 +268,35 @@ export function PaymentSettingsManagement() {
               </div>
             ))}
           </div>
+
+          {/* Admin Refund Fee */}
+          <div className="space-y-4 pt-6 border-t">
+            <h3 className="text-lg font-semibold">Refund Settings</h3>
+            <div className="space-y-2">
+              <Label htmlFor="ADMIN_REFUND_FEE" className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                <span className="font-medium">ADMIN REFUND FEE</span>
+                <span className="text-sm text-gray-500">(in SGD)</span>
+              </Label>
+              <p className="text-sm text-gray-500">
+                Fee deducted from all refund requests. This is non-refundable and covers administrative costs.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="ADMIN_REFUND_FEE"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData['ADMIN_REFUND_FEE'] || ''}
+                  onChange={(e) => handleInputChange('ADMIN_REFUND_FEE', e.target.value)}
+                  placeholder="Enter admin refund fee (e.g., 2.00)"
+                  className="max-w-xs"
+                />
+                <span className="text-sm text-gray-600">SGD</span>
+              </div>
+            </div>
+          </div>
+
 
           {/* Enable/Disable Settings */}
           {/* {enableSettings.length > 0 && (
@@ -354,7 +383,7 @@ export function PaymentSettingsManagement() {
         </CardContent>
       </Card>
 
-      
+
 
       {/* Help Section */}
       {/* <Alert>

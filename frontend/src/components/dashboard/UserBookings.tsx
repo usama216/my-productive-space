@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2, Timer, Key } from 'lucide-react'
+import { Calendar, Clock, MapPin, Users, DollarSign, CheckCircle, XCircle, Edit, AlertTriangle, X, Loader2, Timer, Key, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -24,9 +24,9 @@ import {
 } from '@/lib/bookingService'
 import { requestRefund } from '@/lib/refundService'
 import { sendDoorAccessLink } from '@/lib/doorService'
-import { 
-  formatSingaporeDate, 
-  formatSingaporeDateOnly, 
+import {
+  formatSingaporeDate,
+  formatSingaporeDateOnly,
   formatSingaporeTimeOnly,
   formatBookingDateRange,
   toSingaporeTime,
@@ -42,7 +42,7 @@ export function UserBookings() {
   const [loading, setLoading] = useState(true)
   const [userStats, setUserStats] = useState({ upcomingBookings: 0, ongoingBookings: 0, pastBookings: 0 })
   const [activeTab, setActiveTab] = useState<'upcoming' | 'ongoing' | 'past' | 'cancelled'>('upcoming')
-  
+
   // Refund dialog state
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
@@ -52,7 +52,8 @@ export function UserBookings() {
   // Dynamic payment fee settings state
   const [feeSettings, setFeeSettings] = useState({
     paynowFee: 0.20,
-    creditCardFeePercentage: 5.0
+    creditCardFeePercentage: 5.0,
+    adminRefundFee: 2.00
   })
   const [actualRefundAmount, setActualRefundAmount] = useState<number | null>(null)
   const [sendingTuyaLink, setSendingTuyaLink] = useState<string | null>(null)
@@ -114,10 +115,10 @@ export function UserBookings() {
   // Handle cancel booking (refund request)
   const handleSendTuyaLink = async (booking: Booking) => {
     setSendingTuyaLink(booking.bookingRef)
-    
+
     try {
       const result = await sendDoorAccessLink(booking.bookingRef)
-      
+
       if (result.success) {
         toast({
           title: "Door Access Link Sent!",
@@ -146,7 +147,7 @@ export function UserBookings() {
     setSelectedBooking(booking)
     setRefundReason('')
     setIsRefundDialogOpen(true)
-    
+
     // Calculate actual refund amount
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookingPaymentDetails`, {
@@ -158,7 +159,7 @@ export function UserBookings() {
           bookingId: booking.id
         })
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         const paidAmount = parseFloat(data.paymentAmount || booking.totalAmount)
@@ -169,10 +170,10 @@ export function UserBookings() {
         const cardFee = parseFloat(data.cardFee || 0)
         const payNowFee = parseFloat(data.payNowFee || 0)
         const originalCost = parseFloat(data.totalCost || booking.totalAmount)
-        const isCard = data.paymentMethod && 
-          (data.paymentMethod.toLowerCase().includes('card') || 
-           data.paymentMethod.toLowerCase().includes('credit'))
-        
+        const isCard = data.paymentMethod &&
+          (data.paymentMethod.toLowerCase().includes('card') ||
+            data.paymentMethod.toLowerCase().includes('credit'))
+
         setIsCardPayment(isCard)
         setPromoDiscountAmount(promoDiscount)
         setPackageDiscountAmount(packageDiscount)
@@ -181,18 +182,22 @@ export function UserBookings() {
         setCardFee(cardFee)
         setPayNowFee(payNowFee)
         setTotalCost(originalCost)
-        
+
         if (isCard) {
-          // Deduct dynamic % card fee
+          // Deduct dynamic % card fee AND admin refund fee
           const multiplier = 1 + (feeSettings.creditCardFeePercentage / 100)
-          const actualAmount = paidAmount / multiplier
-          setActualRefundAmount(actualAmount)
+          const amountAfterCardFee = paidAmount / multiplier
+          const finalRefund = amountAfterCardFee - feeSettings.adminRefundFee
+          setActualRefundAmount(Math.max(0, finalRefund))
         } else if (payNowFee > 0) {
-          // Deduct dynamic PayNow transaction fee
-          const actualAmount = paidAmount - feeSettings.paynowFee
-          setActualRefundAmount(Math.max(0, actualAmount))
+          // Deduct dynamic PayNow transaction fee AND admin refund fee
+          const amountAfterPayNowFee = paidAmount - feeSettings.paynowFee
+          const finalRefund = amountAfterPayNowFee - feeSettings.adminRefundFee
+          setActualRefundAmount(Math.max(0, finalRefund))
         } else {
-          setActualRefundAmount(paidAmount)
+          // Only deduct admin refund fee
+          const finalRefund = paidAmount - feeSettings.adminRefundFee
+          setActualRefundAmount(Math.max(0, finalRefund))
         }
       } else {
         // Fallback to booking amount
@@ -234,10 +239,10 @@ export function UserBookings() {
 
     try {
       setIsSubmittingRefund(true)
-      
+
       // Get user ID from auth context
       const userId = authUser?.id
-      
+
       if (!userId) {
         toast({
           title: "Error",
@@ -246,21 +251,21 @@ export function UserBookings() {
         })
         return
       }
-      
+
       await requestRefund(selectedBooking.id, refundReason, userId)
-      
+
       toast({
         title: "Refund Approved",
         description: "Your refund has been approved and added to your store credits.",
       })
-      
+
       setIsRefundDialogOpen(false)
       setSelectedBooking(null)
       setRefundReason('')
-      
+
       // Reload bookings to reflect any status changes
       loadBookings()
-      
+
     } catch (error) {
       console.error('Refund Request Error:', error)
       toast({
@@ -286,7 +291,8 @@ export function UserBookings() {
       const settings = await getPaymentSettings()
       setFeeSettings({
         paynowFee: settings.PAYNOW_TRANSACTION_FEE,
-        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE
+        creditCardFeePercentage: settings.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE,
+        adminRefundFee: settings.ADMIN_REFUND_FEE
       })
     } catch (error) {
       console.error('Error loading payment fee settings:', error)
@@ -300,7 +306,7 @@ export function UserBookings() {
     .filter(booking => {
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
-      
+
       // Upcoming: bookings that haven't started yet
       return startAt > now
     })
@@ -311,7 +317,7 @@ export function UserBookings() {
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
       const endAt = new Date(booking.endAt)
-      
+
       // Ongoing: bookings that are currently in progress (started and not ended)
       return startAt <= now && endAt > now
     })
@@ -373,21 +379,21 @@ export function UserBookings() {
     const bookingStart = new Date(booking.startAt.includes('Z') ? booking.startAt : booking.startAt + 'Z')
     const bookingEnd = new Date(booking.endAt.includes('Z') ? booking.endAt : booking.endAt + 'Z')
     const hoursDifference = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60)
-    
+
     // Check if booking is past (ended)
     const isPast = now.getTime() > bookingEnd.getTime()
     if (isPast) {
       return false
     }
-    
+
     // Check if booking is ongoing
     const isOngoing = now.getTime() >= bookingStart.getTime() && now.getTime() <= bookingEnd.getTime()
-    
+
     // Can extend if:
     // 1. Less than 5 hours before start (hoursDifference < 5 and positive)
     // 2. Currently ongoing
     const canExtend = (hoursDifference < 5 && hoursDifference >= 0) || isOngoing
-    
+
     return canExtend && booking.confirmedPayment && booking.refundstatus === 'NONE'
   }
 
@@ -436,7 +442,7 @@ export function UserBookings() {
   // Get current tab bookings with sorting by most recent date/time first
   const getCurrentTabBookings = () => {
     let tabBookings: Booking[] = []
-    
+
     switch (activeTab) {
       case 'upcoming':
         tabBookings = upcomingBookings
@@ -453,7 +459,7 @@ export function UserBookings() {
       default:
         return []
     }
-    
+
     // Sort bookings by most recent date/time first
     return tabBookings.sort((a, b) => {
       // For upcoming bookings, sort by startAt (earliest first)
@@ -474,7 +480,7 @@ export function UserBookings() {
         const bDate = new Date(b.updatedAt || b.createdAt || b.startAt).getTime()
         return bDate - aDate
       }
-      
+
       // Default sorting by startAt (most recent first)
       return new Date(b.startAt).getTime() - new Date(a.startAt).getTime()
     })
@@ -572,8 +578,8 @@ export function UserBookings() {
         <button
           onClick={() => setActiveTab('upcoming')}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'upcoming'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-white text-gray-900 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
             }`}
         >
           Upcoming ({upcomingBookings.length})
@@ -581,8 +587,8 @@ export function UserBookings() {
         <button
           onClick={() => setActiveTab('ongoing')}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'ongoing'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-white text-gray-900 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
             }`}
         >
           Ongoing ({ongoingBookings.length})
@@ -590,8 +596,8 @@ export function UserBookings() {
         <button
           onClick={() => setActiveTab('past')}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'past'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-white text-gray-900 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
             }`}
         >
           Past ({pastBookings.length})
@@ -599,8 +605,8 @@ export function UserBookings() {
         <button
           onClick={() => setActiveTab('cancelled')}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${activeTab === 'cancelled'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-white text-gray-900 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
             }`}
         >
           Cancelled ({bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED').length})
@@ -611,9 +617,9 @@ export function UserBookings() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {activeTab === 'upcoming' ? 'Upcoming Bookings' : 
-             activeTab === 'ongoing' ? 'Ongoing Bookings' : 
-             activeTab === 'cancelled' ? 'Cancelled Bookings' : 'Past Bookings'}
+            {activeTab === 'upcoming' ? 'Upcoming Bookings' :
+              activeTab === 'ongoing' ? 'Ongoing Bookings' :
+                activeTab === 'cancelled' ? 'Cancelled Bookings' : 'Past Bookings'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -628,18 +634,18 @@ export function UserBookings() {
                 <Calendar className="h-12 w-12 mx-auto" />
               </div>
               <p className="text-gray-500 text-lg">
-                {activeTab === 'upcoming' ? 'No upcoming bookings' : 
-                 activeTab === 'ongoing' ? 'No ongoing bookings' : 
-                 activeTab === 'cancelled' ? 'No cancelled bookings' : 'No past bookings'}
+                {activeTab === 'upcoming' ? 'No upcoming bookings' :
+                  activeTab === 'ongoing' ? 'No ongoing bookings' :
+                    activeTab === 'cancelled' ? 'No cancelled bookings' : 'No past bookings'}
               </p>
               <p className="text-gray-400 text-sm">
                 {activeTab === 'upcoming'
                   ? 'Book a study space to get started'
                   : activeTab === 'ongoing'
-                  ? 'Your active bookings will appear here'
-                  : activeTab === 'cancelled'
-                  ? 'Your refunded bookings will appear here'
-                  : 'Your completed bookings will appear here'
+                    ? 'Your active bookings will appear here'
+                    : activeTab === 'cancelled'
+                      ? 'Your refunded bookings will appear here'
+                      : 'Your completed bookings will appear here'
                 }
               </p>
             </div>
@@ -680,7 +686,7 @@ export function UserBookings() {
                           {(() => {
                             const startDate = formatSingaporeDateOnly(booking.startAt);
                             const endDate = formatSingaporeDateOnly(booking.endAt);
-                            
+
                             // If same date, show date once
                             if (startDate === endDate) {
                               return (
@@ -691,7 +697,7 @@ export function UserBookings() {
                                 </>
                               );
                             }
-                            
+
                             // If different dates, show both dates
                             return (
                               <>
@@ -727,15 +733,15 @@ export function UserBookings() {
                       <div className="text-sm">
                         {(() => {
                           const bookedFor = [];
-                        
+
                           if (booking.students > 0) bookedFor.push(`Students: ${booking.students}`);
                           if (booking.members > 0) bookedFor.push(`Members: ${booking.members}`);
                           if (booking.tutors > 0) bookedFor.push(`Tutors: ${booking.tutors}`);
-                          
+
                           if (bookedFor.length === 0) {
                             return <div className="text-gray-500">---</div>;
                           }
-                          
+
                           return (
                             <div className="leading-tight">
                               {bookedFor.map((item, index) => (
@@ -757,24 +763,24 @@ export function UserBookings() {
                             const discountTypes = new Set(
                               booking.discountHistory.map((d: any) => d.discountType)
                             );
-                            
+
                             // Convert to readable names
                             const typeNames: string[] = [];
                             if (discountTypes.has('CREDIT')) typeNames.push('Credit');
                             if (discountTypes.has('PASS')) typeNames.push('Package Applied');
                             if (discountTypes.has('PROMO_CODE')) typeNames.push('Promo Code');
-                            
+
                             if (typeNames.length > 0) {
                               return (
                                 <div className="flex flex-wrap gap-1">
                                   {typeNames.map((name, idx) => (
-                                    <Badge 
-                                      key={idx} 
-                                      variant="outline" 
+                                    <Badge
+                                      key={idx}
+                                      variant="outline"
                                       className={
                                         name === 'Credit' ? 'bg-green-50 text-green-700 border-green-200' :
-                                        name === 'Package Applied' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                        'bg-blue-50 text-blue-700 border-blue-200'
+                                          name === 'Package Applied' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                            'bg-blue-50 text-blue-700 border-blue-200'
                                       }
                                     >
                                       {name}
@@ -784,7 +790,7 @@ export function UserBookings() {
                               );
                             }
                           }
-                          
+
                           // Fallback to old logic if no discountHistory
                           if (booking.packageUsed && booking.packageId) {
                             return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Package</Badge>;
@@ -816,7 +822,7 @@ export function UserBookings() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                      <div className="font-medium">${(booking.extensionamounts && booking.extensionamounts.length > 0 ? Number(booking.totalactualcost) : Number(booking.totalAmount)).toFixed(2)}</div>
+                        <div className="font-medium">${(booking.extensionamounts && booking.extensionamounts.length > 0 ? Number(booking.totalactualcost) : Number(booking.totalAmount)).toFixed(2)}</div>
                         {/* {booking.extensionamounts && booking.extensionamounts.length > 0 && (
                           <div className="text-xs text-blue-600">
                             Total: ${(() => {
@@ -908,23 +914,23 @@ export function UserBookings() {
                         )}
 
                         {/* Tuya button shows in upcoming tab when reschedule is NOT available (less than 5 hours before) */}
-                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' && 
-                         (!canEditBooking(booking)) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSendTuyaLink(booking)}
-                            disabled={sendingTuyaLink === booking.bookingRef}
-                            className="hover:bg-green-50 border-green-200 text-green-700"
-                          >
-                            {sendingTuyaLink === booking.bookingRef ? (
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            ) : (
-                              <Key className="h-4 w-4 mr-1" />
-                            )}
-                            {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Door Access Link'}
-                          </Button>
-                        )}
+                        {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus === 'NONE' &&
+                          (!canEditBooking(booking)) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSendTuyaLink(booking)}
+                              disabled={sendingTuyaLink === booking.bookingRef}
+                              className="hover:bg-green-50 border-green-200 text-green-700"
+                            >
+                              {sendingTuyaLink === booking.bookingRef ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Key className="h-4 w-4 mr-1" />
+                              )}
+                              {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Door Access Link'}
+                            </Button>
+                          )}
 
                         {activeTab === 'upcoming' && canExtendBooking(booking) && (
                           <>
@@ -952,20 +958,19 @@ export function UserBookings() {
                           </Button>
                         )}
 
-                      
 
-                     
+
+
 
                         {activeTab === 'upcoming' && booking.confirmedPayment && booking.refundstatus !== 'NONE' && (
                           <div className="flex items-center gap-2">
-                            <Badge 
-                              className={`text-xs ${
-                                booking.refundstatus === 'APPROVED' 
-                                  ? 'bg-orange-100 text-orange-800 border-orange-200' 
-                                  : booking.refundstatus === 'REJECTED' 
-                                    ? 'bg-red-100 text-red-800 border-red-200' 
-                                    : 'bg-orange-50 text-orange-700 border-orange-200'
-                              }`}
+                            <Badge
+                              className={`text-xs ${booking.refundstatus === 'APPROVED'
+                                ? 'bg-orange-100 text-orange-800 border-orange-200'
+                                : booking.refundstatus === 'REJECTED'
+                                  ? 'bg-red-100 text-red-800 border-red-200'
+                                  : 'bg-orange-50 text-orange-700 border-orange-200'
+                                }`}
                             >
                               {booking.refundstatus === 'REQUESTED' && 'Refund Requested'}
                               {booking.refundstatus === 'APPROVED' && 'Refund Approved'}
@@ -976,12 +981,12 @@ export function UserBookings() {
 
                         {activeTab === 'cancelled' && (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') && (
                           <div className="flex items-center gap-2">
-                            <Badge 
+                            <Badge
                               className="bg-orange-100 text-orange-800 border-orange-200 text-xs"
                             >
-                              Refunded 
+                              Refunded
                             </Badge>
-                          
+
                           </div>
                         )}
 
@@ -1009,8 +1014,8 @@ export function UserBookings() {
                               )}
                               {sendingTuyaLink === booking.bookingRef ? 'Sending...' : 'Door Access Link'}
                             </Button>
-                        
-                            
+
+
                             {booking.confirmedPayment && booking.refundstatus === 'NONE' && (booking.rescheduleCount || 0) < 1 && canEditBooking(booking) && (
                               <Button
                                 size="sm"
@@ -1103,19 +1108,19 @@ export function UserBookings() {
           <DialogHeader>
             <DialogTitle>Request Refund</DialogTitle>
           </DialogHeader>
-          
+
           {selectedBooking && (
             <div className="space-y-4">
-             
-              
+
+
               <div className="space-y-2">
-            
+
                 <div className="p-3 bg-gray-50 rounded-md text-sm space-y-2">
                   <div><strong>Reference:</strong> {selectedBooking.bookingRef}</div>
                   <div><strong>Location:</strong> {selectedBooking.location}</div>
                   <div><strong>Date:</strong> {formatSingaporeDateOnly(selectedBooking.startAt)}</div>
                   <div><strong>Time:</strong> {formatSingaporeTimeOnly(selectedBooking.startAt)} - {formatSingaporeTimeOnly(selectedBooking.endAt)}</div>
-                  
+
                   <div className="border-t pt-2 mt-2 space-y-1">
                     {/* <div className="flex justify-between items-center">
                       <span>Booking Cost:</span>
@@ -1156,7 +1161,7 @@ export function UserBookings() {
                       <span>${Number(selectedBooking.totalAmount).toFixed(2)}</span>
                     </div>
                   </div>
-                  
+
                   {actualRefundAmount !== null && (
                     <div className="border-t pt-2 mt-2 bg-green-50 p-2 rounded">
                       <div className="flex justify-between items-center">
@@ -1178,11 +1183,26 @@ export function UserBookings() {
                           * Discount, promo code if any, will not be refundable.
                         </div>
                       )}
+                      <div className="text-xs text-gray-600 mt-1">
+                        * Refund Policy: Refund is subjected to a non-refundable <strong>${feeSettings.adminRefundFee.toFixed(2)}</strong> admin fee.
+                      </div>
                     </div>
                   )}
+
+
+
+                  {/* Admin Refund Fee Disclaimer */}
+                  {/* <div className="border-t pt-2 mt-2 bg-gray-100 p-3 rounded">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-gray-700">
+                        <strong>Refund Policy:</strong> Refund is subjected to a non-refundable <strong>${feeSettings.adminRefundFee.toFixed(2)}</strong> admin fee.
+                      </div>
+                    </div>
+                  </div> */}
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="refundReason">Reason for Refund *</Label>
                 <Textarea
@@ -1197,21 +1217,23 @@ export function UserBookings() {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                   Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation.
+                  Approved refunds will be added to your store credits, which expire in 30 days. Store credits used cannot be refunded for any cancellation.
                   <br />
                   Any discounts, promo codes, packages, credit card fees, or PayNow transaction fees cannot be refunded.
+                  <br />
+                  Refund is subjected to a non-refundable ${feeSettings.adminRefundFee.toFixed(2)} admin fee.
                 </AlertDescription>
               </Alert>
-              
+
               <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setIsRefundDialogOpen(false)}
                   disabled={isSubmittingRefund}
                 >
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleSubmitRefund}
                   disabled={isSubmittingRefund || !refundReason.trim()}
                   variant="destructive"

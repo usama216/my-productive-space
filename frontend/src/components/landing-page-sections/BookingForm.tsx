@@ -1,7 +1,7 @@
 // src/components/BookingForm.tsx
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import Image from 'next/image'
@@ -19,6 +19,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { PeopleSelector } from '@/components/PeopleSelector'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
+import { getOperatingHours, getClosureDates, OperatingHours, ClosureDate } from '@/lib/shopHoursService'
+import { Loader2 } from 'lucide-react'
 
 export default function BookingForm() {
   const router = useRouter()
@@ -42,17 +44,45 @@ export default function BookingForm() {
     total: 1
   })
 
+  // Shop hours state
+  const [operatingHours, setOperatingHours] = useState<OperatingHours[]>([])
+  const [closureDates, setClosureDates] = useState<ClosureDate[]>([])
+  const [isLoadingShopHours, setIsLoadingShopHours] = useState(false)
+
+  // Load shop hours on mount
+  useEffect(() => {
+    const loadShopHours = async () => {
+      setIsLoadingShopHours(true)
+      try {
+        // Hardcoded to Kovan as per UI
+        const [hours, closures] = await Promise.all([
+          getOperatingHours('Kovan'),
+          getClosureDates('Kovan')
+        ])
+        setOperatingHours(hours)
+        setClosureDates(closures)
+        console.log('✅ Shop hours loaded:', hours)
+      } catch (error) {
+        console.error('Error loading shop hours:', error)
+      } finally {
+        setIsLoadingShopHours(false)
+      }
+    }
+
+    loadShopHours()
+  }, [])
+
   // Calculate max date (2 months from today)
   const maxBookingDate = addMonths(new Date(), 2)
 
   // Helper function to STRICTLY enforce 15-minute intervals
   const enforceStrict15Minutes = (date: Date | null): Date | null => {
     if (!date) return null;
-    
+
     const strictDate = new Date(date);
     const minutes = strictDate.getMinutes();
     const remainder = minutes % 15;
-    
+
     // Reject any time that's not on a 15-minute boundary
     if (remainder !== 0) {
       // Always round DOWN to the previous 15-minute mark for strict enforcement
@@ -65,14 +95,74 @@ export default function BookingForm() {
       strictDate.setSeconds(0);
       strictDate.setMilliseconds(0);
     }
-    
+
     return strictDate;
   };
 
-  // Filter function to only allow 15-minute intervals in time picker
-  const filterTime = (time: Date): boolean => {
-    const minutes = time.getMinutes();
-    return minutes % 15 === 0; // Only allow :00, :15, :30, :45
+  // Helper to generate available times for a given date based on operating hours
+  const getAvailableTimes = (date: Date | null): Date[] => {
+    if (!date) return [];
+
+    const dayOfWeek = date.getDay();
+
+    // Log for debugging
+    console.log(' Getting available times for:', {
+      date: date.toDateString(),
+      dayOfWeek,
+      operatingHoursLoaded: operatingHours.length,
+      isLoadingShopHours
+    });
+
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive);
+
+    // CRITICAL: Always show times even if hours aren't loaded yet (fallback)
+    if (operatingHours.length === 0 || !dayHours) {
+      console.log(' Using fallback times - shop hours not loaded or day closed');
+      const times: Date[] = [];
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      for (let i = 0; i < 24 * 4; i++) {
+        times.push(new Date(start.getTime() + i * 15 * 60 * 1000));
+      }
+      return times;
+    }
+
+    console.log(' Using shop hours:', dayHours);
+    const times: Date[] = [];
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    // Generate 15-min intervals within shop hours
+    for (let i = 0; i < 24 * 4; i++) {
+      const time = new Date(start.getTime() + i * 15 * 60 * 1000);
+      const timeString = time.toTimeString().split(' ')[0].substring(0, 5);
+
+      const openTime = dayHours.openTime.substring(0, 5);
+      const closeTime = dayHours.closeTime.substring(0, 5);
+
+      if (timeString >= openTime && timeString <= closeTime) {
+        times.push(time);
+      }
+    }
+
+    console.log(` Generated ${times.length} available times for ${date.toDateString()}`);
+    return times;
+  };
+
+  const getAvailableEndTimes = (date: Date | null): Date[] => {
+    const times = getAvailableTimes(date);
+    if (!startDate || !times.length) return times;
+
+    // Filter based on start time (must be >= start time + 1 hour)
+    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    return times.filter(time => {
+      // If same day, check time
+      if (date && startDate && date.toDateString() === startDate.toDateString()) {
+        return time >= minEndTime;
+      }
+      return true;
+    });
   };
 
   const handleStartChange = (date: Date | null) => {
@@ -83,31 +173,31 @@ export default function BookingForm() {
 
   const handleEndChange = (date: Date | null) => {
     const validDate = enforceStrict15Minutes(date);
-    
+
     // Prevent selecting past end times
     if (validDate && startDate) {
       const now = new Date();
       const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000); // Start + 1 hour
-      
+
       // If selecting today and end time is before current time + 1 hour from start
       if (isSameDay(validDate, now) && validDate < minEndTime && minEndTime > now) {
         // Don't allow past times
         alert('End time cannot be in the past. Please select a future time.');
         return;
       }
-      
+
       // Ensure end time is at least 1 hour after start time
       if (validDate <= startDate) {
         alert('End time must be after start time');
         return;
       }
-      
+
       if (validDate < minEndTime) {
         alert('End time must be at least 1 hour after start time');
         return;
       }
     }
-    
+
     setEndDate(validDate)
   }
 
@@ -225,7 +315,7 @@ export default function BookingForm() {
       })
       return
     }
-    
+
     // Validate minimum booking duration of 1 hour
     const timeDifferenceMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
     if (timeDifferenceMinutes < 60) {
@@ -236,7 +326,7 @@ export default function BookingForm() {
       })
       return
     }
-    
+
     // Check if booking is over 24 hours
     const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
     if (timeDifferenceHours > 24) {
@@ -247,7 +337,7 @@ export default function BookingForm() {
       })
       return
     }
-    
+
     // Check if it is a valid cross-day booking
     const daysDifference = Math.floor(timeDifferenceHours / 24)
 
@@ -290,7 +380,7 @@ export default function BookingForm() {
   const handleContinueToBooking = () => {
     // Clear home page localStorage before navigating
     clearHomePageStorage()
-    
+
     // Create URL with prefilled data
     const params = new URLSearchParams({
       location: 'kovan',
@@ -400,7 +490,10 @@ export default function BookingForm() {
               <div className="flex space-x-4">
                 {/* From */}
                 <div className="flex flex-col">
-                  <label className="text-xs text-gray-500 uppercase mb-1 text-left">From</label>
+                  <label className="text-xs text-gray-500 uppercase mb-1 text-left flex items-center gap-2">
+                    From
+                    {isLoadingShopHours && <Loader2 className="h-3 w-3 animate-spin text-orange-500" />}
+                  </label>
                   <DatePicker
                     selected={startDate}
                     onChange={handleStartChange}
@@ -410,7 +503,7 @@ export default function BookingForm() {
                     endDate={endDate}
                     showTimeSelect
                     timeIntervals={15}
-                    filterTime={filterTime}
+                    includeTimes={getAvailableTimes(startDate)}
                     dateFormat="MMM d, yyyy h:mm aa"
                     placeholderText="Start"
                     className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -434,7 +527,7 @@ export default function BookingForm() {
                     maxDate={endMaxDate}
                     showTimeSelect
                     timeIntervals={15}
-                    filterTime={filterTime}
+                    includeTimes={getAvailableEndTimes(endDate)}
                     dateFormat="MMM d, yyyy h:mm aa"
                     placeholderText="End"
                     className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -508,8 +601,7 @@ export default function BookingForm() {
                     startDate={startDate}
                     endDate={endDate}
                     showTimeSelect
-                    timeIntervals={15}
-                    filterTime={filterTime}
+                    includeTimes={getAvailableTimes(startDate)}
                     dateFormat="MMM d, h:mm aa"
                     placeholderText="Start"
                     className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -531,8 +623,7 @@ export default function BookingForm() {
                     minDate={endMinDate}
                     maxDate={endMaxDate}
                     showTimeSelect
-                    timeIntervals={15}
-                    filterTime={filterTime}
+                    includeTimes={getAvailableEndTimes(endDate)}
                     dateFormat="MMM d, h:mm aa"
                     placeholderText="End"
                     className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -607,8 +698,7 @@ export default function BookingForm() {
                     startDate={startDate}
                     endDate={endDate}
                     showTimeSelect
-                    timeIntervals={15}
-                    filterTime={filterTime}
+                    includeTimes={getAvailableTimes(startDate)}
                     dateFormat="MMM d, h:mm aa"
                     placeholderText="Start"
                     className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -630,8 +720,7 @@ export default function BookingForm() {
                     minDate={endMinDate}
                     maxDate={endMaxDate}
                     showTimeSelect
-                    timeIntervals={15}
-                    filterTime={filterTime}
+                    includeTimes={getAvailableEndTimes(endDate)}
                     dateFormat="MMM d, h:mm aa"
                     placeholderText="End"
                     className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"

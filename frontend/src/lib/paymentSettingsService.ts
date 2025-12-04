@@ -7,6 +7,7 @@ import { authenticatedFetch } from './apiClient'
 interface PaymentSettings {
   PAYNOW_TRANSACTION_FEE: number
   CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE: number
+  ADMIN_REFUND_FEE: number
   PAYNOW_ENABLED: boolean
   CREDIT_CARD_ENABLED: boolean
 }
@@ -23,6 +24,7 @@ function getDefaultSettings(): PaymentSettings {
   return {
     PAYNOW_TRANSACTION_FEE: 0.20,
     CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE: 5.0,
+    ADMIN_REFUND_FEE: 2.00,
     PAYNOW_ENABLED: true,
     CREDIT_CARD_ENABLED: true
   }
@@ -43,7 +45,7 @@ export async function getPaymentSettings(): Promise<PaymentSettings> {
     const response = await authenticatedFetch(
       `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/payment-settings`
     )
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch payment settings')
     }
@@ -66,6 +68,7 @@ export async function getPaymentSettings(): Promise<PaymentSettings> {
       const settings: PaymentSettings = {
         PAYNOW_TRANSACTION_FEE: settingsMap.PAYNOW_TRANSACTION_FEE || 0.20,
         CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE: settingsMap.CREDIT_CARD_TRANSACTION_FEE_PERCENTAGE || 5.0,
+        ADMIN_REFUND_FEE: settingsMap.ADMIN_REFUND_FEE || 2.00,
         PAYNOW_ENABLED: settingsMap.PAYNOW_ENABLED !== false,
         CREDIT_CARD_ENABLED: settingsMap.CREDIT_CARD_ENABLED !== false
       }

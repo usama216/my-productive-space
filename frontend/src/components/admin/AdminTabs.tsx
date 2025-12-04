@@ -16,6 +16,7 @@ import { PricingManagement } from './PricingManagement'
 import { TuyaSettingsManagement } from './TuyaSettingsManagement'
 import { PaymentSettingsManagement } from './PaymentSettingsManagement'
 import { AnnouncementManagement } from './AnnouncementManagement'
+import { ShopHoursManagement } from './ShopHoursManagement'
 import OpenDoorExample from '@/components/OpenDoorExample'
 import AdminDoorUnlock from '../AdminDoorUnlock'
 
@@ -54,8 +55,12 @@ export default function AdminTabs({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="flex w-full overflow-x-auto p-1">
-        <TabsTrigger value="overview">
+      <TabsList
+        className="flex w-full justify-start overflow-x-auto whitespace-nowrap px-6 py-2 relative"
+        style={{ scrollBehavior: 'smooth' }}
+      >
+
+        <TabsTrigger value="overview" className="snap-start">
           Overview
           {pendingStudents.length > 0 && (
             <span className="ml-2 bg-orange-500 text-white text-xs rounded-full px-2 py-1">
@@ -65,21 +70,24 @@ export default function AdminTabs({
         </TabsTrigger>
         <TabsTrigger value="announcements">Latest Announcement</TabsTrigger>
 
-        <TabsTrigger value="bookings">Bookings</TabsTrigger>
-        <TabsTrigger value="user-management">User Management</TabsTrigger>
-        <TabsTrigger value="packages">Packages</TabsTrigger>
-        <TabsTrigger value="package-usage">Package Usage</TabsTrigger>
-        <TabsTrigger value="promocodes">Promo Codes</TabsTrigger>
-        <TabsTrigger value="refunds">User Credits</TabsTrigger>
-        <TabsTrigger value="pricing">Pricing</TabsTrigger>
-        <TabsTrigger value="payment-settings" className="flex items-center whitespace-nowrap">
+        <TabsTrigger value="bookings" className="snap-start">Bookings</TabsTrigger>
+        <TabsTrigger value="user-management" className="snap-start">User Management</TabsTrigger>
+        <TabsTrigger value="packages" className="snap-start">Packages</TabsTrigger>
+        <TabsTrigger value="package-usage" className="snap-start">Package Usage</TabsTrigger>
+        <TabsTrigger value="promocodes" className="snap-start">Promo Codes</TabsTrigger>
+        <TabsTrigger value="refunds" className="snap-start">User Credits</TabsTrigger>
+        <TabsTrigger value="pricing" className="snap-start">Pricing</TabsTrigger>
+        <TabsTrigger value="payment-settings" className="snap-start flex items-center whitespace-nowrap">
           Payment Settings
         </TabsTrigger>
-        <TabsTrigger value="door-lock" className="flex items-center whitespace-nowrap">
+        <TabsTrigger value="door-lock" className="snap-start flex items-center whitespace-nowrap">
           Door Lock
         </TabsTrigger>
-        <TabsTrigger value="tuya-settings" className="flex items-center whitespace-nowrap">
+        <TabsTrigger value="tuya-settings" className="snap-start flex items-center whitespace-nowrap">
           Tuya Settings
+        </TabsTrigger>
+        <TabsTrigger value="shop-hours" className="snap-start flex items-center whitespace-nowrap">
+          Shop Hours
         </TabsTrigger>
 
       </TabsList>
@@ -301,6 +309,11 @@ export default function AdminTabs({
       {/* Tuya Settings Tab */}
       <TabsContent value="tuya-settings" className="space-y-4">
         <TuyaSettingsManagement />
+      </TabsContent>
+
+      {/* Shop Hours Tab */}
+      <TabsContent value="shop-hours" className="space-y-4">
+        <ShopHoursManagement />
       </TabsContent>
 
       {/* Settings Tab */}

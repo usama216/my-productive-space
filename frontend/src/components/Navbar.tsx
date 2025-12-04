@@ -25,6 +25,7 @@ type Section = {
 
 const sections: Section[] = [
   { name: 'Book Now', href: '/#BookNow' },
+  { name: "Announcements", href: "/#LatestAnnouncements" },
   { name: 'About', href: '/#About' },
   { name: 'Locations', href: '/#Locations' },
   { name: 'Pricing', href: '/#Pricing' },
@@ -63,10 +64,10 @@ export default function Navbar() {
       // Clear local storage immediately for faster UX
       localStorage.removeItem('auth_user')
       localStorage.removeItem('database_user')
-      
+
       // Navigate first
       router.push('/?toastType=logOut')
-      
+
       // Then sign out in background
       await supabase.auth.signOut()
     } catch (error: any) {
@@ -133,46 +134,46 @@ export default function Navbar() {
           {authLoading ? (
             <Loader2 className="animate-spin h-5 w-5" />
           ) : isLoggedIn ? (
-          <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <div className="flex items-center gap-2 cursor-pointer">
-      <Image
-        src={avatarUrl}
-        alt="Profile"
-        width={32}
-        height={32}
-        className="rounded-full"
-      />
-<span className="text-sm font-medium">
-  {databaseUser?.name || user?.user_metadata?.firstName || "User"}
-</span>
-    </div>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="end">
-    {databaseUser?.memberType === 'ADMIN' && (
-      <DropdownMenuItem asChild>
-        <Link href="/admin">Admin Dashboard</Link>
-      </DropdownMenuItem>
-    )}
-    <DropdownMenuItem asChild>
-      <Link href="/dashboard">Dashboard</Link>
-    </DropdownMenuItem>
-    <DropdownMenuItem
-      onClick={handleLogout}
-      disabled={logoutLoading}
-      className="cursor-pointer"
-    >
-      {logoutLoading ? (
-        <div className="flex items-center">
-          <Loader2 className="animate-spin h-4 w-4 mr-2" />
-          Logging out...
-        </div>
-      ) : (
-        "Logout"
-      )}
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="flex items-center gap-2 cursor-pointer">
+                  <Image
+                    src={avatarUrl}
+                    alt="Profile"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                  <span className="text-sm font-medium">
+                    {databaseUser?.name || user?.user_metadata?.firstName || "User"}
+                  </span>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {databaseUser?.memberType === 'ADMIN' && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">Admin Dashboard</Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  disabled={logoutLoading}
+                  className="cursor-pointer"
+                >
+                  {logoutLoading ? (
+                    <div className="flex items-center">
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      Logging out...
+                    </div>
+                  ) : (
+                    "Logout"
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
           ) : (
             <>
@@ -234,7 +235,7 @@ export default function Navbar() {
                 </a>
               )
             )}
-            
+
             <div className="pt-2 border-t border-gray-200">
               {authLoading ? (
                 <div className="flex items-center justify-center w-full">
@@ -243,9 +244,9 @@ export default function Navbar() {
               ) : user ? (
                 <div className="space-y-2">
                   {databaseUser?.memberType === 'ADMIN' && (
-                    <Button 
-                      variant="ghost" 
-                      className="w-full" 
+                    <Button
+                      variant="ghost"
+                      className="w-full"
                       onClick={() => {
                         router.push('/admin')
                         setMobileOpen(false)
@@ -254,9 +255,9 @@ export default function Navbar() {
                       Admin Dashboard
                     </Button>
                   )}
-                  <Button 
-                    variant="ghost" 
-                    className="w-full" 
+                  <Button
+                    variant="ghost"
+                    className="w-full"
                     onClick={() => {
                       router.push('/dashboard')
                       setMobileOpen(false)
@@ -264,9 +265,9 @@ export default function Navbar() {
                   >
                     Dashboard
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full" 
+                  <Button
+                    variant="ghost"
+                    className="w-full"
                     onClick={handleLogout}
                     disabled={logoutLoading}
                   >
@@ -279,9 +280,9 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex space-x-4">
-                  <Button 
-                    variant="ghost" 
-                    className="flex-1" 
+                  <Button
+                    variant="ghost"
+                    className="flex-1"
                     onClick={() => {
                       router.push('/login')
                       setMobileOpen(false)

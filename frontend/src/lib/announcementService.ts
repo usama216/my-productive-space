@@ -206,3 +206,30 @@ export const formatAnnouncementDate = (dateString: string): string => {
         hour12: true
     })
 }
+
+import { supabase } from './supabaseClient'
+
+export const uploadAnnouncementImage = async (file: File): Promise<{ success: boolean; url?: string; error?: string }> => {
+    try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `announcement-${Date.now()}.${fileExt}`
+        const filePath = `${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+            .from('announcements')
+            .upload(filePath, file)
+
+        if (uploadError) {
+            throw uploadError
+        }
+
+        const { data } = supabase.storage
+            .from('announcements')
+            .getPublicUrl(filePath)
+
+        return { success: true, url: data.publicUrl }
+    } catch (error: any) {
+        console.error('Upload Error:', error)
+        return { success: false, error: error.message || 'Failed to upload image' }
+    }
+}

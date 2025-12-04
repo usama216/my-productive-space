@@ -39,7 +39,7 @@ import { PromoCode } from '@/lib/promoCodeService'
 import { getUserPackages, UserPackage } from '@/lib/services/packageService'
 import { getAllPricingForLocation } from '@/lib/pricingService'
 import { getUserProfile, UserProfile } from '@/lib/userProfileService'
-import { 
+import {
   getCurrentSingaporeTime,
   getSingaporeTimeConstraints,
   toDatePickerDate,
@@ -51,6 +51,7 @@ import {
   toSingaporeTime
 } from '@/lib/timezoneUtils'
 import { formatCurrency } from '@/lib/paymentUtils'
+import { getOperatingHours, getClosureDates, type OperatingHours, type ClosureDate } from '@/lib/shopHoursService'
 
 
 const locations = [
@@ -64,7 +65,7 @@ export default function BookingClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, userId, isLoggedIn, loading: isLoadingAuth, databaseUser } = useAuth()
-
+  const [location, setLocation] = useState<string>('kovan')
   const [entitlementMode, setEntitlementMode] = useState<'package' | 'promo' | 'credit'>('package')
   const [selectedPackage, setSelectedPackage] = useState<string>('')
   const [promoCode, setPromoCode] = useState<string>('')
@@ -128,6 +129,11 @@ export default function BookingClient() {
   const [bookedSeats, setBookedSeats] = useState<string[]>([])
   const [isLoadingSeats, setIsLoadingSeats] = useState(false)
 
+  // Shop hours state
+  const [operatingHours, setOperatingHours] = useState<OperatingHours[]>([])
+  const [closureDates, setClosureDates] = useState<ClosureDate[]>([])
+  const [isLoadingShopHours, setIsLoadingShopHours] = useState(false)
+
 
   const [studentsValidated, setStudentsValidated] = useState(false)
   const [validatedStudents, setValidatedStudents] = useState<StudentValidationStatus[]>([])
@@ -137,13 +143,13 @@ export default function BookingClient() {
   // Fetch fresh user profile data
   const loadFreshUserProfile = async () => {
     if (!userId) return
-    
+
     setIsLoadingUserProfile(true)
     try {
-    
+
       const profile = await getUserProfile(userId)
       if (profile) {
-      
+
         setFreshUserProfile(profile)
       } else {
         console.log('❌ Failed to load fresh user profile')
@@ -165,6 +171,37 @@ export default function BookingClient() {
     loadPaymentFeeSettings() // Load dynamic payment fees on component mount
     loadFreshUserProfile() // Load fresh user profile
   }, [searchParams, userId])
+
+  // Load shop hours when location changes
+  useEffect(() => {
+    if (location && locations.length > 0) {
+      loadShopHours()
+    }
+  }, [location, locations])
+
+  // Load shop hours and closure dates
+  const loadShopHours = async () => {
+    if (!location) return
+
+    setIsLoadingShopHours(true)
+    try {
+      const locationData = locations.find(loc => loc.id === location)
+      const locationName = locationData?.name || 'Kovan'
+
+      console.log(`Fetching shop hours for: ${locationName}`)
+
+      const [hours, closures] = await Promise.all([
+        getOperatingHours(locationName),
+        getClosureDates(locationName)
+      ])
+      setOperatingHours(hours)
+      setClosureDates(closures)
+    } catch (error) {
+      console.error('Error loading shop hours:', error)
+    } finally {
+      setIsLoadingShopHours(false)
+    }
+  }
 
 
 
@@ -281,19 +318,19 @@ export default function BookingClient() {
   const isAdminAccount = freshUserProfile?.memberType === 'ADMIN'
   const isBookingForSingleStudent = peopleBreakdown.coStudents === 1
   const isVerifiedStudent = freshUserProfile?.studentVerificationStatus === 'VERIFIED'
-  
+
   // Calculate how many students need verification
   // If current user is ADMIN, no verification is needed
   // If current user is a verified student, they don't need verification
   // So we only need to verify the additional students
   const studentsNeedingVerification = isAdminAccount
     ? 0  // Admin accounts don't need student verification
-    : isVerifiedStudent 
-    ? Math.max(0, peopleBreakdown.coStudents - 1)  // Current user is verified, so verify others
-    : peopleBreakdown.coStudents  // Current user is not verified, so verify all
-  
+    : isVerifiedStudent
+      ? Math.max(0, peopleBreakdown.coStudents - 1)  // Current user is verified, so verify others
+      : peopleBreakdown.coStudents  // Current user is not verified, so verify all
+
   const needsStudentVerification = studentsNeedingVerification > 0
-  
+
   // Check if tutor has more than 4 students or more than 4 workers (not allowed)
   const hasTutorWithTooManyPeople = peopleBreakdown.coTutors === 1 && (peopleBreakdown.coStudents > 4 || peopleBreakdown.coWorkers > 4)
 
@@ -302,22 +339,22 @@ export default function BookingClient() {
 
   // Auto-validate if student account is booking for only themselves or if user is admin
   useEffect(() => {
-   
-    
+
+
     if (isAdminAccount) {
-     
+
       setStudentsValidated(true)
     } else if (isVerifiedStudent && peopleBreakdown.coStudents === 1) {
-     
+
       setStudentsValidated(true)
     } else if (peopleBreakdown.coStudents === 0) {
-    
+
       setStudentsValidated(false)
     } else if (studentsNeedingVerification === 0) {
-    
+
       setStudentsValidated(true)
     } else {
-    
+
       setStudentsValidated(false)
     }
   }, [isAdminAccount, isStudentAccount, isVerifiedStudent, peopleBreakdown.coStudents, studentsNeedingVerification])
@@ -326,31 +363,31 @@ export default function BookingClient() {
   useEffect(() => {
     if (freshUserProfile && !isLoadingUserProfile) {
       console.log('🔄 Auto-filling customer information with fresh user profile:', freshUserProfile)
-      
+
       // Auto-fill customer name
       if (freshUserProfile.firstName && freshUserProfile.lastName) {
         const fullName = `${freshUserProfile.firstName} ${freshUserProfile.lastName}`
         setCustomerName(fullName)
-       
+
       }
-      
+
       // Auto-fill customer email
       if (freshUserProfile.email) {
         setCustomerEmail(freshUserProfile.email)
-      
+
       }
-      
+
       // Auto-fill customer phone
       if (freshUserProfile.contactNumber) {
         setCustomerPhone(freshUserProfile.contactNumber)
-      
+
       }
     }
   }, [freshUserProfile, isLoadingUserProfile])
 
 
 
-  const [location, setLocation] = useState<string>('kovan')
+
   const [people, setPeople] = useState<number>(1)
 
   const [startDate, setStartDate] = useState<Date | null>(null)
@@ -424,17 +461,17 @@ export default function BookingClient() {
     const packageParam = searchParams.get('package')
     if (packageParam && userPackages.length > 0 && !selectedPackage) {
       const decodedPackageName = decodeURIComponent(packageParam)
-      
+
       // Try exact match first
       let foundPackage = userPackages.find(pkg => pkg.packageName === decodedPackageName)
-      
+
       // If no exact match, try case-insensitive match
       if (!foundPackage) {
         foundPackage = userPackages.find(pkg =>
           pkg.packageName.toLowerCase() === decodedPackageName.toLowerCase()
         )
       }
-      
+
       // If still no match, try partial match
       if (!foundPackage) {
         foundPackage = userPackages.find(pkg =>
@@ -442,18 +479,18 @@ export default function BookingClient() {
           decodedPackageName.toLowerCase().includes(pkg.packageName.toLowerCase())
         )
       }
-      
+
       if (foundPackage) {
         console.log('✅ Auto-selecting package from URL:', foundPackage.packageName)
         setSelectedPackage(foundPackage.id)
         setEntitlementMode('package')
-        
+
         toast({
           title: "Package Selected",
           description: `${foundPackage.packageName} has been automatically selected for your booking.`,
         })
       } else {
-      
+
         toast({
           title: "Package Not Found",
           description: `You don't have the "${decodedPackageName}" package. Please purchase it first or select a different package.`,
@@ -631,7 +668,7 @@ export default function BookingClient() {
 
     // Auto-select package if package parameter is in URL
     if (packageParam) {
-    
+
       setEntitlementMode('package')
     }
   }, [searchParams])
@@ -658,11 +695,11 @@ export default function BookingClient() {
   // Helper function to STRICTLY enforce 15-minute intervals
   const enforceStrict15Minutes = (date: Date | null): Date | null => {
     if (!date) return null;
-    
+
     const strictDate = new Date(date);
     const minutes = strictDate.getMinutes();
     const remainder = minutes % 15;
-    
+
     // Reject any time that's not on a 15-minute boundary
     if (remainder !== 0) {
       // Always round DOWN to the previous 15-minute mark for strict enforcement
@@ -670,7 +707,7 @@ export default function BookingClient() {
       strictDate.setMinutes(validMinutes);
       strictDate.setSeconds(0);
       strictDate.setMilliseconds(0);
-      
+
       toast({
         title: "Invalid Time",
         description: `Only 15-minute intervals allowed. Changed to ${strictDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
@@ -681,7 +718,7 @@ export default function BookingClient() {
       strictDate.setSeconds(0);
       strictDate.setMilliseconds(0);
     }
-    
+
     return strictDate;
   };
 
@@ -694,12 +731,12 @@ export default function BookingClient() {
 
   const handleEndChange = (date: Date | null) => {
     const validDate = enforceStrict15Minutes(date);
-    
+
     // If selecting same day as start date and start time is late (after 5 PM)
     // automatically move to next day to prevent negative duration
     if (validDate && startDate && isSameDay(validDate, startDate)) {
       const startHour = startDate.getHours();
-      
+
       // If start time is after 5 PM (17:00), force next day selection
       if (startHour >= 17) {
         const nextDay = addDays(startDate, 1);
@@ -707,7 +744,7 @@ export default function BookingClient() {
         // Set time to midnight + 1 hour (minimum gap)
         nextDayWithTime.setHours(0, 0, 0, 0);
         const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
-        
+
         // If the calculated min end time is on next day, use it
         if (minEndTime > startDate && !isSameDay(minEndTime, startDate)) {
           setEndDate(minEndTime);
@@ -719,1660 +756,1713 @@ export default function BookingClient() {
           return;
         }
       }
-    }
-    
-    setEndDate(validDate)
-  }
-
-  // Filter function to only allow 15-minute intervals in time picker
-  const filterTime = (time: Date): boolean => {
-    const minutes = time.getMinutes();
-    return minutes % 15 === 0; // Only allow :00, :15, :30, :45
-  };
-
-  // Filter function for end time - ensures time is after start time + 1 hour
-  const filterEndTime = (time: Date): boolean => {
-    // First check 15-minute intervals
-    const minutes = time.getMinutes();
-    if (minutes % 15 !== 0) return false;
-
-    // If no start date selected, allow all valid intervals
-    if (!startDate) return true;
-
-    // If end date is not selected yet, we can't filter properly
-    if (!endDate) return true;
-
-    // Create a date object combining endDate's date with the time parameter's time
-    const potentialEndTime = new Date(endDate);
-    potentialEndTime.setHours(time.getHours(), time.getMinutes(), 0, 0);
-
-    // Calculate minimum end time (start time + 1 hour)
-    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
-
-    // If same day booking, time must be after start time + 1 hour
-    if (isSameDay(startDate, endDate)) {
-      return potentialEndTime >= minEndTime;
+      setEndDate(validDate)
     }
 
-    // If next day booking, check both time range AND minimum 1 hour gap
-    const nextDay = addDays(startDate, 1);
-    if (isSameDay(endDate, nextDay)) {
-      const hour = time.getHours();
-      // Must be within midnight to noon AND at least 1 hour after start time
-      const isWithinTimeRange = hour >= 0 && hour <= 12;
-      const meetsMinimumGap = potentialEndTime >= minEndTime;
-      return isWithinTimeRange && meetsMinimumGap;
+    // Helper to generate available times for a given date based on operating hours
+    const getAvailableTimes = (date: Date | null): Date[] => {
+      if (!date) return [];
+
+      const dayOfWeek = date.getDay();
+      const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive);
+
+      // If no operating hours loaded OR day is closed, return all 15-min intervals (fallback)
+      // This ensures the time picker is always visible
+      if (operatingHours.length === 0 || !dayHours) {
+        const times: Date[] = [];
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        for (let i = 0; i < 24 * 4; i++) {
+          times.push(new Date(start.getTime() + i * 15 * 60 * 1000));
+        }
+        return times;
+      }
+
+      const times: Date[] = [];
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+
+      // Generate 15-min intervals
+      for (let i = 0; i < 24 * 4; i++) {
+        const time = new Date(start.getTime() + i * 15 * 60 * 1000);
+        const timeString = time.toTimeString().split(' ')[0].substring(0, 5);
+
+        const openTime = dayHours.openTime.substring(0, 5);
+        const closeTime = dayHours.closeTime.substring(0, 5);
+
+        if (timeString >= openTime && timeString <= closeTime) {
+          times.push(time);
+        }
+      }
+      return times;
+    };
+
+    const getAvailableEndTimes = (date: Date | null): Date[] => {
+      const times = getAvailableTimes(date);
+      if (!startDate || !times.length) return times;
+
+      // Filter based on start time (must be >= start time + 1 hour)
+      const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+      return times.filter(time => {
+        // If same day, check time
+        if (date && startDate && date.toDateString() === startDate.toDateString()) {
+          return time >= minEndTime;
+        }
+        return true;
+      });
+    };
+
+
+
+    // Get constraints for end date selection
+    const getEndDateConstraints = () => {
+      if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
+
+      const startHour = startDate.getHours();
+
+      // If start time is after 5 PM (17:00), minimum end date is next day
+      // This prevents selecting same day which would cause negative duration
+      let minEndDate = startDate;
+      if (startHour >= 17) {
+        minEndDate = addDays(startDate, 1);
+      }
+
+      const maxEndDate = addDays(startDate, 1) // Allow booking until next day
+
+      return {
+        minDate: minEndDate,
+        maxDate: maxEndDate > maxBookingDate ? maxBookingDate : maxEndDate
+      }
     }
 
-    return true;
-  };
+    // Get time constraints for end time selection
+    const getEndTimeConstraints = () => {
+      // return block @start
+      if (!startDate || !endDate) {
+        return {
+          minTime: setHours(setMinutes(new Date(), 0), 0),
+          maxTime: setHours(setMinutes(new Date(), 59), 23)
+        }
+      }
 
-  // Get constraints for end date selection
-  const getEndDateConstraints = () => {
-    if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
+      // Minimum end time is start time + 1 hour (60 minutes)
+      const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000)
 
-    const startHour = startDate.getHours();
-    
-    // If start time is after 5 PM (17:00), minimum end date is next day
-    // This prevents selecting same day which would cause negative duration
-    let minEndDate = startDate;
-    if (startHour >= 17) {
-      minEndDate = addDays(startDate, 1);
-    }
-    
-    const maxEndDate = addDays(startDate, 1) // Allow booking until next day
+      // If end date is same day as start date
+      if (isSameDay(startDate, endDate)) {
+        return {
+          minTime: minEndTime, // Must be at least 1 hour after start time
+          maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
+        }
+      }
 
-    return {
-      minDate: minEndDate,
-      maxDate: maxEndDate > maxBookingDate ? maxBookingDate : maxEndDate
-    }
-  }
+      // If end date is next day
+      const nextDay = addDays(startDate, 1)
+      if (isSameDay(endDate, nextDay)) {
+        return {
+          minTime: setHours(setMinutes(endDate, 0), 0), // From 12:00 AM next day
+          maxTime: setHours(setMinutes(endDate, 0), 12) // Until 12:00 PM next day
+        }
+      }
 
-  // Get time constraints for end time selection
-  const getEndTimeConstraints = () => {
-    // return block @start
-    if (!startDate || !endDate) {
       return {
         minTime: setHours(setMinutes(new Date(), 0), 0),
         maxTime: setHours(setMinutes(new Date(), 59), 23)
       }
     }
 
-    // Minimum end time is start time + 1 hour (60 minutes)
-    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000)
-
-    // If end date is same day as start date
-    if (isSameDay(startDate, endDate)) {
-      return {
-        minTime: minEndTime, // Must be at least 1 hour after start time
-        maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
+    // Get constraints when no end date is selected yet (for initial filtering)
+    const getInitialEndTimeConstraints = () => {
+      if (!startDate) return {
+        minTime: setHours(setMinutes(new Date(), 0), 0),
+        maxTime: setHours(setMinutes(new Date(), 59), 23)
       }
-    }
 
-    // If end date is next day
-    const nextDay = addDays(startDate, 1)
-    if (isSameDay(endDate, nextDay)) {
-      return {
-        minTime: setHours(setMinutes(endDate, 0), 0), // From 12:00 AM next day
-        maxTime: setHours(setMinutes(endDate, 0), 12) // Until 12:00 PM next day
+      // Minimum end time is start time + 1 hour (60 minutes)
+      const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000) // Add 1 hour
+
+      // For today's date, start from the start time + 1 hour
+      const today = new Date()
+      if (isSameDay(startDate, today)) {
+        return {
+          minTime: minEndTime,
+          maxTime: setHours(setMinutes(today, 59), 23)
+        }
       }
-    }
 
-    return {
-      minTime: setHours(setMinutes(new Date(), 0), 0),
-      maxTime: setHours(setMinutes(new Date(), 59), 23)
-    }
-  }
-
-  // Get constraints when no end date is selected yet (for initial filtering)
-  const getInitialEndTimeConstraints = () => {
-    if (!startDate) return {
-      minTime: setHours(setMinutes(new Date(), 0), 0),
-      maxTime: setHours(setMinutes(new Date(), 59), 23)
-    }
-
-    // Minimum end time is start time + 1 hour (60 minutes)
-    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000) // Add 1 hour
-
-    // For today's date, start from the start time + 1 hour
-    const today = new Date()
-    if (isSameDay(startDate, today)) {
+      // For future dates, still need 1 hour minimum
       return {
         minTime: minEndTime,
-        maxTime: setHours(setMinutes(today, 59), 23)
+        maxTime: setHours(setMinutes(new Date(), 59), 23)
       }
     }
 
-    // For future dates, still need 1 hour minimum
-    return {
-      minTime: minEndTime,
-      maxTime: setHours(setMinutes(new Date(), 59), 23)
-    }
-  }
 
 
+    // Get minimum start time
+    const getStartTimeConstraints = () => {
+      const selectedDate = startDate || new Date()
+      const today = new Date()
 
-  // Get minimum start time
-  const getStartTimeConstraints = () => {
-    const selectedDate = startDate || new Date()
-    const today = new Date()
+      // If booking for today, minimum time is current time
+      if (isSameDay(selectedDate, today)) {
+        return {
+          minTime: new Date(),
+          maxTime: setHours(setMinutes(new Date(), 59), 23) // Until 11:59 PM
+        }
+      }
 
-    // If booking for today, minimum time is current time
-    if (isSameDay(selectedDate, today)) {
+      // For future dates, allow full day
       return {
-        minTime: new Date(),
+        minTime: setHours(setMinutes(new Date(), 0), 0), // From 12:00 AM
         maxTime: setHours(setMinutes(new Date(), 59), 23) // Until 11:59 PM
       }
     }
 
-    // For future dates, allow full day
-    return {
-      minTime: setHours(setMinutes(new Date(), 0), 0), // From 12:00 AM
-      maxTime: setHours(setMinutes(new Date(), 59), 23) // Until 11:59 PM
-    }
-  }
 
 
 
+    // Validate booking constraints
+    const validateBookingConstraints = () => {
+      if (!startDate || !endDate) return { isValid: false, message: 'Please select both start and end times' }
 
-  // Validate booking constraints
-  const validateBookingConstraints = () => {
-    if (!startDate || !endDate) return { isValid: false, message: 'Please select both start and end times' }
-
-    // Validate booking time constraints
-    if (endDate <= startDate) {
-      return { isValid: false, message: 'End time must be after start time' }
-    }
-
-    // Validate minimum booking duration of 1 hour
-    const timeDifferenceMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
-    if (timeDifferenceMinutes < 60) {
-      return { isValid: false, message: 'Minimum booking duration is 1 hour' }
-    }
-
-    // Check if booking is over 24 hours
-    const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
-    if (timeDifferenceHours > 24) {
-      return {
-        isValid: false,
-        message: 'Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.'
+      // Validate booking time constraints
+      if (endDate <= startDate) {
+        return { isValid: false, message: 'End time must be after start time' }
       }
-    }
 
-    // Check if it is a valid cross-day booking
-    const daysDifference = Math.floor(timeDifferenceHours / 24)
-
-    if (daysDifference > 1) {
-      return {
-        isValid: false,
-        message: 'Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)'
+      // Validate minimum booking duration of 1 hour
+      const timeDifferenceMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
+      if (timeDifferenceMinutes < 60) {
+        return { isValid: false, message: 'Minimum booking duration is 1 hour' }
       }
-    }
 
-    if (daysDifference === 1) {
-      const startHour = startDate.getHours()
-      const endHour = endDate.getHours()
-
-      // Business rule: Cross-day bookings only allowed from 5 PM to 12 PM next day
-      if (startHour < 17 || endHour > 12) {
+      // Check if booking is over 24 hours
+      const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+      if (timeDifferenceHours > 24) {
         return {
           isValid: false,
-          message: 'Cross-day bookings are only allowed from 5 PM to 12 PM next day'
+          message: 'Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.'
         }
       }
-    }
 
-    return { isValid: true, message: '' }
-  }
+      // Check if it is a valid cross-day booking
+      const daysDifference = Math.floor(timeDifferenceHours / 24)
 
-
-  //
-
-  // Function to fetch booked seats
-  const fetchBookedSeats = useCallback(async () => {
-    if (!location || !startDate || !endDate) {
-      setBookedSeats([])
-      return
-    }
-
-    setIsLoadingSeats(true)
-    try {
-      const locationData = locations.find(loc => loc.id === location)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          location: locationData?.name || location,
-          startAt: startDate.toISOString().replace('T', ' ').replace('Z', ''),
-          endAt: endDate.toISOString().replace('T', ' ').replace('Z', '')
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setBookedSeats(data.bookedSeats || [])
-
-        if (data.summary?.pending > 0) {
-          console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
+      if (daysDifference > 1) {
+        return {
+          isValid: false,
+          message: 'Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)'
         }
+      }
 
-        // Check if all seats are booked
-        const availableSeats = DEMO_LAYOUT.length - (data.bookedSeats || []).length
-        console.log('availableSeats', availableSeats)
-        if (availableSeats === 0) {
+      if (daysDifference === 1) {
+        const startHour = startDate.getHours()
+        const endHour = endDate.getHours()
+
+        // Business rule: Cross-day bookings only allowed from 5 PM to 12 PM next day
+        if (startHour < 17 || endHour > 12) {
+          return {
+            isValid: false,
+            message: 'Cross-day bookings are only allowed from 5 PM to 12 PM next day'
+          }
+        }
+      }
+
+      return { isValid: true, message: '' }
+    }
+
+
+    //
+
+    // Function to fetch booked seats
+    const fetchBookedSeats = useCallback(async () => {
+      if (!location || !startDate || !endDate) {
+        setBookedSeats([])
+        return
+      }
+
+      setIsLoadingSeats(true)
+      try {
+        const locationData = locations.find(loc => loc.id === location)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            location: locationData?.name || location,
+            startAt: startDate.toISOString().replace('T', ' ').replace('Z', ''),
+            endAt: endDate.toISOString().replace('T', ' ').replace('Z', '')
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setBookedSeats(data.bookedSeats || [])
+
+          if (data.summary?.pending > 0) {
+            console.log('⏳ Pending payment bookings detected - seats temporarily blocked')
+          }
+
+          // Check if all seats are booked
+          const availableSeats = DEMO_LAYOUT.length - (data.bookedSeats || []).length
+          console.log('availableSeats', availableSeats)
+          if (availableSeats === 0) {
+            toast({
+              title: "No seats available",
+              description: "Please choose another time.",
+              variant: "destructive",
+            })
+          }
+        } else {
+          console.error('Failed to fetch booked seats')
+          setBookedSeats([])
+        }
+      } catch (error) {
+        console.error('Error fetching booked seats:', error)
+        setBookedSeats([])
+      } finally {
+        setIsLoadingSeats(false)
+      }
+    }, [location, startDate, endDate])
+
+    // Fetch booked seats when location, start date, or end date changes
+    useEffect(() => {
+      fetchBookedSeats()
+      // Clear selected seats when booking details change
+      setSelectedSeats([])
+    }, [fetchBookedSeats])
+
+    // memoize to keep identity stable
+    const handleStudentValidationChange = useCallback((allValid: boolean, students: any[]) => {
+      setStudentsValidated(allValid)
+      setValidatedStudents(students)
+    }, [])
+
+
+    const selectedLocation = locations.find(loc => loc.id === location)
+    const totalHours = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60))) : 0
+
+    // Calculate base subtotal using people-based pricing
+    const baseSubtotal = (() => {
+      if (!selectedLocation || !bookingDuration) return 0
+
+      // Use actual duration hours for pricing calculation
+      const actualHours = bookingDuration.durationHours
+
+      // Determine pricing tier based on actual duration
+      const pricingTier = actualHours <= 1 ? '1hour' : 'over1hour'
+
+      // Calculate cost based on people breakdown
+      let totalCost = 0
+
+      // Students (coStudents)
+      const studentRate = actualHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate
+      const studentCost = studentRate * actualHours * peopleBreakdown.coStudents
+      totalCost += studentCost
+
+      // Members (coWorkers) 
+      const memberRate = actualHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate
+      const memberCost = memberRate * actualHours * peopleBreakdown.coWorkers
+      totalCost += memberCost
+
+      // Tutors (coTutors)
+      const tutorRate = actualHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate
+      const tutorCost = tutorRate * actualHours * peopleBreakdown.coTutors
+      totalCost += tutorCost
+
+      return totalCost
+    })()
+
+    // Calculate discount if voucher is applied
+    const discountInfo = null // Removed test voucher calculation
+    const promoDiscountInfo = promoCodeInfo
+
+    // Calculate package discount if package is selected
+    const packageDiscountInfo = selectedPackage ? (() => {
+      const pkg = userPackages?.find(p => p.id === selectedPackage)
+      if (!pkg || !bookingDuration) return null
+
+      // Package applies to individual person hours, not total booking hours
+      const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
+      const individualPersonHours = bookingDuration.durationHours; // Hours per person
+
+      // Package can only cover hours for ONE person, not all people
+      const appliedHours = Math.min(individualPersonHours, discountHours);
+      const remainingHours = Math.max(0, individualPersonHours - appliedHours);
+
+      // Calculate discount based on the user role (since package applies to the person who owns it)
+      // We need to determine which person the package applies to - for simplicity, assume it's the first person
+      const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
+        peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+
+      // Get the hourly rate for the person with the package (use actual duration for pricing)
+      const pricePerHour = memberType === 'STUDENT' ?
+        (individualPersonHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
+        memberType === 'TUTOR' ?
+          (individualPersonHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
+          (individualPersonHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
+
+      const discountAmount = appliedHours * pricePerHour; // Discount for 1 person
+
+      // Calculate final amount after package discount (matching backend logic)
+      let finalAmount = 0;
+
+      // If package covers all hours (full day), user pays zero
+      if (appliedHours >= individualPersonHours && individualPersonHours > 0) {
+        // Full package coverage - user pays nothing for the person with package
+        // But other people still pay full price
+        const packagePersonCost = individualPersonHours * pricePerHour;
+        const otherPeopleCost = baseSubtotal - packagePersonCost;
+        finalAmount = Math.max(0, otherPeopleCost);
+      } else {
+        // Partial package coverage - user pays for remaining hours for the person with package
+        // Plus full cost for other people
+        const remainingCostForPackagePerson = remainingHours * pricePerHour;
+        const packagePersonCost = individualPersonHours * pricePerHour;
+        const otherPeopleCost = baseSubtotal - packagePersonCost;
+        finalAmount = Math.max(0, remainingCostForPackagePerson + otherPeopleCost);
+      }
+
+      // Debug logging
+
+
+      return {
+        discountAmount: discountAmount,
+        finalAmount: finalAmount,
+        appliedHours: appliedHours,
+        remainingHours: remainingHours,
+        packageAppliedToPerson: 1 // Package applies to 1 person only
+      }
+    })() : null
+
+    // Calculate final amounts - packages take precedence over promo codes, then credits
+    let subtotal = baseSubtotal
+    let discountAmount = 0
+
+    if (packageDiscountInfo) {
+      subtotal = packageDiscountInfo.finalAmount
+      discountAmount = packageDiscountInfo.discountAmount
+    } else if (promoDiscountInfo) {
+      subtotal = promoDiscountInfo.finalAmount
+      discountAmount = promoDiscountInfo.discountAmount
+    } else if (creditInfo) {
+      subtotal = creditInfo.finalAmount
+      discountAmount = creditInfo.discountAmount
+    }
+
+    const total = subtotal
+
+
+
+    // Update finalTotal when total changes (only for step 1, step 2+ uses payment method calculation)
+    useEffect(() => {
+      if (bookingStep === 1) {
+        setFinalTotal(total)
+      }
+    }, [total, bookingStep])
+
+    // Check for 24-hour booking validation
+    useEffect(() => {
+      if (startDate && endDate) {
+        const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+        const isOver24 = timeDifferenceHours > 24
+
+        if (isOver24 && !isOver24Hours) {
+          // Show toast when user selects over 24 hours
           toast({
-            title: "No seats available",
-            description: "Please choose another time.",
+            title: "Booking Duration Exceeded",
+            description: "Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.",
             variant: "destructive",
           })
         }
+
+        setIsOver24Hours(isOver24)
       } else {
-        console.error('Failed to fetch booked seats')
-        setBookedSeats([])
+        setIsOver24Hours(false)
       }
-    } catch (error) {
-      console.error('Error fetching booked seats:', error)
-      setBookedSeats([])
-    } finally {
-      setIsLoadingSeats(false)
-    }
-  }, [location, startDate, endDate])
+    }, [startDate, endDate, isOver24Hours, toast])
 
-  // Fetch booked seats when location, start date, or end date changes
-  useEffect(() => {
-    fetchBookedSeats()
-    // Clear selected seats when booking details change
-    setSelectedSeats([])
-  }, [fetchBookedSeats])
-
-  // memoize to keep identity stable
-  const handleStudentValidationChange = useCallback((allValid: boolean, students: any[]) => {
-    setStudentsValidated(allValid)
-    setValidatedStudents(students)
-  }, [])
-
-
-  const selectedLocation = locations.find(loc => loc.id === location)
-  const totalHours = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60))) : 0
-
-  // Calculate base subtotal using people-based pricing
-  const baseSubtotal = (() => {
-    if (!selectedLocation || !bookingDuration) return 0
-
-    // Use actual duration hours for pricing calculation
-    const actualHours = bookingDuration.durationHours
-
-    // Determine pricing tier based on actual duration
-    const pricingTier = actualHours <= 1 ? '1hour' : 'over1hour'
-
-    // Calculate cost based on people breakdown
-    let totalCost = 0
-
-    // Students (coStudents)
-    const studentRate = actualHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate
-    const studentCost = studentRate * actualHours * peopleBreakdown.coStudents
-    totalCost += studentCost
-
-    // Members (coWorkers) 
-    const memberRate = actualHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate
-    const memberCost = memberRate * actualHours * peopleBreakdown.coWorkers
-    totalCost += memberCost
-
-    // Tutors (coTutors)
-    const tutorRate = actualHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate
-    const tutorCost = tutorRate * actualHours * peopleBreakdown.coTutors
-    totalCost += tutorCost
-
-    return totalCost
-  })()
-
-  // Calculate discount if voucher is applied
-  const discountInfo = null // Removed test voucher calculation
-  const promoDiscountInfo = promoCodeInfo
-
-  // Calculate package discount if package is selected
-  const packageDiscountInfo = selectedPackage ? (() => {
-    const pkg = userPackages?.find(p => p.id === selectedPackage)
-    if (!pkg || !bookingDuration) return null
-
-    // Package applies to individual person hours, not total booking hours
-    const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
-    const individualPersonHours = bookingDuration.durationHours; // Hours per person
-    
-    // Package can only cover hours for ONE person, not all people
-    const appliedHours = Math.min(individualPersonHours, discountHours);
-    const remainingHours = Math.max(0, individualPersonHours - appliedHours);
-    
-    // Calculate discount based on the user role (since package applies to the person who owns it)
-    // We need to determine which person the package applies to - for simplicity, assume it's the first person
-    const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
-                      peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
-    
-    // Get the hourly rate for the person with the package (use actual duration for pricing)
-    const pricePerHour = memberType === 'STUDENT' ? 
-      (individualPersonHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
-      memberType === 'TUTOR' ? 
-      (individualPersonHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
-      (individualPersonHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
-    
-    const discountAmount = appliedHours * pricePerHour; // Discount for 1 person
-    
-    // Calculate final amount after package discount (matching backend logic)
-    let finalAmount = 0;
-    
-    // If package covers all hours (full day), user pays zero
-    if (appliedHours >= individualPersonHours && individualPersonHours > 0) {
-      // Full package coverage - user pays nothing for the person with package
-      // But other people still pay full price
-      const packagePersonCost = individualPersonHours * pricePerHour;
-      const otherPeopleCost = baseSubtotal - packagePersonCost;
-      finalAmount = Math.max(0, otherPeopleCost);
-    } else {
-      // Partial package coverage - user pays for remaining hours for the person with package
-      // Plus full cost for other people
-      const remainingCostForPackagePerson = remainingHours * pricePerHour;
-      const packagePersonCost = individualPersonHours * pricePerHour;
-      const otherPeopleCost = baseSubtotal - packagePersonCost;
-      finalAmount = Math.max(0, remainingCostForPackagePerson + otherPeopleCost);
+    // Handle payment method change
+    const handlePaymentMethodChange = (method: 'payNow' | 'creditCard', newTotal: number) => {
+      setSelectedPaymentMethod(method)
+      setFinalTotal(newTotal)
     }
 
-    // Debug logging
-   
-
-    return {
-      discountAmount: discountAmount,
-      finalAmount: finalAmount,
-      appliedHours: appliedHours,
-      remainingHours: remainingHours,
-      packageAppliedToPerson: 1 // Package applies to 1 person only
-    }
-  })() : null
-
-  // Calculate final amounts - packages take precedence over promo codes, then credits
-  let subtotal = baseSubtotal
-  let discountAmount = 0
-
-  if (packageDiscountInfo) {
-    subtotal = packageDiscountInfo.finalAmount
-    discountAmount = packageDiscountInfo.discountAmount
-  } else if (promoDiscountInfo) {
-    subtotal = promoDiscountInfo.finalAmount
-    discountAmount = promoDiscountInfo.discountAmount
-  } else if (creditInfo) {
-    subtotal = creditInfo.finalAmount
-    discountAmount = creditInfo.discountAmount
-  }
-
-  const total = subtotal
 
 
+    const handleBookingSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
 
-  // Update finalTotal when total changes (only for step 1, step 2+ uses payment method calculation)
-  useEffect(() => {
-    if (bookingStep === 1) {
-      setFinalTotal(total)
-    }
-  }, [total, bookingStep])
+      // Double-check user is logged in
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-  // Check for 24-hour booking validation
-  useEffect(() => {
-    if (startDate && endDate) {
-      const timeDifferenceHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
-      const isOver24 = timeDifferenceHours > 24
-      
-      if (isOver24 && !isOver24Hours) {
-        // Show toast when user selects over 24 hours
+      // Validate seat selection
+      if (selectedSeats.length !== people) {
         toast({
-          title: "Booking Duration Exceeded",
-          description: "Booking of more than 24 hours should not be allowed. If required, please contact admin via whatsapp.",
+          title: "Seat selection required",
+          description: `Please select exactly ${people} seat${people !== 1 ? 's' : ''} for your booking.`,
           variant: "destructive",
         })
-      }
-      
-      setIsOver24Hours(isOver24)
-    } else {
-      setIsOver24Hours(false)
-    }
-  }, [startDate, endDate, isOver24Hours, toast])
-
-  // Handle payment method change
-  const handlePaymentMethodChange = (method: 'payNow' | 'creditCard', newTotal: number) => {
-    setSelectedPaymentMethod(method)
-    setFinalTotal(newTotal)
-  }
-
-
-
-  const handleBookingSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // Double-check user is logged in
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
-    // Validate seat selection
-    if (selectedSeats.length !== people) {
-      toast({
-        title: "Seat selection required",
-        description: `Please select exactly ${people} seat${people !== 1 ? 's' : ''} for your booking.`,
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Check if there are enough available seats
-    const availableSeats = DEMO_LAYOUT.length - bookedSeats.length
-    console.log('availableSeats', availableSeats)
-    if (availableSeats === 0) {
-      toast({
-        title: "No seats available",
-        description: "Please choose another time.",
-        variant: "destructive",
-      })
-      return
-    }
-    if (availableSeats < people) {
-      toast({
-        title: "Not enough seats available",
-        description: `Sorry, only ${availableSeats} seat${availableSeats !== 1 ? 's are' : ' is'} available for this time slot. Please select a different time or reduce the number of people.`,
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validate booking constraints
-    const validation = validateBookingConstraints()
-    if (!validation.isValid) {
-      toast({
-        title: "Booking validation failed",
-        description: validation.message,
-        variant: "destructive",
-      })
-      return
-    }
-
-
-    // Check if it's a zero amount booking - handle immediately
-    if (total <= 0) {
-      await handleZeroAmountBooking()
-      return
-    }
-
-    // For non-zero amounts, just move to payment step
-    // Booking will be created when user clicks "Pay"
-    setBookingStep(2)
-    
-    // Scroll to top when moving to payment step
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  // Handle zero amount bookings (free bookings)
-  const handleZeroAmountBooking = async () => {
-    setIsLoading(true)
-
-    try {
-      // Prepare booking payload
-      const locationData = locations.find(loc => loc.id === location)
-      const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
-        peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
-
-      const bookingPayload = {
-        userId: user!.id,
-        location: locationData?.name || location,
-        startAt: startDate?.toISOString(),
-        endAt: endDate?.toISOString(),
-        specialRequests: specialRequests || null,
-        seatNumbers: selectedSeats,
-        pax: people,
-        students: peopleBreakdown.coStudents,
-        members: peopleBreakdown.coWorkers,
-        tutors: peopleBreakdown.coTutors,
-        totalCost: baseSubtotal,
-        promoCodeId: promoCodeInfo?.promoCode?.id || null,
-        discountAmount: (promoCodeInfo?.discountAmount || 0) + (creditInfo?.discountAmount || 0),
-        totalAmount: total,
-        memberType: memberType,
-        bookedForEmails: [customerEmail],
-        confirmedPayment: false,
-        bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
-        paymentId: null,
-        bookedAt: new Date().toISOString(),
-        packageId: selectedPackage || null,
-        packageUsed: !!selectedPackage,
-        packageDiscountAmount: packageDiscountInfo?.discountAmount || 0,
-        packageDiscountId: selectedPackage || null,
-        packageName: packageDiscountInfo ? userPackages?.find(p => p.id === selectedPackage)?.packageName || 'Package' : null,
-        creditAmount: creditInfo?.creditAmount || 0
+        return
       }
 
-      // Create booking
-      const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingPayload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create booking');
+      // Check if there are enough available seats
+      const availableSeats = DEMO_LAYOUT.length - bookedSeats.length
+      console.log('availableSeats', availableSeats)
+      if (availableSeats === 0) {
+        toast({
+          title: "No seats available",
+          description: "Please choose another time.",
+          variant: "destructive",
+        })
+        return
+      }
+      if (availableSeats < people) {
+        toast({
+          title: "Not enough seats available",
+          description: `Sorry, only ${availableSeats} seat${availableSeats !== 1 ? 's are' : ' is'} available for this time slot. Please select a different time or reduce the number of people.`,
+          variant: "destructive",
+        })
+        return
       }
 
-      const result = await response.json();
-      const createdBookingId = result.booking?.id || result.id;
-      setBookingId(createdBookingId);
+      // Validate booking constraints
+      const validation = validateBookingConstraints()
+      if (!validation.isValid) {
+        toast({
+          title: "Booking validation failed",
+          description: validation.message,
+          variant: "destructive",
+        })
+        return
+      }
 
-      // Store booking data for confirmation step
-      localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
 
-      // Go to confirmation step (booking will be confirmed there)
-      setBookingStep(3)
-      
-      // Scroll to top when moving to confirmation step
+      // Check if it's a zero amount booking - handle immediately
+      if (total <= 0) {
+        await handleZeroAmountBooking()
+        return
+      }
+
+      // For non-zero amounts, just move to payment step
+      // Booking will be created when user clicks "Pay"
+      setBookingStep(2)
+
+      // Scroll to top when moving to payment step
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
 
-    } catch (error) {
-      toast({
-        title: "Booking failed",
-        description: error instanceof Error ? error.message : "An error occurred while creating your booking. Please try again.",
-        variant: "destructive",
+    // Handle zero amount bookings (free bookings)
+    const handleZeroAmountBooking = async () => {
+      setIsLoading(true)
+
+      try {
+        // Prepare booking payload
+        const locationData = locations.find(loc => loc.id === location)
+        const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
+          peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+
+        const bookingPayload = {
+          userId: user!.id,
+          location: locationData?.name || location,
+          startAt: startDate?.toISOString(),
+          endAt: endDate?.toISOString(),
+          specialRequests: specialRequests || null,
+          seatNumbers: selectedSeats,
+          pax: people,
+          students: peopleBreakdown.coStudents,
+          members: peopleBreakdown.coWorkers,
+          tutors: peopleBreakdown.coTutors,
+          totalCost: baseSubtotal,
+          promoCodeId: promoCodeInfo?.promoCode?.id || null,
+          discountAmount: (promoCodeInfo?.discountAmount || 0) + (creditInfo?.discountAmount || 0),
+          totalAmount: total,
+          memberType: memberType,
+          bookedForEmails: [customerEmail],
+          confirmedPayment: false,
+          bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
+          paymentId: null,
+          bookedAt: new Date().toISOString(),
+          packageId: selectedPackage || null,
+          packageUsed: !!selectedPackage,
+          packageDiscountAmount: packageDiscountInfo?.discountAmount || 0,
+          packageDiscountId: selectedPackage || null,
+          packageName: packageDiscountInfo ? userPackages?.find(p => p.id === selectedPackage)?.packageName || 'Package' : null,
+          creditAmount: creditInfo?.creditAmount || 0
+        }
+
+        // Create booking
+        const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bookingPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create booking');
+        }
+
+        const result = await response.json();
+        const createdBookingId = result.booking?.id || result.id;
+        setBookingId(createdBookingId);
+
+        // Store booking data for confirmation step
+        localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
+
+        // Go to confirmation step (booking will be confirmed there)
+        setBookingStep(3)
+
+        // Scroll to top when moving to confirmation step
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+
+      } catch (error) {
+        toast({
+          title: "Booking failed",
+          description: error instanceof Error ? error.message : "An error occurred while creating your booking. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    // Create booking for payment (called from PaymentStep)
+    const createBookingForPayment = async (): Promise<string | null> => {
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+
+      try {
+        // Prepare booking payload
+        const locationData = locations.find(loc => loc.id === location)
+        const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
+          peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+
+        const bookingPayload = {
+          userId: user.id,
+          location: locationData?.name || location,
+          startAt: startDate?.toISOString(),
+          endAt: endDate?.toISOString(),
+          specialRequests: specialRequests || null,
+          seatNumbers: selectedSeats,
+          pax: people,
+          students: peopleBreakdown.coStudents,
+          members: peopleBreakdown.coWorkers,
+          tutors: peopleBreakdown.coTutors,
+          totalCost: baseSubtotal,
+          promoCodeId: promoCodeInfo?.promoCode?.id || null,
+          discountAmount: (promoCodeInfo?.discountAmount || 0) + (creditInfo?.discountAmount || 0),
+          totalAmount: total,
+          memberType: memberType,
+          bookedForEmails: [customerEmail],
+          confirmedPayment: false,
+          bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
+          paymentId: null,
+          bookedAt: new Date().toISOString(),
+          packageId: selectedPackage || null,
+          packageUsed: !!selectedPackage,
+          packageDiscountAmount: packageDiscountInfo?.discountAmount || 0,
+          packageDiscountId: selectedPackage || null,
+          packageName: packageDiscountInfo ? userPackages?.find(p => p.id === selectedPackage)?.packageName || 'Package' : null,
+          creditAmount: creditInfo?.creditAmount || 0
+        }
+
+        // Create booking
+        const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bookingPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create booking');
+        }
+
+        const result = await response.json();
+        const createdBookingId = result.booking?.id || result.id;
+
+        // Store booking data for payment step
+        localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
+
+        return createdBookingId;
+
+      } catch (error) {
+        console.error('Error creating booking for payment:', error)
+        throw error
+      }
+
+    };
+
+    // Helper function to get dates that should be excluded (closure dates)
+    const getExcludedDates = (): Date[] => {
+      const excluded: Date[] = []
+
+      closureDates.forEach(closure => {
+        const start = new Date(closure.startDate)
+        const end = new Date(closure.endDate)
+
+        // Add all dates in the closure range
+        let current = new Date(start)
+        while (current <= end) {
+          excluded.push(new Date(current))
+          current.setDate(current.getDate() + 1)
+        }
       })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
-  // Create booking for payment (called from PaymentStep)
-  const createBookingForPayment = async (): Promise<string | null> => {
-    if (!user) {
-      throw new Error('User not authenticated')
+      return excluded
     }
 
+    // Get constraints for the DatePicker components
+    const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
+    const endTimeConstraints = endDate ? getEndTimeConstraints() : getInitialEndTimeConstraints()
 
-    try {
-      // Prepare booking payload
-      const locationData = locations.find(loc => loc.id === location)
-      const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' :
-        peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+    const isFormValid =
+      location &&
+      people &&
+      startDate &&
+      endDate &&
+      customerName &&
+      customerEmail &&
+      customerPhone &&
+      (!needsStudentVerification || studentsValidated) && // Only require validation if verification is needed
+      selectedSeats.length === people &&
+      user;
 
-      const bookingPayload = {
-        userId: user.id,
-        location: locationData?.name || location,
-        startAt: startDate?.toISOString(),
-        endAt: endDate?.toISOString(),
-        specialRequests: specialRequests || null,
-        seatNumbers: selectedSeats,
-        pax: people,
-        students: peopleBreakdown.coStudents,
-        members: peopleBreakdown.coWorkers,
-        tutors: peopleBreakdown.coTutors,
-        totalCost: baseSubtotal,
-        promoCodeId: promoCodeInfo?.promoCode?.id || null,
-        discountAmount: (promoCodeInfo?.discountAmount || 0) + (creditInfo?.discountAmount || 0),
-        totalAmount: total,
-        memberType: memberType,
-        bookedForEmails: [customerEmail],
-        confirmedPayment: false,
-        bookingRef: `BOOK${Date.now().toString().slice(-6)}`,
-        paymentId: null,
-        bookedAt: new Date().toISOString(),
-        packageId: selectedPackage || null,
-        packageUsed: !!selectedPackage,
-        packageDiscountAmount: packageDiscountInfo?.discountAmount || 0,
-        packageDiscountId: selectedPackage || null,
-        packageName: packageDiscountInfo ? userPackages?.find(p => p.id === selectedPackage)?.packageName || 'Package' : null,
-        creditAmount: creditInfo?.creditAmount || 0
-      }
+    // Debug form validation
 
-      // Create booking
-      const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingPayload),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create booking');
-      }
-
-      const result = await response.json();
-      const createdBookingId = result.booking?.id || result.id;
-
-      // Store booking data for payment step
-      localStorage.setItem('currentBooking', JSON.stringify(result.booking || result))
-
-      return createdBookingId;
-
-    } catch (error) {
-      console.error('Error creating booking for payment:', error)
-      throw error
+    // Show loading state while checking auth
+    if (isLoadingAuth) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <Navbar />
+          <div className="pt-32 text-center">
+            <p>Loading...</p>
+          </div>
+        </div>
+      )
     }
-  }
 
-  // Get constraints for the DatePicker components
-  const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
-  const endTimeConstraints = endDate ? getEndTimeConstraints() : getInitialEndTimeConstraints()
-
-  const isFormValid =
-    location &&
-    people &&
-    startDate &&
-    endDate &&
-    customerName &&
-    customerEmail &&
-    customerPhone &&
-    (!needsStudentVerification || studentsValidated) && // Only require validation if verification is needed
-    selectedSeats.length === people &&
-    user;
-
-  // Debug form validation
-
-
-  // Show loading state while checking auth
-  if (isLoadingAuth) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="pt-32 text-center">
-          <p>Loading...</p>
-        </div>
-      </div>
-    )
-  }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <div className="pt-32 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {!user && (
-            <Alert className="mb-6 border-orange-200 bg-orange-50">
-              <AlertCircle className="h-4 w-4 text-orange-600" />
-              <AlertTitle className="text-orange-800">Sign In Required</AlertTitle>
-              <AlertDescription className="text-orange-700">
-                You must be signed in as a member to make bookings.
-                <Button
-                  variant="link"
-                  className="px-2 text-orange-600 hover:text-orange-800"
-                  onClick={() => router.push('/login')}
-                >
-                  Sign in now
-                </Button>
-                to continue with your booking.
-              </AlertDescription>
-            </Alert>
-          )}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-serif text-gray-900 mb-4">Complete Your Booking</h1>
-            <p className="text-lg text-gray-600">Secure your co-working space in just a few steps</p>
-          </div>
-
-          {/* Progress Steps */}
-          <div className="flex justify-center mb-8">
-            <div className="flex space-x-8">
-              {[
-                { step: 1, title: 'Details', icon: Calendar },
-                { step: 2, title: 'Payment', icon: CreditCard },
-                { step: 3, title: 'Confirmation', icon: Shield }
-              ].map(({ step, title, icon: Icon }) => (
-                <div key={step} className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bookingStep >= step ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
-                    }`}>
-                    {bookingStep > step ? '✓' : <Icon className="w-5 h-5" />}
-                  </div>
-                  <span className={`ml-2 text-sm font-medium ${bookingStep >= step ? 'text-orange-500' : 'text-gray-500'
-                    }`}>
-                    {title}
-                  </span>
-                </div>
-              ))}
+        <div className="pt-32 pb-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {!user && (
+              <Alert className="mb-6 border-orange-200 bg-orange-50">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertTitle className="text-orange-800">Sign In Required</AlertTitle>
+                <AlertDescription className="text-orange-700">
+                  You must be signed in as a member to make bookings.
+                  <Button
+                    variant="link"
+                    className="px-2 text-orange-600 hover:text-orange-800"
+                    onClick={() => router.push('/login')}
+                  >
+                    Sign in now
+                  </Button>
+                  to continue with your booking.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-serif text-gray-900 mb-4">Complete Your Booking</h1>
+              <p className="text-lg text-gray-600">Secure your co-working space in just a few steps</p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Form */}
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Calendar className="w-5 h-5 mr-2" />
-                    Booking Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {bookingStep === 1 && (
-                    <form onSubmit={handleBookingSubmit} className="space-y-4 sm:space-y-6">
-                      {/* Workspace Selection */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        <div>
-                          <Label htmlFor="location">Location</Label>
-                          <Select value={location} onValueChange={setLocation} disabled={!user}>
-                            <SelectTrigger className={`w-full ${!user ? "bg-gray-50" : ""}`}>
-                              <SelectValue placeholder="Select location" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {locations.map(loc => (
-                                <SelectItem key={loc.id} value={loc.id}>
-                                  {loc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+            {/* Progress Steps */}
+            <div className="flex justify-center mb-8">
+              <div className="flex space-x-8">
+                {[
+                  { step: 1, title: 'Details', icon: Calendar },
+                  { step: 2, title: 'Payment', icon: CreditCard },
+                  { step: 3, title: 'Confirmation', icon: Shield }
+                ].map(({ step, title, icon: Icon }) => (
+                  <div key={step} className="flex items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bookingStep >= step ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
+                      }`}>
+                      {bookingStep > step ? '✓' : <Icon className="w-5 h-5" />}
+                    </div>
+                    <span className={`ml-2 text-sm font-medium ${bookingStep >= step ? 'text-orange-500' : 'text-gray-500'
+                      }`}>
+                      {title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-
-                        <div>
-                          <Label>Number of People</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className={`w-full justify-start ${!user ? "bg-gray-50" : ""}`} disabled={!user}>
-                                {people} {people === 1 ? 'Person' : 'People'}
-                                {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    ({peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓)
-                                  </span>
-                                ) : null}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent align="start" className="w-auto">
-                              <PeopleSelector
-                                value={people}
-                                min={1}
-                                max={15}
-                                onChange={handlePeopleChange}
-                                showBreakdown={true}
-                                onBreakdownChange={handleBreakdownChange}
-                                storageKey="book-now-people-selector"
-                                enablePersistence={true}
-                                initialBreakdown={peopleBreakdown}
-                                isInitialLoad={true}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-
-                      {/* Date & Time Selection */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        <div>
-                          <Label>Start Date & Time</Label>
-                          {/* Get minimum start time constraints */}
-                          <DatePicker
-                            selected={startDate}
-                            onChange={handleStartChange}
-                            onChangeRaw={(e) => e?.preventDefault()}
-                            selectsStart
-                            startDate={startDate}
-                            endDate={endDate}
-                            showTimeSelect
-                            timeIntervals={15}
-                            filterTime={filterTime}
-                            dateFormat="MMM d, h:mm aa"
-                            placeholderText="Select start time"
-                            className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
-                            wrapperClassName="w-full"
-                            minDate={minDate}
-                            maxDate={maxBookingDate}
-                            {...getStartTimeConstraints()}
-                            disabled={!user}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>End Date & Time</Label>
-                          {/* Get end time constraints */}
-                          <DatePicker
-                            selected={endDate}
-                            onChange={handleEndChange}
-                            onChangeRaw={(e) => e?.preventDefault()}
-                            selectsEnd
-                            startDate={startDate}
-                            endDate={endDate}
-                            minDate={endMinDate}
-                            maxDate={endMaxDate}
-                            showTimeSelect
-                            timeIntervals={15}
-                            filterTime={filterEndTime}
-                            dateFormat="MMM d, h:mm aa"
-                            placeholderText="Select end time"
-                            className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
-                            wrapperClassName="w-full"
-                            disabled={!startDate || !user}
-                            {...endTimeConstraints}
-                          />
-                          {/* {startDate && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)
-                            </p>
-                          )} */}
-                        </div>
-                      </div>
-                     
-                     
-                      <div className="flex flex-col mt-2">
-                        <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All timezones are based on GMT+8</p>
-                        </div>
-                        <div className="flex flex-col">
-                        <p className='text-gray-600 border border-gray-600 rounded-md p-1 px-4 text-xs inline-block'>Booking has to be made for at least an hour</p>
-                        </div>
-                       
-                      {/* Booking Duration Display */}
-                      {bookingDuration && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-800">
-                              Booking Duration: {bookingDuration.durationHours.toFixed(2)} hours
-                            </span>
-                          </div>
-                          <p className="text-xs text-blue-600 mt-1">
-                            {bookingDuration.startAt && bookingDuration.endAt && (
-                              <>
-                                From {formatSingaporeDate(bookingDuration.startAt)} to {formatSingaporeDate(bookingDuration.endAt)}
-                              </>
-                            )}
-                          </p>
-                        </div>
-                      )}
-                      {hasTutorWithTooManyPeople && (
-                        <Alert variant="destructive" className="mb-4">
-                          <AlertTriangle className="h-4 w-4" />
-                          <AlertTitle>Booking Not Allowed</AlertTitle>
-                          <AlertDescription>
-                           
-                            A maximum of 4 students or 4 co-workers in a booking is allowed. Anything more than this, please contact us via whatsapp to make special arrangements
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {(() => {
-                        console.log('🎨 Rendering student verification UI:', {
-                          needsStudentVerification,
-                          isStudentAccount,
-                          isBookingForSingleStudent,
-                          coStudents: peopleBreakdown.coStudents,
-                          user: !!user
-                        })
-                        return null
-                      })()}
-
-                      {/* Show loading state while fetching user profile */}
-                      {isLoadingUserProfile && peopleBreakdown.coStudents > 0 && (
-                        <div className="mt-2 p-3 rounded-md bg-gray-50 border border-gray-200">
-                          <div className="flex items-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                            <p className="text-sm text-gray-600">Loading user profile...</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {needsStudentVerification && user && !isLoadingUserProfile && (
-                        <div>
-                         
-                          <StudentValidation
-                            numberOfStudents={studentsNeedingVerification}
-                            onValidationChange={handleStudentValidationChange}
-                            currentUserEmail={freshUserProfile?.email}
-                          />
-                          <div className={`mt-2 p-2 rounded-md text-sm ${studentsValidated
-                            ? 'bg-green-50 border border-green-200 text-green-800'
-                            : 'bg-orange-50 border border-orange-200 text-orange-800'
-                            }`}>
-                            {studentsValidated
-                              ? `✅ All ${studentsNeedingVerification} student${studentsNeedingVerification > 1 ? 's' : ''} validated successfully!`
-                              : `⚠️ Please validate ${studentsNeedingVerification} student${studentsNeedingVerification > 1 ? 's' : ''} to continue`
-                            }
-                          </div>
-                        </div>
-                      )}
-
-                 
-
-                      {/* Customer Information */}
-                      <div className="border-t pt-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-medium">Contact Information</h3>
-                          {isLoadingUserProfile ? (
-                            <div className="flex items-center text-sm text-gray-500">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
-                              <span>Loading profile...</span>
-                            </div>
-                          ) : null}
-                        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Main Form */}
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Calendar className="w-5 h-5 mr-2" />
+                      Booking Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {bookingStep === 1 && (
+                      <form onSubmit={handleBookingSubmit} className="space-y-4 sm:space-y-6">
+                        {/* Workspace Selection */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                           <div>
-                            <Label htmlFor="name">Full Name *</Label>
-                            <Input
-                              id="name"
-                              value={customerName}
-                              onChange={(e) => setCustomerName(e.target.value)}
-                              placeholder="Enter your full name"
-                              required
-                              disabled={!user}
-                              className={!user ? "bg-gray-50" : ""}
-                            />
+                            <Label htmlFor="location">Location</Label>
+                            <Select value={location} onValueChange={setLocation} disabled={!user}>
+                              <SelectTrigger className={`w-full ${!user ? "bg-gray-50" : ""}`}>
+                                <SelectValue placeholder="Select location" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {locations.map(loc => (
+                                  <SelectItem key={loc.id} value={loc.id}>
+                                    {loc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
+
+
                           <div>
-                            <Label htmlFor="email">Email Address *</Label>
-                            <Input
-                              id="email"
-                              type="email"
-                              value={customerEmail}
-                              onChange={(e) => setCustomerEmail(e.target.value)}
-                              placeholder="Enter your email"
-                              required
-                              disabled={!user}
-                              className={!user ? "bg-gray-50" : ""}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="phone">Phone Number *</Label>
-                            <Input
-                              id="phone"
-                              type="tel"
-                              value={customerPhone}
-                              onChange={(e) => setCustomerPhone(e.target.value)}
-                              placeholder="Enter your phone number"
-                              required
-                              disabled={!user}
-                              className={!user ? "bg-gray-50" : ""}
-                            />
+                            <Label>Number of People</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" className={`w-full justify-start ${!user ? "bg-gray-50" : ""}`} disabled={!user}>
+                                  {people} {people === 1 ? 'Person' : 'People'}
+                                  {peopleBreakdown.coTutors > 0 || peopleBreakdown.coStudents > 0 ? (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      ({peopleBreakdown.coWorkers}💼 {peopleBreakdown.coTutors}👩‍🏫 {peopleBreakdown.coStudents}🎓)
+                                    </span>
+                                  ) : null}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent align="start" className="w-auto">
+                                <PeopleSelector
+                                  value={people}
+                                  min={1}
+                                  max={15}
+                                  onChange={handlePeopleChange}
+                                  showBreakdown={true}
+                                  onBreakdownChange={handleBreakdownChange}
+                                  storageKey="book-now-people-selector"
+                                  enablePersistence={true}
+                                  initialBreakdown={peopleBreakdown}
+                                  isInitialLoad={true}
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Special Requests */}
-                      <div>
-                        <Label htmlFor="requests">Special Requests (Optional)</Label>
-                        <Textarea
-                          id="requests"
-                          value={specialRequests}
-                          onChange={(e) => setSpecialRequests(e.target.value)}
-                          placeholder="Any special requirements or requests?"
-                          rows={3}
-                          disabled={!user}
-                          className={!user ? "bg-gray-50" : ""}
-                        />
-                      </div>
-                      {/* seat selection */}
-                      {user && (
-                        <div>
-                          <Label>Select Your Seat(s)</Label>
-                          <p className="text-sm text-gray-600 mb-2">
-                            Please select exactly {people} seat{people !== 1 ? 's' : ''} for your booking.
-                            {!isLoadingSeats && (
-                              <span className="ml-2 text-blue-600">
-                                ({DEMO_LAYOUT.length - bookedSeats.length} seats available)
+                        {/* Date & Time Selection */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                          <div>
+                            <Label className="flex items-center gap-2">
+                              Start Date & Time
+                              {(isLoadingShopHours || isLoadingSeats) && (
+                                <Loader2 className="h-3 w-3 animate-spin text-orange-500" />
+                              )}
+                            </Label>
+                            {/* Get minimum start time constraints */}
+                            <DatePicker
+                              selected={startDate}
+                              onChange={handleStartChange}
+                              onChangeRaw={(e) => e?.preventDefault()}
+                              selectsStart
+                              startDate={startDate}
+                              endDate={endDate}
+                              showTimeSelect
+                              timeIntervals={15}
+                              includeTimes={getAvailableTimes(startDate)}
+                              excludeDates={getExcludedDates()}
+                              dateFormat="MMM d, h:mm aa"
+                              placeholderText="Select start time"
+                              className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
+                              wrapperClassName="w-full"
+                              minDate={minDate}
+                              maxDate={maxBookingDate}
+                              {...getStartTimeConstraints()}
+                              disabled={!user}
+                            />
+                          </div>
+
+                          <div>
+                            <Label>End Date & Time</Label>
+                            {/* Get end time constraints */}
+                            <DatePicker
+                              selected={endDate}
+                              onChange={handleEndChange}
+                              onChangeRaw={(e) => e?.preventDefault()}
+                              selectsEnd
+                              startDate={startDate}
+                              endDate={endDate}
+                              minDate={endMinDate}
+                              maxDate={endMaxDate}
+                              showTimeSelect
+                              timeIntervals={15}
+                              includeTimes={getAvailableEndTimes(endDate)}
+                              excludeDates={getExcludedDates()}
+                              dateFormat="MMM d, h:mm aa"
+                              placeholderText="Select end time"
+                              className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
+                              wrapperClassName="w-full"
+                              {...getEndTimeConstraints()}
+                              disabled={!user || !startDate}
+                            />
+                            {/* {startDate && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)
+                          )} */}
+                          </div>
+                        </div>
+
+
+                        <div className="flex flex-col mt-2">
+                          <p className='text-orange-600 border border-orange-600 rounded-md p-1 px-4 text-xs inline-block'>All timezones are based on GMT+8</p>
+                        </div>
+                        <div className="flex flex-col">
+                          <p className='text-gray-600 border border-gray-600 rounded-md p-1 px-4 text-xs inline-block'>Booking has to be made for at least an hour</p>
+                        </div>
+
+                        {/* Booking Duration Display */}
+                        {bookingDuration && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-blue-600" />
+                              <span className="text-sm font-medium text-blue-800">
+                                Booking Duration: {bookingDuration.durationHours.toFixed(2)} hours
                               </span>
-                            )}
-                          </p>
-
-                          {isLoadingSeats ? (
-                            <div className="flex items-center justify-center p-8 border rounded-lg">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-                              <span className="ml-3 text-gray-600">Loading available seats...</span>
                             </div>
-                          ) : (
-                            <>
-                              {/* Show message if no seats available */}
-                              {DEMO_LAYOUT.length - bookedSeats.length === 0 && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                                  <div className="flex items-center">
-                                    <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                                    <div>
-                                      <h3 className="text-sm font-medium text-red-800">No seats available</h3>
-                                      <p className="text-sm text-red-700">Please choose another time.</p>
-                                    </div>
-                                  </div>
-                                </div>
+                            <p className="text-xs text-blue-600 mt-1">
+                              {bookingDuration.startAt && bookingDuration.endAt && (
+                                <>
+                                  From {formatSingaporeDate(bookingDuration.startAt)} to {formatSingaporeDate(bookingDuration.endAt)}
+                                </>
                               )}
+                            </p>
+                          </div>
+                        )}
+                        {hasTutorWithTooManyPeople && (
+                          <Alert variant="destructive" className="mb-4">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Booking Not Allowed</AlertTitle>
+                            <AlertDescription>
 
-                              {/* Show message if not enough seats for requested people */}
-                              {DEMO_LAYOUT.length - bookedSeats.length > 0 && people > (DEMO_LAYOUT.length - bookedSeats.length) && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                                  <div className="flex items-center">
-                                    <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                                    <div>
-                                      <h3 className="text-sm font-medium text-red-800">Not enough seats available</h3>
-                                      <p className="text-sm text-red-700">
-                                        There are only {DEMO_LAYOUT.length - bookedSeats.length} seats available. Please select another timeslot.
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              <SeatPicker
-                                layout={DEMO_LAYOUT}
-                                tables={DEMO_TABLES}
-                                labels={DEMO_LABELS}
-                                bookedSeats={bookedSeats}
-                                overlays={OVERLAYS}
-                                maxSeats={people}
-                                onSelectionChange={setSelectedSeats}
-                              />
-                              <div className="flex justify-between items-center mt-2">
-                                <p className="text-sm text-gray-600">
-                                  Selected: {selectedSeats.join(', ') || 'none'}
-                                </p>
-                                {selectedSeats.length !== people && (
-                                  <p className="text-sm text-orange-600">
-                                    {selectedSeats.length < people
-                                      ? `Please select ${people - selectedSeats.length} more seat${people - selectedSeats.length !== 1 ? 's' : ''}`
-                                      : `Please deselect ${selectedSeats.length - people} seat${selectedSeats.length - people !== 1 ? 's' : ''}`
-                                    }
-                                  </p>
-                                )}
+                              A maximum of 4 students or 4 co-workers in a booking is allowed. Anything more than this, please contact us via whatsapp to make special arrangements
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {(() => {
+                          console.log('🎨 Rendering student verification UI:', {
+                            needsStudentVerification,
+                            isStudentAccount,
+                            isBookingForSingleStudent,
+                            coStudents: peopleBreakdown.coStudents,
+                            user: !!user
+                          })
+                          return null
+                        })()}
+
+                        {/* Show loading state while fetching user profile */}
+                        {isLoadingUserProfile && peopleBreakdown.coStudents > 0 && (
+                          <div className="mt-2 p-3 rounded-md bg-gray-50 border border-gray-200">
+                            <div className="flex items-center">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                              <p className="text-sm text-gray-600">Loading user profile...</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {needsStudentVerification && user && !isLoadingUserProfile && (
+                          <div>
+
+                            <StudentValidation
+                              numberOfStudents={studentsNeedingVerification}
+                              onValidationChange={handleStudentValidationChange}
+                              currentUserEmail={freshUserProfile?.email}
+                            />
+                            <div className={`mt-2 p-2 rounded-md text-sm ${studentsValidated
+                              ? 'bg-green-50 border border-green-200 text-green-800'
+                              : 'bg-orange-50 border border-orange-200 text-orange-800'
+                              }`}>
+                              {studentsValidated
+                                ? `✅ All ${studentsNeedingVerification} student${studentsNeedingVerification > 1 ? 's' : ''} validated successfully!`
+                                : `⚠️ Please validate ${studentsNeedingVerification} student${studentsNeedingVerification > 1 ? 's' : ''} to continue`
+                              }
+                            </div>
+                          </div>
+                        )}
+
+
+
+                        {/* Customer Information */}
+                        <div className="border-t pt-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-medium">Contact Information</h3>
+                            {isLoadingUserProfile ? (
+                              <div className="flex items-center text-sm text-gray-500">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
+                                <span>Loading profile...</span>
                               </div>
-                              {bookedSeats.length > 0 && (
-                                <p className="text-sm text-red-600 mt-2">
-                                  ⚠️ {bookedSeats.length} seat{bookedSeats.length !== 1 ? 's are' : ' is'} already booked for this time slot
-                                </p>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-
-
-
-                      {/* ── ENTITLEMENT TABS ───────────────────────────── */}
-                      {user && (
-                        <EntitlementTabs
-                          mode={entitlementMode}
-                          onModeChange={(newMode) => {
-                            setEntitlementMode(newMode);
-                            setSelectedPackage('');
-                            setPromoCode('');
-                            setPromoValid(false);
-                            setPromoCodeInfo(null);
-                            setCreditInfo(null);
-                          }}
-                          onChange={(discountInfo) => {
-                            if (discountInfo && discountInfo.type === 'package') {
-                              setEntitlementMode('package')
-                              setSelectedPackage(discountInfo.id)
-                              setPromoCode('')
-                              setPromoValid(false)
-                              setPromoCodeInfo(null)
-                              setCreditInfo(null)
-                            } else if (discountInfo && discountInfo.type === 'promo') {
-
-
-                              setEntitlementMode('promo')
-                              setPromoCode(discountInfo.promoCode?.code || '')
-                              setPromoValid(true)
-                              setSelectedPackage('')
-                              setPromoCodeInfo(discountInfo)
-                              setCreditInfo(null)
-                            } else if (discountInfo && discountInfo.type === 'credit') {
-
-                              setEntitlementMode('credit')
-                              setCreditInfo(discountInfo)
-                              setSelectedPackage('')
-                              setPromoCode('')
-                              setPromoValid(false)
-                              setPromoCodeInfo(null)
-                            } else {
-                              // Clear all discounts
-                              setEntitlementMode('package')
-                              setSelectedPackage('')
-                              setPromoCode('')
-                              setPromoValid(false)
-                              setPromoCodeInfo(null)
-                              setCreditInfo(null)
-                            }
-                          }}
-                          selectedPackage={selectedPackage}
-                          promoCode={promoCode}
-                          promoValid={promoValid}
-
-                          userId={userId}
-                          bookingAmount={baseSubtotal}
-                          bookingDuration={bookingDuration}
-                          userRole={peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'}
-                          locationPrice={(() => {
-                            // Get the appropriate hourly rate based on user role and booking duration
-                            const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
-                            const individualPersonHours = bookingDuration?.durationHours || 0
-                            return memberType === 'STUDENT' ? 
-                              (individualPersonHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
-                              memberType === 'TUTOR' ? 
-                              (individualPersonHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
-                              (individualPersonHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
-                          })()}
-                          totalPeople={people}
-                        />
-                      )}
-                      {/* ──────────────────────────────────────────────── */}
-
-                      {/* Tutor with too many students error */}
-                      
-
-                      <Button
-                        type="submit"
-                        className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={
-                          !user ||
-                          selectedSeats.length !== people ||
-                          (needsStudentVerification && !studentsValidated) ||
-                          isLoading ||
-                          isOver24Hours ||
-                          hasTutorWithTooManyPeople
-                        }
-                      >
-                        {!user
-                          ? 'Sign In Required'
-                          : hasTutorWithTooManyPeople
-                            ? 'Tutors with more than 4 Students/Workers Not Allowed - Contact Admin'
-                          : isOver24Hours
-                            ? 'Booking Over 24 Hours Not Allowed'
-                          : selectedSeats.length !== people
-                            ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
-                        : needsStudentVerification && !studentsValidated
-                          ? `Validate ${studentsNeedingVerification} Student${studentsNeedingVerification > 1 ? 's' : ''} to Continue`
-                              : total <= 0
-                                ? (isLoading ? 'Confirming Free Booking...' : 'Confirm Free Booking')
-                                : (isLoading ? 'Processing...' : 'Continue to Payment')
-                        }
-                      </Button>
-
-                      {!user && (
-                        <p className="text-center text-sm text-gray-600 mt-2">
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="text-orange-600 hover:text-orange-800 p-0"
-                            onClick={() => router.push('/login')}
-                          >
-                            Sign in
-                          </Button>
-                          {' '}to make your booking
-                        </p>
-                      )}
-
-                      {needsStudentVerification && !studentsValidated && user && (
-                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <div className="flex items-start space-x-2">
-                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                            ) : null}
+                          </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                             <div>
-                              <p className="text-sm font-medium text-amber-800">Student Verification Required</p>
-                              <p className="text-xs text-amber-700 mt-1">
-                                Please complete student verification for all {studentsNeedingVerification} student{studentsNeedingVerification > 1 ? 's' : ''} before proceeding to payment.
-                              </p>
+                              <Label htmlFor="name">Full Name *</Label>
+                              <Input
+                                id="name"
+                                value={customerName}
+                                onChange={(e) => setCustomerName(e.target.value)}
+                                placeholder="Enter your full name"
+                                required
+                                disabled={!user}
+                                className={!user ? "bg-gray-50" : ""}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="email">Email Address *</Label>
+                              <Input
+                                id="email"
+                                type="email"
+                                value={customerEmail}
+                                onChange={(e) => setCustomerEmail(e.target.value)}
+                                placeholder="Enter your email"
+                                required
+                                disabled={!user}
+                                className={!user ? "bg-gray-50" : ""}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="phone">Phone Number *</Label>
+                              <Input
+                                id="phone"
+                                type="tel"
+                                value={customerPhone}
+                                onChange={(e) => setCustomerPhone(e.target.value)}
+                                placeholder="Enter your phone number"
+                                required
+                                disabled={!user}
+                                className={!user ? "bg-gray-50" : ""}
+                              />
                             </div>
                           </div>
                         </div>
-                      )}
-                    </form>
-                  )}
 
-                  {bookingStep === 2 && (
-                    <div className="space-y-6">
-                      <h3 className="text-lg font-medium">Payment Information</h3>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-4">
-
-                          <PaymentStep
-                            subtotal={baseSubtotal}
-                            total={total}
-                            discountAmount={discountAmount}
-                            selectedPackage={selectedPackage}
-                            customer={{ name: customerName, email: customerEmail, phone: customerPhone }}
-                            bookingId={bookingId || undefined}
-                            onBack={() => {
-                              setBookingStep(1)
-                              setSelectedPaymentMethod('payNow') // Reset to default payment method
-                            }}
-                            onComplete={() => setBookingStep(3)}
-                            onPaymentMethodChange={handlePaymentMethodChange}
-                            onCreateBooking={createBookingForPayment}
-                            onBookingCreated={(bookingId) => setBookingId(bookingId)}
+                        {/* Special Requests */}
+                        <div>
+                          <Label htmlFor="requests">Special Requests (Optional)</Label>
+                          <Textarea
+                            id="requests"
+                            value={specialRequests}
+                            onChange={(e) => setSpecialRequests(e.target.value)}
+                            placeholder="Any special requirements or requests?"
+                            rows={3}
+                            disabled={!user}
+                            className={!user ? "bg-gray-50" : ""}
                           />
-                        </p>
+                        </div>
+                        {/* seat selection */}
+                        {user && (
+                          <div>
+                            <Label>Select Your Seat(s)</Label>
+                            <p className="text-sm text-gray-600 mb-2">
+                              Please select exactly {people} seat{people !== 1 ? 's' : ''} for your booking.
+                              {!isLoadingSeats && (
+                                <span className="ml-2 text-blue-600">
+                                  ({DEMO_LAYOUT.length - bookedSeats.length} seats available)
+                                </span>
+                              )}
+                            </p>
 
-                      </div>
-                    </div>
-
-                  )}
-
-                  {bookingStep === 3 && (
-                    <div className="text-center py-8">
-                      {confirmationStatus === 'loading' && (
-                        <>
-                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirming Your Booking...</h3>
-                          <p className="text-gray-600 mb-6">
-                            Please wait while we confirm your booking.
-                          </p>
-                        </>
-                      )}
-
-                      {confirmationStatus === 'error' && (
-                        <>
-                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                            {confirmationHeadingError || ' Booking Failed '}
-                          </h3>
-                          <p className="text-red-600 mb-4">
-                            {confirmationError || 'An error occurred while confirming your booking.'}
-                          </p>
-                          {isPaymentFailed(searchParams.get('status')) && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                              <div className="flex items-start space-x-2">
-                                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                                <div className="text-sm text-amber-800">
-                                  <p className="font-medium">What happened?</p>
-                                  <p>Your payment was not completed successfully.</p>
-
-                                  <p className="mt-2">Your booking has not been confirmed and no charges were made to your account.</p>
-                                </div>
+                            {isLoadingSeats ? (
+                              <div className="flex items-center justify-center p-8 border rounded-lg">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+                                <span className="ml-3 text-gray-600">Loading available seats...</span>
                               </div>
-                            </div>
-                          )}
-                          <div className="space-y-3">
-                            {isPaymentFailed(searchParams.get('status')) ? (
-                              <>
-                                <Button
-                                  onClick={() => router.push('/')}
-                                  className="bg-orange-500 hover:bg-orange-600"
-                                >
-                                  Try Booking Again
-                                </Button>
-                                <Button
-                                  onClick={() => router.push('/dashboard')}
-                                  variant="outline"
-                                  className="ml-3"
-                                >
-                                  Go to Dashboard
-                                </Button>
-                              </>
                             ) : (
                               <>
-
-
-                              </>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {confirmationStatus === 'success' && (
-                        <>
-                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
-                          {(() => {
-                            const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
-                            const isZeroAmount = currentBooking.totalAmount <= 0
-
-                            return (
-                              <>
-                                <p className="text-gray-600 mb-6">
-                                  {isZeroAmount
-                                    ? "Your booking has been automatically confirmed as the total amount was $0.00. No payment was required."
-                                    : "Your booking has been confirmed. You will receive a confirmation email shortly."
-                                  }
-                                </p>
-                                {isZeroAmount && (
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                                    <div className="flex items-center space-x-2">
-                                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                                        <span className="text-green-600 text-sm">💰</span>
-                                      </div>
+                                {/* Show message if no seats available */}
+                                {DEMO_LAYOUT.length - bookedSeats.length === 0 && (
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-center">
+                                      <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
                                       <div>
-                                        <p className="text-sm font-medium text-green-800">Zero Amount Booking</p>
-                                        <p className="text-xs text-green-600">Fully covered by package discount</p>
+                                        <h3 className="text-sm font-medium text-red-800">No seats available</h3>
+                                        <p className="text-sm text-red-700">Please choose another time.</p>
                                       </div>
                                     </div>
                                   </div>
                                 )}
+
+                                {/* Show message if not enough seats for requested people */}
+                                {DEMO_LAYOUT.length - bookedSeats.length > 0 && people > (DEMO_LAYOUT.length - bookedSeats.length) && (
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-center">
+                                      <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                                      <div>
+                                        <h3 className="text-sm font-medium text-red-800">Not enough seats available</h3>
+                                        <p className="text-sm text-red-700">
+                                          There are only {DEMO_LAYOUT.length - bookedSeats.length} seats available. Please select another timeslot.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                <SeatPicker
+                                  layout={DEMO_LAYOUT}
+                                  tables={DEMO_TABLES}
+                                  labels={DEMO_LABELS}
+                                  bookedSeats={bookedSeats}
+                                  overlays={OVERLAYS}
+                                  maxSeats={people}
+                                  onSelectionChange={setSelectedSeats}
+                                />
+                                <div className="flex justify-between items-center mt-2">
+                                  <p className="text-sm text-gray-600">
+                                    Selected: {selectedSeats.join(', ') || 'none'}
+                                  </p>
+                                  {selectedSeats.length !== people && (
+                                    <p className="text-sm text-orange-600">
+                                      {selectedSeats.length < people
+                                        ? `Please select ${people - selectedSeats.length} more seat${people - selectedSeats.length !== 1 ? 's' : ''}`
+                                        : `Please deselect ${selectedSeats.length - people} seat${selectedSeats.length - people !== 1 ? 's' : ''}`
+                                      }
+                                    </p>
+                                  )}
+                                </div>
+                                {bookedSeats.length > 0 && (
+                                  <p className="text-sm text-red-600 mt-2">
+                                    ⚠️ {bookedSeats.length} seat{bookedSeats.length !== 1 ? 's are' : ' is'} already booked for this time slot
+                                  </p>
+                                )}
                               </>
-                            )
-                          })()}
-                          <div className="bg-gray-50 p-4 rounded-lg text-left">
-                            <p className="text-sm text-gray-600">
-                              Booking Reference: {(() => {
-                                try {
-                                  const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
-                                  return currentBooking.bookingRef || `#BK${Date.now().toString().slice(-6)}`
-                                } catch {
-                                  return `#BK${Date.now().toString().slice(-6)}`
-                                }
-                              })()}
-                            </p>
-                            {bookingId && (
-                              <p className="text-sm text-gray-600 mt-1">Booking ID: {bookingId}</p>
                             )}
                           </div>
-                          <Button
-                            onClick={() => router.push('/dashboard')}
-                            className="mt-6 bg-orange-500 hover:bg-orange-600"
-                          >
-                            View My Bookings
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        )}
 
-            {/* Booking Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-24">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    Booking Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {!user && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-md p-4 text-center">
-                      <p className="text-sm text-orange-800 font-medium">Member Booking</p>
-                      <p className="text-xs text-orange-700 mt-1">Sign in to view pricing</p>
-                    </div>
-                  )}
-                  {confirmedBookingData ? (
-                    // Show confirmed booking data
-                    <div className="space-y-3">
-                      <div className="flex items-start space-x-3">
-                        <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="font-medium">{confirmedBookingData.location}</p>
-                          <p className="text-sm text-gray-600">Confirmed Booking</p>
-                        </div>
-                      </div>
 
-                    
-                      {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
-                        <div className="flex items-center space-x-3">
-                        <Users className="w-5 h-5 text-gray-400" />
-                        <span>{confirmedBookingData.pax} {confirmedBookingData.pax === 1 ? 'Person' : 'People'}</span>
-                      </div>
-                      )}
 
-                      <div className="flex items-center space-x-3">
-                        <Clock className="w-5 h-5 text-gray-400" />
-                        <div>
-                          <p className="text-sm">
-                            {formatBookingDateRange(confirmedBookingData.startAt, confirmedBookingData.endAt)}
+                        {/* ── ENTITLEMENT TABS ───────────────────────────── */}
+                        {user && (
+                          <EntitlementTabs
+                            mode={entitlementMode}
+                            onModeChange={(newMode) => {
+                              setEntitlementMode(newMode);
+                              setSelectedPackage('');
+                              setPromoCode('');
+                              setPromoValid(false);
+                              setPromoCodeInfo(null);
+                              setCreditInfo(null);
+                            }}
+                            onChange={(discountInfo) => {
+                              if (discountInfo && discountInfo.type === 'package') {
+                                setEntitlementMode('package')
+                                setSelectedPackage(discountInfo.id)
+                                setPromoCode('')
+                                setPromoValid(false)
+                                setPromoCodeInfo(null)
+                                setCreditInfo(null)
+                              } else if (discountInfo && discountInfo.type === 'promo') {
+
+
+                                setEntitlementMode('promo')
+                                setPromoCode(discountInfo.promoCode?.code || '')
+                                setPromoValid(true)
+                                setSelectedPackage('')
+                                setPromoCodeInfo(discountInfo)
+                                setCreditInfo(null)
+                              } else if (discountInfo && discountInfo.type === 'credit') {
+
+                                setEntitlementMode('credit')
+                                setCreditInfo(discountInfo)
+                                setSelectedPackage('')
+                                setPromoCode('')
+                                setPromoValid(false)
+                                setPromoCodeInfo(null)
+                              } else {
+                                // Clear all discounts
+                                setEntitlementMode('package')
+                                setSelectedPackage('')
+                                setPromoCode('')
+                                setPromoValid(false)
+                                setPromoCodeInfo(null)
+                                setCreditInfo(null)
+                              }
+                            }}
+                            selectedPackage={selectedPackage}
+                            promoCode={promoCode}
+                            promoValid={promoValid}
+
+                            userId={userId}
+                            bookingAmount={baseSubtotal}
+                            bookingDuration={bookingDuration}
+                            userRole={peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'}
+                            locationPrice={(() => {
+                              // Get the appropriate hourly rate based on user role and booking duration
+                              const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+                              const individualPersonHours = bookingDuration?.durationHours || 0
+                              return memberType === 'STUDENT' ?
+                                (individualPersonHours === 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
+                                memberType === 'TUTOR' ?
+                                  (individualPersonHours === 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
+                                  (individualPersonHours === 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
+                            })()}
+                            totalPeople={people}
+                          />
+                        )}
+                        {/* ──────────────────────────────────────────────── */}
+
+                        {/* Tutor with too many students error */}
+
+
+                        <Button
+                          type="submit"
+                          className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={
+                            !user ||
+                            selectedSeats.length !== people ||
+                            (needsStudentVerification && !studentsValidated) ||
+                            isLoading ||
+                            isOver24Hours ||
+                            hasTutorWithTooManyPeople
+                          }
+                        >
+                          {!user
+                            ? 'Sign In Required'
+                            : hasTutorWithTooManyPeople
+                              ? 'Tutors with more than 4 Students/Workers Not Allowed - Contact Admin'
+                              : isOver24Hours
+                                ? 'Booking Over 24 Hours Not Allowed'
+                                : selectedSeats.length !== people
+                                  ? `Select ${people} Seat${people !== 1 ? 's' : ''} to Continue`
+                                  : needsStudentVerification && !studentsValidated
+                                    ? `Validate ${studentsNeedingVerification} Student${studentsNeedingVerification > 1 ? 's' : ''} to Continue`
+                                    : total <= 0
+                                      ? (isLoading ? 'Confirming Free Booking...' : 'Confirm Free Booking')
+                                      : (isLoading ? 'Processing...' : 'Continue to Payment')
+                          }
+                        </Button>
+
+                        {!user && (
+                          <p className="text-center text-sm text-gray-600 mt-2">
+                            <Button
+                              type="button"
+                              variant="link"
+                              className="text-orange-600 hover:text-orange-800 p-0"
+                              onClick={() => router.push('/login')}
+                            >
+                              Sign in
+                            </Button>
+                            {' '}to make your booking
                           </p>
-                        </div>
-                      </div>
+                        )}
 
-                      {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
-                        <div className="flex items-center space-x-3">
-                          <div className="w-5 h-5 text-gray-400">🪑</div>
-                          <span className="text-sm">Seats: {confirmedBookingData.seatNumbers.join(', ')}</span>
-                        </div>
-                      )}
-
-                      {confirmedBookingData.specialRequests && (
-                        <div className="flex items-start space-x-3">
-                          <div className="w-5 h-5 text-gray-400">📝</div>
-                          <div>
-                            <p className="text-sm font-medium">Special Requests</p>
-                            <p className="text-sm text-gray-600">{confirmedBookingData.specialRequests}</p>
+                        {needsStudentVerification && !studentsValidated && user && (
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="flex items-start space-x-2">
+                              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-sm font-medium text-amber-800">Student Verification Required</p>
+                                <p className="text-xs text-amber-700 mt-1">
+                                  Please complete student verification for all {studentsNeedingVerification} student{studentsNeedingVerification > 1 ? 's' : ''} before proceeding to payment.
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : selectedLocation && user && bookingStep !== 3 ? (
-                    // Show form data when not yet confirmed (hide during step 3 loading)
-                    <div className="space-y-3">
-                      <div className="flex items-start space-x-3">
-                        <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="font-medium">{selectedLocation.name}</p>
-                          <p className="text-sm text-gray-600">{selectedLocation.address}</p>
+                        )}
+                      </form>
+                    )}
+
+                    {bookingStep === 2 && (
+                      <div className="space-y-6">
+                        <h3 className="text-lg font-medium">Payment Information</h3>
+                        <div className="p-4 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-600 mb-4">
+
+                            <PaymentStep
+                              subtotal={baseSubtotal}
+                              total={total}
+                              discountAmount={discountAmount}
+                              selectedPackage={selectedPackage}
+                              customer={{ name: customerName, email: customerEmail, phone: customerPhone }}
+                              bookingId={bookingId || undefined}
+                              onBack={() => {
+                                setBookingStep(1)
+                                setSelectedPaymentMethod('payNow') // Reset to default payment method
+                              }}
+                              onComplete={() => setBookingStep(3)}
+                              onPaymentMethodChange={handlePaymentMethodChange}
+                              onCreateBooking={createBookingForPayment}
+                              onBookingCreated={(bookingId) => setBookingId(bookingId)}
+                            />
+                          </p>
+
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-3">
-                        <Users className="w-5 h-5 text-gray-400" />
-                        <span>{people} {people === 1 ? 'Person' : 'People'}</span>
-                      </div>
+                    )}
 
-                      {bookingStep >= 2 && (
-                        <div className="flex items-center space-x-3">
-                          <CreditCard className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <span className="text-sm font-medium">
-                              {selectedPaymentMethod === 'payNow' ? 'Pay Now (Scan & Pay)' : 'Credit Card Payment'}
-                            </span>
-                            {selectedPaymentMethod === 'creditCard' && (
-                              <p className="text-xs text-amber-600">+{paymentFeeSettings.creditCardFeePercentage}% processing fee</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Promo Code Summary */}
-                      {promoCodeInfo && (
-                        <div className="flex items-center space-x-3">
-                          <Ticket className="w-5 h-5 text-blue-600" />
-                          <div>
-                            <span className="text-sm font-medium text-blue-800">
-                              Promo Code Applied
-                            </span>
-                            <p className="text-xs text-blue-600">
-                              Discount: ${promoCodeInfo.discountAmount.toFixed(2)}
+                    {bookingStep === 3 && (
+                      <div className="text-center py-8">
+                        {confirmationStatus === 'loading' && (
+                          <>
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirming Your Booking...</h3>
+                            <p className="text-gray-600 mb-6">
+                              Please wait while we confirm your booking.
                             </p>
+                          </>
+                        )}
+
+                        {confirmationStatus === 'error' && (
+                          <>
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                              {confirmationHeadingError || ' Booking Failed '}
+                            </h3>
+                            <p className="text-red-600 mb-4">
+                              {confirmationError || 'An error occurred while confirming your booking.'}
+                            </p>
+                            {isPaymentFailed(searchParams.get('status')) && (
+                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                                <div className="flex items-start space-x-2">
+                                  <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                                  <div className="text-sm text-amber-800">
+                                    <p className="font-medium">What happened?</p>
+                                    <p>Your payment was not completed successfully.</p>
+
+                                    <p className="mt-2">Your booking has not been confirmed and no charges were made to your account.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            <div className="space-y-3">
+                              {isPaymentFailed(searchParams.get('status')) ? (
+                                <>
+                                  <Button
+                                    onClick={() => router.push('/')}
+                                    className="bg-orange-500 hover:bg-orange-600"
+                                  >
+                                    Try Booking Again
+                                  </Button>
+                                  <Button
+                                    onClick={() => router.push('/dashboard')}
+                                    variant="outline"
+                                    className="ml-3"
+                                  >
+                                    Go to Dashboard
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+
+
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {confirmationStatus === 'success' && (
+                          <>
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
+                            {(() => {
+                              const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
+                              const isZeroAmount = currentBooking.totalAmount <= 0
+
+                              return (
+                                <>
+                                  <p className="text-gray-600 mb-6">
+                                    {isZeroAmount
+                                      ? "Your booking has been automatically confirmed as the total amount was $0.00. No payment was required."
+                                      : "Your booking has been confirmed. You will receive a confirmation email shortly."
+                                    }
+                                  </p>
+                                  {isZeroAmount && (
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                          <span className="text-green-600 text-sm">💰</span>
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-medium text-green-800">Zero Amount Booking</p>
+                                          <p className="text-xs text-green-600">Fully covered by package discount</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )
+                            })()}
+                            <div className="bg-gray-50 p-4 rounded-lg text-left">
+                              <p className="text-sm text-gray-600">
+                                Booking Reference: {(() => {
+                                  try {
+                                    const currentBooking = JSON.parse(localStorage.getItem('currentBooking') || '{}')
+                                    return currentBooking.bookingRef || `#BK${Date.now().toString().slice(-6)}`
+                                  } catch {
+                                    return `#BK${Date.now().toString().slice(-6)}`
+                                  }
+                                })()}
+                              </p>
+                              {bookingId && (
+                                <p className="text-sm text-gray-600 mt-1">Booking ID: {bookingId}</p>
+                              )}
+                            </div>
+                            <Button
+                              onClick={() => router.push('/dashboard')}
+                              className="mt-6 bg-orange-500 hover:bg-orange-600"
+                            >
+                              View My Bookings
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Booking Summary */}
+              <div className="lg:col-span-1">
+                <Card className="sticky top-24">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      Booking Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!user && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-md p-4 text-center">
+                        <p className="text-sm text-orange-800 font-medium">Member Booking</p>
+                        <p className="text-xs text-orange-700 mt-1">Sign in to view pricing</p>
+                      </div>
+                    )}
+                    {confirmedBookingData ? (
+                      // Show confirmed booking data
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3">
+                          <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                          <div>
+                            <p className="font-medium">{confirmedBookingData.location}</p>
+                            <p className="text-sm text-gray-600">Confirmed Booking</p>
                           </div>
                         </div>
-                      )}
 
-                      {startDate && endDate && (
+
+                        {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
+                          <div className="flex items-center space-x-3">
+                            <Users className="w-5 h-5 text-gray-400" />
+                            <span>{confirmedBookingData.pax} {confirmedBookingData.pax === 1 ? 'Person' : 'People'}</span>
+                          </div>
+                        )}
+
                         <div className="flex items-center space-x-3">
                           <Clock className="w-5 h-5 text-gray-400" />
                           <div>
                             <p className="text-sm">
-                              {startDate.toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                              {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {formatBookingDateRange(confirmedBookingData.startAt, confirmedBookingData.endAt)}
                             </p>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  ) : bookingStep === 3 && confirmationStatus === 'loading' ? (
-                    // Show loading state during confirmation
-                    <div className="text-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-orange-500" />
-                      <p className="text-sm text-gray-600">Confirming your booking...</p>
-                      <p className="text-xs text-gray-500 mt-1">Please wait</p>
-                    </div>
-                  ) : null}
 
-                  {confirmedBookingData ? (
-                    // Show confirmed booking pricing
-                    <div className="border-t pt-4 space-y-2">
-                      <div className="flex justify-between">
-                        <span>Booking Reference</span>
-                        <span className="font-mono text-sm">{confirmedBookingData.bookingRef}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Member Type</span>
-                        <span className="capitalize">{confirmedBookingData.memberType.toLowerCase()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Total Amount</span>
-                        <span className="font-bold">${confirmedBookingData.totalAmount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Status</span>
-                        <span className="text-green-600 font-medium">✓ Confirmed</span>
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Confirmed At</span>
-                        <span>
-                          {new Date(
-                            new Date(confirmedBookingData.updatedAt).getTime() + 8 * 60 * 60 * 1000
-                          ).toLocaleString("en-SG", {
-                            year: "numeric",
-                            month: "short",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: true,
-                          })}
-                        </span>
-                      </div>
-
-                    </div>
-                  ) : totalHours > 0 && user && bookingStep !== 3 ? (
-                    <div className="border-t pt-4 space-y-2">
-                      {/* Role-based rates */}
-                      {peopleBreakdown.coStudents > 0 && (
-                        <div className="flex justify-between">
-                          <span>Students ({peopleBreakdown.coStudents}):</span>
-                          <span>${bookingDuration && bookingDuration.durationHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate}/hr</span>
-                        </div>
-                      )}
-                      {peopleBreakdown.coWorkers > 0 && (
-                        <div className="flex justify-between">
-                          <span>Members ({peopleBreakdown.coWorkers}):</span>
-                          <span>${bookingDuration && bookingDuration.durationHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate}/hr</span>
-                        </div>
-                      )}
-                      {peopleBreakdown.coTutors > 0 && (
-                        <div className="flex justify-between">
-                          <span>Tutors ({peopleBreakdown.coTutors}):</span>
-                          <span>${bookingDuration && bookingDuration.durationHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate}/hr</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span>Duration</span>
-                        <span>{bookingDuration ? bookingDuration.durationHours.toFixed(2) : totalHours} hours</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>People</span>
-                        <span>{people}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Base Subtotal</span>
-                        <span>${baseSubtotal.toFixed(2)}</span>
-                      </div>
-
-                      {/* Show discount if applied */}
-                      {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (
-                        <div className="flex justify-between text-blue-600">
-                          <span>Promo Code Applied</span>
-                          <span>-${promoCodeInfo.discountAmount.toFixed(2)}</span>
-                        </div>
-                      )}
-
-                      {/* Show credit discount if applied */}
-                      {creditInfo && creditInfo.discountAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Store Credit Applied</span>
-                          <span>-${creditInfo.discountAmount.toFixed(2)}</span>
-                        </div>
-                      )}
-
-                      {/* Package Discount Information */}
-                      {selectedPackage && (() => {
-                        // Find the selected package details
-                        const pkg = userPackages?.find(p => p.id === selectedPackage)
-                        if (!pkg || !bookingDuration) return null
-
-                        // Use dynamic hoursAllowed from package configuration instead of hardcoded values
-                        const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
-                      
-                        const appliedHours = Math.min(bookingDuration.durationHours, discountHours || 4);
-                        const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
-                       
-
-                        // Get the appropriate hourly rate based on user role and booking duration
-                        const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
-                        const individualPersonHours = bookingDuration.durationHours
-                        const pricePerHour = memberType === 'STUDENT' ? 
-                          (individualPersonHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
-                          memberType === 'TUTOR' ? 
-                          (individualPersonHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
-                          (individualPersonHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
-                        const packageDiscount = appliedHours * pricePerHour;
-                        const remainingAmount = remainingHours * pricePerHour;
-
-                        return (
-                          <>
-                          
-                            <div className="flex justify-between text-green-600">
-                              <span className='text-sm'>Package Applied</span>
-                              <span className='text-sm'>{appliedHours?.toFixed(2)}h free</span>
-                            </div>
-                            <div className="flex justify-between text-green-600">
-                              <span className='text-sm'>Package Discount</span>
-                              <span className='text-sm'>-${packageDiscount.toFixed(2)}</span>
-                            </div>
-                          
-                            {remainingAmount === 0 && people === 1 && (
-                              <div className="flex justify-between text-green-600 font-medium">
-                                <span className='text-sm'>Fully Covered!</span>
-                                <span>🎉</span>
-                              </div>
-                            )}
-                          </>
-                        )
-                      })()}
-
-                      <div className="flex justify-between">
-                        <span>Subtotal</span>
-                        <span>${subtotal.toFixed(2)}</span>
-                      </div>
-
-                      {selectedPaymentMethod === 'creditCard' && (() => {
-                        const fee = subtotal * (paymentFeeSettings.creditCardFeePercentage / 100)
-                        return (
-                          <div className="flex justify-between text-amber-600">
-                            <span>Credit Card Fee ({paymentFeeSettings.creditCardFeePercentage}%)</span>
-                            <span>${formatCurrency(fee)}</span>
+                        {confirmedBookingData.seatNumbers && confirmedBookingData.seatNumbers.length > 0 && (
+                          <div className="flex items-center space-x-3">
+                            <div className="w-5 h-5 text-gray-400">🪑</div>
+                            <span className="text-sm">Seats: {confirmedBookingData.seatNumbers.join(', ')}</span>
                           </div>
-                        )
-                      })()}
+                        )}
 
-                      {bookingStep >= 2 && selectedPaymentMethod === 'payNow' && subtotal < 10 && (() => {
-                        const fee = paymentFeeSettings.paynowFee
-                        if (fee > 0) {
+                        {confirmedBookingData.specialRequests && (
+                          <div className="flex items-start space-x-3">
+                            <div className="w-5 h-5 text-gray-400">📝</div>
+                            <div>
+                              <p className="text-sm font-medium">Special Requests</p>
+                              <p className="text-sm text-gray-600">{confirmedBookingData.specialRequests}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : selectedLocation && user && bookingStep !== 3 ? (
+                      // Show form data when not yet confirmed (hide during step 3 loading)
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3">
+                          <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                          <div>
+                            <p className="font-medium">{selectedLocation.name}</p>
+                            <p className="text-sm text-gray-600">{selectedLocation.address}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                          <Users className="w-5 h-5 text-gray-400" />
+                          <span>{people} {people === 1 ? 'Person' : 'People'}</span>
+                        </div>
+
+                        {bookingStep >= 2 && (
+                          <div className="flex items-center space-x-3">
+                            <CreditCard className="w-5 h-5 text-gray-400" />
+                            <div>
+                              <span className="text-sm font-medium">
+                                {selectedPaymentMethod === 'payNow' ? 'Pay Now (Scan & Pay)' : 'Credit Card Payment'}
+                              </span>
+                              {selectedPaymentMethod === 'creditCard' && (
+                                <p className="text-xs text-amber-600">+{paymentFeeSettings.creditCardFeePercentage}% processing fee</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Promo Code Summary */}
+                        {promoCodeInfo && (
+                          <div className="flex items-center space-x-3">
+                            <Ticket className="w-5 h-5 text-blue-600" />
+                            <div>
+                              <span className="text-sm font-medium text-blue-800">
+                                Promo Code Applied
+                              </span>
+                              <p className="text-xs text-blue-600">
+                                Discount: ${promoCodeInfo.discountAmount.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {startDate && endDate && (
+                          <div className="flex items-center space-x-3">
+                            <Clock className="w-5 h-5 text-gray-400" />
+                            <div>
+                              <p className="text-sm">
+                                {startDate.toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                                {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : bookingStep === 3 && confirmationStatus === 'loading' ? (
+                      // Show loading state during confirmation
+                      <div className="text-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-orange-500" />
+                        <p className="text-sm text-gray-600">Confirming your booking...</p>
+                        <p className="text-xs text-gray-500 mt-1">Please wait</p>
+                      </div>
+                    ) : null}
+
+                    {confirmedBookingData ? (
+                      // Show confirmed booking pricing
+                      <div className="border-t pt-4 space-y-2">
+                        <div className="flex justify-between">
+                          <span>Booking Reference</span>
+                          <span className="font-mono text-sm">{confirmedBookingData.bookingRef}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Member Type</span>
+                          <span className="capitalize">{confirmedBookingData.memberType.toLowerCase()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total Amount</span>
+                          <span className="font-bold">${confirmedBookingData.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Status</span>
+                          <span className="text-green-600 font-medium">✓ Confirmed</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Confirmed At</span>
+                          <span>
+                            {new Date(
+                              new Date(confirmedBookingData.updatedAt).getTime() + 8 * 60 * 60 * 1000
+                            ).toLocaleString("en-SG", {
+                              year: "numeric",
+                              month: "short",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </span>
+                        </div>
+
+                      </div>
+                    ) : totalHours > 0 && user && bookingStep !== 3 ? (
+                      <div className="border-t pt-4 space-y-2">
+                        {/* Role-based rates */}
+                        {peopleBreakdown.coStudents > 0 && (
+                          <div className="flex justify-between">
+                            <span>Students ({peopleBreakdown.coStudents}):</span>
+                            <span>${bookingDuration && bookingDuration.durationHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate}/hr</span>
+                          </div>
+                        )}
+                        {peopleBreakdown.coWorkers > 0 && (
+                          <div className="flex justify-between">
+                            <span>Members ({peopleBreakdown.coWorkers}):</span>
+                            <span>${bookingDuration && bookingDuration.durationHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate}/hr</span>
+                          </div>
+                        )}
+                        {peopleBreakdown.coTutors > 0 && (
+                          <div className="flex justify-between">
+                            <span>Tutors ({peopleBreakdown.coTutors}):</span>
+                            <span>${bookingDuration && bookingDuration.durationHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate}/hr</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span>Duration</span>
+                          <span>{bookingDuration ? bookingDuration.durationHours.toFixed(2) : totalHours} hours</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>People</span>
+                          <span>{people}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Base Subtotal</span>
+                          <span>${baseSubtotal.toFixed(2)}</span>
+                        </div>
+
+                        {/* Show discount if applied */}
+                        {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (
+                          <div className="flex justify-between text-blue-600">
+                            <span>Promo Code Applied</span>
+                            <span>-${promoCodeInfo.discountAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+
+                        {/* Show credit discount if applied */}
+                        {creditInfo && creditInfo.discountAmount > 0 && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Store Credit Applied</span>
+                            <span>-${creditInfo.discountAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+
+                        {/* Package Discount Information */}
+                        {selectedPackage && (() => {
+                          // Find the selected package details
+                          const pkg = userPackages?.find(p => p.id === selectedPackage)
+                          if (!pkg || !bookingDuration) return null
+
+                          // Use dynamic hoursAllowed from package configuration instead of hardcoded values
+                          const discountHours = pkg.hoursAllowed || 4; // Default to 4 hours if not set
+
+                          const appliedHours = Math.min(bookingDuration.durationHours, discountHours || 4);
+                          const remainingHours = Math.max(0, bookingDuration.durationHours - appliedHours);
+
+
+                          // Get the appropriate hourly rate based on user role and booking duration
+                          const memberType = peopleBreakdown.coStudents > 0 ? 'STUDENT' : peopleBreakdown.coTutors > 0 ? 'TUTOR' : 'MEMBER'
+                          const individualPersonHours = bookingDuration.durationHours
+                          const pricePerHour = memberType === 'STUDENT' ?
+                            (individualPersonHours <= 1 ? pricing.student.oneHourRate : pricing.student.overOneHourRate) :
+                            memberType === 'TUTOR' ?
+                              (individualPersonHours <= 1 ? pricing.tutor.oneHourRate : pricing.tutor.overOneHourRate) :
+                              (individualPersonHours <= 1 ? pricing.member.oneHourRate : pricing.member.overOneHourRate)
+                          const packageDiscount = appliedHours * pricePerHour;
+                          const remainingAmount = remainingHours * pricePerHour;
+
                           return (
-                            <div className="flex justify-between text-orange-600">
-                              <span>PayNow Transaction Fee</span>
+                            <>
+
+                              <div className="flex justify-between text-green-600">
+                                <span className='text-sm'>Package Applied</span>
+                                <span className='text-sm'>{appliedHours?.toFixed(2)}h free</span>
+                              </div>
+                              <div className="flex justify-between text-green-600">
+                                <span className='text-sm'>Package Discount</span>
+                                <span className='text-sm'>-${packageDiscount.toFixed(2)}</span>
+                              </div>
+
+                              {remainingAmount === 0 && people === 1 && (
+                                <div className="flex justify-between text-green-600 font-medium">
+                                  <span className='text-sm'>Fully Covered!</span>
+                                  <span>🎉</span>
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+
+                        <div className="flex justify-between">
+                          <span>Subtotal</span>
+                          <span>${subtotal.toFixed(2)}</span>
+                        </div>
+
+                        {selectedPaymentMethod === 'creditCard' && (() => {
+                          const fee = subtotal * (paymentFeeSettings.creditCardFeePercentage / 100)
+                          return (
+                            <div className="flex justify-between text-amber-600">
+                              <span>Credit Card Fee ({paymentFeeSettings.creditCardFeePercentage}%)</span>
                               <span>${formatCurrency(fee)}</span>
                             </div>
                           )
-                        }
-                        return null
-                      })()}
-                      <div className="flex justify-between font-bold text-lg border-t pt-2">
-                        <span>Total</span>
-                        <span className={total <= 0 ? "text-green-600" : ""}>
-                          {total <= 0 ? (
-                            <>
-                              <span className="line-through text-gray-400">${(() => {
+                        })()}
+
+                        {bookingStep >= 2 && selectedPaymentMethod === 'payNow' && subtotal < 10 && (() => {
+                          const fee = paymentFeeSettings.paynowFee
+                          if (fee > 0) {
+                            return (
+                              <div className="flex justify-between text-orange-600">
+                                <span>PayNow Transaction Fee</span>
+                                <span>${formatCurrency(fee)}</span>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+                        <div className="flex justify-between font-bold text-lg border-t pt-2">
+                          <span>Total</span>
+                          <span className={total <= 0 ? "text-green-600" : ""}>
+                            {total <= 0 ? (
+                              <>
+                                <span className="line-through text-gray-400">${(() => {
+                                  if (bookingStep >= 2) {
+                                    if (selectedPaymentMethod === 'creditCard') {
+                                      const multiplier = 1 + (paymentFeeSettings.creditCardFeePercentage / 100);
+                                      return (subtotal * multiplier).toFixed(2);
+                                    } else if (selectedPaymentMethod === 'payNow') {
+                                      const fee = subtotal < 10 ? paymentFeeSettings.paynowFee : 0;
+                                      return (subtotal + fee).toFixed(2);
+                                    }
+                                  }
+                                  return subtotal.toFixed(2);
+                                })()}</span>
+                                <span className="ml-2">$0.00</span>
+                                <span className="ml-1 text-sm">🎉</span>
+                              </>
+                            ) : (
+                              `$${(() => {
                                 if (bookingStep >= 2) {
                                   if (selectedPaymentMethod === 'creditCard') {
                                     const multiplier = 1 + (paymentFeeSettings.creditCardFeePercentage / 100);
@@ -2383,60 +2473,44 @@ export default function BookingClient() {
                                   }
                                 }
                                 return subtotal.toFixed(2);
-                              })()}</span>
-                              <span className="ml-2">$0.00</span>
-                              <span className="ml-1 text-sm">🎉</span>
-                            </>
-                          ) : (
-                            `$${(() => {
-                              if (bookingStep >= 2) {
-                                if (selectedPaymentMethod === 'creditCard') {
-                                  const multiplier = 1 + (paymentFeeSettings.creditCardFeePercentage / 100);
-                                  return (subtotal * multiplier).toFixed(2);
-                                } else if (selectedPaymentMethod === 'payNow') {
-                                  const fee = subtotal < 10 ? paymentFeeSettings.paynowFee : 0;
-                                  return (subtotal + fee).toFixed(2);
-                                }
-                              }
-                              return subtotal.toFixed(2);
-                            })()}`
-                          )}
-                        </span>
-                      </div>
-
-                      {total <= 0 && (
-                        <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
-                          <div className="text-center">
-                            <p className="text-sm font-medium text-green-800">
-                              🎉 Free Booking!
-                            </p>
-                            <p className="text-xs mt-1 text-green-600">
-                              {selectedPackage ? 'Fully covered by package discount' :
-                                creditInfo ? 'Fully covered by store credit' :
-                                  promoCodeInfo ? 'Fully covered by promo code' :
-                                    'Fully covered by discount'}
-                            </p>
-                          </div>
+                              })()}`
+                            )}
+                          </span>
                         </div>
-                      )}
 
-                      {/* Show total savings if promo code applied */}
-                      {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (
-                        <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
-                          <div className="text-center">
-                            <p className="text-sm font-medium text-green-800">
-                              🎉 You're saving ${promoCodeInfo.discountAmount.toFixed(2)}!
-                            </p>
-                            <p className="text-xs mt-1 text-green-600">
-                              Original: ${baseSubtotal.toFixed(2)} |
-                              Final: ${promoCodeInfo.finalAmount.toFixed(2)}
-                            </p>
+                        {total <= 0 && (
+                          <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
+                            <div className="text-center">
+                              <p className="text-sm font-medium text-green-800">
+                                🎉 Free Booking!
+                              </p>
+                              <p className="text-xs mt-1 text-green-600">
+                                {selectedPackage ? 'Fully covered by package discount' :
+                                  creditInfo ? 'Fully covered by store credit' :
+                                    promoCodeInfo ? 'Fully covered by promo code' :
+                                      'Fully covered by discount'}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Show total savings if credit applied */}
-                      {/* {creditInfo && creditInfo.discountAmount > 0 && (
+                        {/* Show total savings if promo code applied */}
+                        {promoCodeInfo && promoCodeInfo.discountAmount > 0 && (
+                          <div className="mt-3 p-3 rounded-md bg-green-50 border border-green-200">
+                            <div className="text-center">
+                              <p className="text-sm font-medium text-green-800">
+                                🎉 You're saving ${promoCodeInfo.discountAmount.toFixed(2)}!
+                              </p>
+                              <p className="text-xs mt-1 text-green-600">
+                                Original: ${baseSubtotal.toFixed(2)} |
+                                Final: ${promoCodeInfo.finalAmount.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show total savings if credit applied */}
+                        {/* {creditInfo && creditInfo.discountAmount > 0 && (
                         <div className="mt-3 p-3 rounded-md bg-blue-50 border border-blue-200">
                           <div className="text-center">
                             <p className="text-sm font-medium text-blue-800">
@@ -2449,16 +2523,17 @@ export default function BookingClient() {
                           </div>
                         </div>
                       )} */}
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <FooterSection />
-    </div>
-  )
+        <FooterSection />
+      </div>
+    )
+  }
 }

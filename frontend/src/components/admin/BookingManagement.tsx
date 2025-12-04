@@ -13,17 +13,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Search, Calendar, Users, DollarSign, Clock, MapPin, Eye, Edit, Trash2, Filter, BarChart3, FileText, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { BookingDetailsModal } from './BookingDetailsModal'
-import { 
-  Booking, 
-  BookingFilters, 
-  getAdminBookings, 
-  getDashboardSummary, 
-  getBookingAnalytics, 
-  updateAdminBooking, 
+import {
+  Booking,
+  BookingFilters,
+  getAdminBookings,
+  getDashboardSummary,
+  getBookingAnalytics,
+  updateAdminBooking,
   cancelAdminBooking,
   formatBookingDate,
   getBookingStatus,
@@ -31,9 +32,9 @@ import {
   calculateDuration,
   getAdminBookingDetails
 } from '@/lib/bookingService'
-import { 
-  formatSingaporeDate, 
-  formatSingaporeDateOnly, 
+import {
+  formatSingaporeDate,
+  formatSingaporeDateOnly,
   formatSingaporeTimeOnly,
   formatBookingDateRange,
   formatLocalDate
@@ -68,24 +69,31 @@ export function BookingManagement() {
     specialRequests: '',
     totalAmount: 0
   })
+
+  // Cancel Booking State
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
+  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [refundAmount, setRefundAmount] = useState<number>(0)
+  const [locations, setLocations] = useState<string[]>([])
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailData, setDetailData] = useState<any>(null)
   const [activities, setActivities] = useState<any[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
-  
+
   // Booking Timeline Modal state
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
   const [selectedBookingRef, setSelectedBookingRef] = useState('')
-  
+
   // Debounced search state
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  
+
   // Date picker states
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
-  
+
   // Seat filter state
   const [selectedSeat, setSelectedSeat] = useState<string>('')
   const hasDateRange = !!startDate && !!endDate
@@ -128,6 +136,27 @@ export function BookingManagement() {
   }
 
   // Load bookings
+  // Fetch locations from pricing configuration
+  const fetchLocations = async () => {
+    try {
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/pricing`)
+      const data = await response.json()
+      if (data.success && Array.isArray(data.data)) {
+        // Extract unique locations
+        const uniqueLocations = Array.from(new Set(data.data.map((item: any) => item.location))) as string[]
+        setLocations(uniqueLocations.sort())
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error)
+      // Fallback to default locations if fetch fails
+      setLocations(['Kovan', 'Beauty World', 'Potong Pasir'])
+    }
+  }
+
+  useEffect(() => {
+    fetchLocations()
+  }, [])
+
   const loadBookings = async () => {
     try {
       setLoading(true)
@@ -244,10 +273,56 @@ export function BookingManagement() {
     setIsEditDialogOpen(true)
   }
 
+  // Handle cancel booking click
+  const handleCancelClick = (booking: Booking) => {
+    setCancellingBooking(booking)
+    setCancelReason('')
+    setRefundAmount(booking.totalAmount) // Default to full refund
+    setIsCancelDialogOpen(true)
+  }
+
+  // Confirm cancel booking
+  const confirmCancel = async () => {
+    if (!cancellingBooking) return
+
+    setIsSubmitting(true)
+    try {
+      const response = await cancelAdminBooking(cancellingBooking.id, {
+        reason: cancelReason,
+        refundAmount: refundAmount
+      })
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Booking cancelled successfully",
+        })
+        setIsCancelDialogOpen(false)
+        setCancellingBooking(null)
+        loadBookings()
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to cancel booking",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Cancel Error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   // Handle update booking
   const handleUpdate = async () => {
     if (!editingBooking) return
-    
+
     setIsSubmitting(true)
     try {
       const payload = {
@@ -292,12 +367,12 @@ export function BookingManagement() {
       // Call the same API but with limit 1000 to get all records
       const exportFilters = { ...filters, limit: 1000, page: 1 }
       const response = await getAdminBookings(exportFilters)
-      
+
       if (response.success && response.bookings) {
         // Convert bookings data to CSV format
         const csvData = convertBookingsToCSV(response.bookings)
         downloadCSV(csvData, 'bookings-export.csv')
-        
+
         toast({
           title: "Success",
           description: `Exported ${response.bookings.length} bookings to Excel`,
@@ -340,10 +415,10 @@ export function BookingManagement() {
       'Members',
       'Tutors'
     ]
-    
+
     const rows = bookings.map(booking => {
-      const extensionAmounts = booking.extensionamounts && booking.extensionamounts.length > 0 
-        ? booking.extensionamounts.join('; ') 
+      const extensionAmounts = booking.extensionamounts && booking.extensionamounts.length > 0
+        ? booking.extensionamounts.join('; ')
         : 'None'
       const totalActualCost = booking.extensionamounts && booking.extensionamounts.length > 0
         ? ((booking.totalCost || 0) + booking.extensionamounts.reduce((sum: number, amount: number) => sum + amount, 0)).toFixed(2)
@@ -370,7 +445,7 @@ export function BookingManagement() {
         booking.tutors
       ]
     })
-    
+
     return [headers, ...rows]
       .map(row => row.map(field => `"${field}"`).join(','))
       .join('\n')
@@ -388,32 +463,7 @@ export function BookingManagement() {
     document.body.removeChild(link)
   }
 
-  // Handle cancel booking
-  const handleCancel = async (booking: Booking, reason: string, refundAmount: number) => {
-    try {
-      const response = await cancelAdminBooking(booking.id, { reason, refundAmount })
-      if (response.success) {
-        toast({
-          title: "Success",
-          description: "Booking cancelled successfully",
-        })
-        loadBookings()
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to cancel booking",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error('Cancel Error:', error)
-      toast({
-        title: "Error",
-        description: "Failed to cancel booking",
-        variant: "destructive",
-      })
-    }
-  }
+
 
   // Format date for datetime-local input
   const formatDateForInput = (dateString: string): string => {
@@ -439,7 +489,7 @@ export function BookingManagement() {
             <BarChart3 className="h-4 w-4" />
             <span>Refresh Analytics</span>
           </Button>
-          
+
           <Button
             variant="outline"
             onClick={exportToExcel}
@@ -451,7 +501,7 @@ export function BookingManagement() {
         </div>
       </div>
 
-   
+
 
       {/* Search and Date Filters */}
       <Card>
@@ -575,196 +625,213 @@ export function BookingManagement() {
             <>
               <div className="overflow-x-auto">
                 <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Pax</TableHead>
-                    <TableHead>Seats</TableHead>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Total Cost</TableHead>
-                    <TableHead>Amount Paid</TableHead>
-                    <TableHead>Package</TableHead>
-                    <TableHead>Refund Status</TableHead>
-                    <TableHead>Reschedule</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bookings.map((booking) => (
-                    <TableRow key={booking.id}>
-                      <TableCell>
-                        <div className="font-mono font-bold">{booking.bookingRef}</div>
-                      </TableCell>
-                                             <TableCell>
-                         <div>
-                           <div className="font-medium">
-                             {booking.bookedForEmails?.[0]?.split('@')[0] || 'N/A'}
-                           </div>
-                           <div className="text-sm text-gray-500">
-                             {booking.bookedForEmails?.[0] || 'N/A'}
-                           </div>
-                           <Badge variant="outline" className="text-xs">
-                             {booking.memberType || 'N/A'}
-                           </Badge>
-                         </div>
-                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <span>{booking.location}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">{booking.pax || 0}</div>
-                          <div className="text-xs text-gray-500">
-                            S:{booking.students || 0} M:{booking.members || 0} T:{booking.tutors || 0}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">
-                            {booking.seatNumbers && booking.seatNumbers.length > 0 ? booking.seatNumbers.join(', ') : 'N/A'}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">{formatBookingDateRange(booking.startAt, booking.endAt)}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {booking.durationHours ? `${booking.durationHours}h` : `${calculateDuration(booking.startAt, booking.endAt)}h`}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">${booking.totalCost || 0}</div>
-                          {(booking.discountAmount && booking.discountAmount > 0) ? (
-                            <div className="text-xs text-green-600">
-                              -${booking.discountAmount} off
-                            </div>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">${booking.totalAmount || 0}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {booking.packageUsed ? (
-                            <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                              Used
-                            </Badge>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {booking.refundstatus && booking.refundstatus !== 'NONE' ? (
-                            <Badge 
-                              variant="outline"
-                              className={booking.refundstatus === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
-                            >
-                              {booking.refundstatus}
-                            </Badge>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {(booking.rescheduleCount || 0) > 0 ? (
-                            <Badge variant="outline" className="bg-orange-100 text-orange-800">
-                              {booking.rescheduleCount}x
-                            </Badge>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(getBookingStatus(booking))}>
-                          {getBookingStatus(booking)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline"
-                          className={booking.confirmedPayment ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-                        >
-                          {booking.confirmedPayment ? 'Paid' : 'Unpaid'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              setIsDetailDialogOpen(true)
-                              setDetailLoading(true)
-                              setDetailData(null)
-                              try {
-                                const resp = await getAdminBookingDetails(booking.id || booking.bookingRef)
-                                if (resp && resp.success) {
-                                  setDetailData(resp.data)
-                                }
-                                // Fetch activities separately
-                                setLoadingActivities(true)
-                                try {
-                                  const activityResp = await authenticatedFetch(
-                                    `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking-activity/comprehensive/${booking.bookingRef}`
-                                  )
-                                  const activityData = await activityResp.json()
-                                  if (activityData.success && activityData.data?.activities) {
-                                    setActivities(activityData.data.activities)
-                                  }
-                                } catch (activityError) {
-                                  console.error('Error fetching activities:', activityError)
-                                  setActivities([])
-                                } finally {
-                                  setLoadingActivities(false)
-                                }
-                              } catch (e) {
-                                // no-op
-                              } finally {
-                                setDetailLoading(false)
-                              }
-                            }}
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {/* <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedBookingRef(booking.bookingRef)
-                              setIsTimelineModalOpen(true)
-                            }}
-                            title="View Timeline & History"
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button> */}
-                        </div>
-                      </TableCell>
-                      
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Pax</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Total Cost</TableHead>
+                      <TableHead>Amount Paid</TableHead>
+                      <TableHead>Package</TableHead>
+                      <TableHead>Refund Status</TableHead>
+                      <TableHead>Reschedule</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
+                  </TableHeader>
+                  <TableBody>
+                    {bookings.map((booking) => (
+                      <TableRow key={booking.id}>
+                        <TableCell>
+                          <div className="font-mono font-bold">{booking.bookingRef}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {booking.bookedForEmails?.[0]?.split('@')[0] || 'N/A'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {booking.bookedForEmails?.[0] || 'N/A'}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {booking.memberType || 'N/A'}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-1">
+                            <MapPin className="h-4 w-4 text-gray-400" />
+                            <span>{booking.location}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">{booking.pax || 0}</div>
+                            <div className="text-xs text-gray-500">
+                              S:{booking.students || 0} M:{booking.members || 0} T:{booking.tutors || 0}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">
+                              {booking.seatNumbers && booking.seatNumbers.length > 0 ? booking.seatNumbers.join(', ') : 'N/A'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">{formatBookingDateRange(booking.startAt, booking.endAt)}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {booking.durationHours ? `${booking.durationHours}h` : `${calculateDuration(booking.startAt, booking.endAt)}h`}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">${booking.totalCost || 0}</div>
+                            {(booking.discountAmount && booking.discountAmount > 0) ? (
+                              <div className="text-xs text-green-600">
+                                -${booking.discountAmount} off
+                              </div>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">${booking.totalAmount || 0}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {booking.packageUsed ? (
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                Used
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {booking.refundstatus && booking.refundstatus !== 'NONE' ? (
+                              <Badge
+                                variant="outline"
+                                className={booking.refundstatus === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
+                              >
+                                {booking.refundstatus}
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {(booking.rescheduleCount || 0) > 0 ? (
+                              <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                {booking.rescheduleCount}x
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(getBookingStatus(booking))}>
+                            {getBookingStatus(booking)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={booking.confirmedPayment ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                          >
+                            {booking.confirmedPayment ? 'Paid' : 'Unpaid'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(booking)}
+                              title="Modify Booking"
+                            >
+                              <Edit className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCancelClick(booking)}
+                              title="Cancel Booking"
+                              disabled={booking.status === 'cancelled' || booking.status === 'completed'}
+                            >
+                              <Trash2 className={`h-4 w-4 ${booking.status === 'cancelled' || booking.status === 'completed' ? 'text-gray-300' : 'text-red-600'}`} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async () => {
+                                setIsDetailDialogOpen(true)
+                                setDetailLoading(true)
+                                setDetailData(null)
+                                try {
+                                  const resp = await getAdminBookingDetails(booking.id || booking.bookingRef)
+                                  if (resp && resp.success) {
+                                    setDetailData(resp.data)
+                                  }
+                                  // Fetch activities separately
+                                  setLoadingActivities(true)
+                                  try {
+                                    const activityResp = await authenticatedFetch(
+                                      `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking-activity/comprehensive/${booking.bookingRef}`
+                                    )
+                                    const activityData = await activityResp.json()
+                                    if (activityData.success && activityData.data?.activities) {
+                                      setActivities(activityData.data.activities)
+                                    }
+                                  } catch (activityError) {
+                                    console.error('Error fetching activities:', activityError)
+                                    setActivities([])
+                                  } finally {
+                                    setLoadingActivities(false)
+                                  }
+                                } catch (e) {
+                                  // no-op
+                                } finally {
+                                  setDetailLoading(false)
+                                }
+                              }}
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedBookingRef(booking.bookingRef)
+                                setIsTimelineModalOpen(true)
+                              }}
+                              title="View Timeline & History"
+                            >
+                              <Info className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+
+                      </TableRow>
+                    ))}
+                  </TableBody>
                 </Table>
               </div>
 
@@ -780,7 +847,7 @@ export function BookingManagement() {
                           {pagination.total} bookings
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm text-muted-foreground">Rows per page:</span>
@@ -796,7 +863,7 @@ export function BookingManagement() {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="outline"
@@ -814,7 +881,7 @@ export function BookingManagement() {
                           >
                             <ChevronLeft className="h-4 w-4" />
                           </Button>
-                          
+
                           <div className="flex items-center space-x-1">
                             {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                               let pageNum: number
@@ -827,7 +894,7 @@ export function BookingManagement() {
                               } else {
                                 pageNum = pagination.page - 2 + i
                               }
-                              
+
                               return (
                                 <Button
                                   key={pageNum}
@@ -841,7 +908,7 @@ export function BookingManagement() {
                               )
                             })}
                           </div>
-                          
+
                           <Button
                             variant="outline"
                             size="sm"
@@ -871,94 +938,146 @@ export function BookingManagement() {
 
       {/* Edit Booking Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Booking</DialogTitle>
-            {isSubmitting && (
-              <div className="flex items-center space-x-2 text-sm text-blue-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span>Updating...</span>
-              </div>
-            )}
+            <DialogTitle>Modify Booking</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="editStartAt">Start Time *</Label>
-                <Input
-                  id="editStartAt"
-                  type="datetime-local"
-                  value={editFormData.startAt}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, startAt: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="editEndAt">End Time *</Label>
-                <Input
-                  id="editEndAt"
-                  type="datetime-local"
-                  value={editFormData.endAt}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, endAt: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="editLocation">Location *</Label>
-                <Input
-                  id="editLocation"
-                  value={editFormData.location}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="editTotalAmount">Total Amount *</Label>
-                <Input
-                  id="editTotalAmount"
-                  type="number"
-                  step="0.01"
-                  value={editFormData.totalAmount}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, totalAmount: parseFloat(e.target.value) || 0 }))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="editSpecialRequests">Special Requests</Label>
-              <Textarea
-                id="editSpecialRequests"
-                value={editFormData.specialRequests}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, specialRequests: e.target.value }))}
-                placeholder="Any special requirements..."
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="startAt">Start Time</Label>
+              <Input
+                id="startAt"
+                type="datetime-local"
+                value={editFormData.startAt}
+                onChange={(e) => setEditFormData({ ...editFormData, startAt: e.target.value })}
               />
             </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleUpdate}
-                disabled={isSubmitting}
-                className="bg-orange-600 hover:bg-orange-700"
-              >
-                {isSubmitting ? 'Updating...' : 'Update Booking'}
-              </Button>
+            <div className="grid gap-2">
+              <Label htmlFor="endAt">End Time</Label>
+              <Input
+                id="endAt"
+                type="datetime-local"
+                value={editFormData.endAt}
+                onChange={(e) => setEditFormData({ ...editFormData, endAt: e.target.value })}
+              />
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="location">Location</Label>
+              <Select
+                value={editFormData.location}
+                onValueChange={(val) => setEditFormData({ ...editFormData, location: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.length > 0 ? (
+                    locations.map((loc) => (
+                      <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="Kovan">Kovan</SelectItem>
+                      <SelectItem value="Beauty World">Beauty World</SelectItem>
+                      <SelectItem value="Potong Pasir">Potong Pasir</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="totalAmount">Total Amount ($)</Label>
+              <Input
+                id="totalAmount"
+                type="number"
+                step="0.01"
+                value={editFormData.totalAmount}
+                onChange={(e) => setEditFormData({ ...editFormData, totalAmount: parseFloat(e.target.value) })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="specialRequests">Special Requests</Label>
+              <Textarea
+                id="specialRequests"
+                value={editFormData.specialRequests}
+                onChange={(e) => setEditFormData({ ...editFormData, specialRequests: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-  {/* Booking Details Dialog */}
+      {/* Cancel Booking Dialog */}
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cancel Booking</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="reason">Cancellation Reason</Label>
+              <Textarea
+                id="reason"
+                placeholder="e.g. User requested, Emergency maintenance"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="refundAmount">Refund Amount ($)</Label>
+              <Input
+                id="refundAmount"
+                type="number"
+                step="0.01"
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(parseFloat(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Original Total: ${cancellingBooking?.totalAmount || 0}
+              </p>
+            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                This action will cancel the booking. Please process any refunds manually if required.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)}>
+              Keep Booking
+            </Button>
+            <Button variant="destructive" onClick={confirmCancel} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                'Confirm Cancellation'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Booking Details Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={(open) => {
         setIsDetailDialogOpen(open)
         if (!open) {
@@ -966,114 +1085,95 @@ export function BookingManagement() {
           setActivities([])
         }
       }}>
-    <DialogContent className="min-w-3xl max-w-4xl max-h-[85vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>Booking Details</DialogTitle>
-      </DialogHeader>
-      {detailLoading ? (
-        <div className="py-6 text-center text-gray-500">
-          <Loader2 className="h-5 w-5 inline animate-spin mr-2" /> Loading details...
-        </div>
-      ) : detailData ? (
-        <div className="space-y-6">
-          {/* Header summary */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="font-mono text-lg font-semibold">{detailData.booking.bookingRef}</div>
-            {/* <div className="flex items-center gap-2">
+        <DialogContent className="min-w-3xl max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Booking Details</DialogTitle>
+          </DialogHeader>
+          {detailLoading ? (
+            <div className="py-6 text-center text-gray-500">
+              <Loader2 className="h-5 w-5 inline animate-spin mr-2" /> Loading details...
+            </div>
+          ) : detailData ? (
+            <div className="space-y-6">
+              {/* Header summary */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="font-mono text-lg font-semibold">{detailData.booking.bookingRef}</div>
+                {/* <div className="flex items-center gap-2">
               <Badge variant="outline" className={detailData.booking.confirmedPayment ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                 {detailData.booking.confirmedPayment ? 'Paid' : 'Unpaid'}
               </Badge>
               <Badge variant="outline">{detailData.booking.memberType || 'N/A'}</Badge>
             </div> */}
-          </div>
+              </div>
 
-          {/* Booking + User */}
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Booking</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-x-2 gap-y-2 text-sm">
-                <div className="text-gray-500">Location</div><div>{detailData.booking.location}</div>
-                <div className="text-gray-500">Dates</div><div>{formatBookingDateRange(detailData.booking.startAt, detailData.booking.endAt)}</div>
-                <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
-                <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
-                
-                {/* Payment Breakdown */}
-                {detailData.auditBreakdown ? (
-                  <>
-                    <div className="text-gray-500">Booking Amount</div>
-                    <div className="font-medium">${detailData.auditBreakdown.payments.subtotal.toFixed(2)}</div>
-                    
-                    {detailData.auditBreakdown.payments.totalFees > 0 && (
+              {/* Booking + User */}
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Booking</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-x-2 gap-y-2 text-sm">
+                    <div className="text-gray-500">Location</div><div>{detailData.booking.location}</div>
+                    <div className="text-gray-500">Dates</div><div>{formatBookingDateRange(detailData.booking.startAt, detailData.booking.endAt)}</div>
+                    <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
+                    <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
+                    <div className="text-gray-500">Amount Paid</div><div>${detailData.booking.totalAmount}</div>
+                    {(detailData.booking.discountAmount && detailData.booking.discountAmount > 0) ? (<><div className="text-gray-500">Discount</div><div>${detailData.booking.discountAmount}</div></>) : null}
+                    <div className="text-gray-500">Payment Method</div><div>{detailData.payment?.paymentMethod ? detailData.payment.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '-'}</div>
+                    {detailData.booking.packageUsed && detailData.packageDiscount && detailData.packageDiscount > 0 ? (<><div className="text-gray-500">Package Discount Applied</div><div>${detailData.packageDiscount.toFixed(2)}</div></>) : null}
+                    {detailData.booking.packageUsed && detailData.package?.packageName ? (<><div className="text-gray-500">Package Used</div><div>{detailData.package.packageName}</div></>) : null}
+                    {detailData.paymentFee && detailData.paymentFee > 0 ? (<><div className="text-gray-500">Payment Fees</div><div>${detailData.paymentFee.toFixed(2)}</div></>) : null}
+                    <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
+                    {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
+                  </CardContent>
+                </Card>
+
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">User</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="text-gray-500">Email</div><div className="break-all">{detailData.user?.email || '-'}</div>
+                    <div className="text-gray-500">Name</div><div>{detailData.user?.firstName && detailData.user?.lastName ? `${detailData.user.firstName} ${detailData.user.lastName}` : (detailData.user?.firstName || detailData.user?.lastName || '-')}</div>
+                    <div className="text-gray-500">Phone</div><div>{detailData.user?.contactNumber || '-'}</div>
+                    <div className="text-gray-500">Role</div><div>{detailData.user?.memberType || '-'}</div>
+                    <div className="text-gray-500">Booked For</div><div className="break-all">{detailData.booking.bookedForEmails?.join(', ') || '-'}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Payment + Promo/Package */}
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Promo / Package</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="text-gray-500">Promo Code</div><div>{detailData.promoCode?.code || '-'}</div>
+                    <div className="text-gray-500">Package Used</div><div>{detailData.booking.packageUsed ? 'Yes' : 'No'}</div>
+                    {detailData.package ? (
                       <>
-                        <div className="text-gray-500">Transaction Fee</div>
-                        <div className="text-orange-600 font-medium">+${detailData.auditBreakdown.payments.totalFees.toFixed(2)}</div>
+                        <div className="text-gray-500">Plan</div><div>{detailData.package.packageName || (detailData.package.packageId ? 'Count-based Pass' : '-')}</div>
+                        <div className="text-gray-500">Quantity</div><div>{detailData.package.quantity ?? '-'}</div>
+                        <div className="text-gray-500">Active</div><div>{detailData.package.isActive ? 'Yes' : 'No'}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-gray-500">Plan</div><div>-</div>
+                        <div className="text-gray-500">Quantity</div><div>-</div>
+                        <div className="text-gray-500">Active</div><div>-</div>
+
                       </>
                     )}
-                    
-                    <div className="text-gray-500">Total Amount Paid</div>
-                    <div className="font-bold text-blue-600">${detailData.booking.totalAmount}</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-gray-500">Total Amount Paid</div>
-                    <div className="font-bold">${detailData.booking.totalAmount}</div>
-                  </>
-                )}
-                
-                <div className="text-gray-500">Payment Method</div><div>{detailData.payment?.paymentMethod ? detailData.payment.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '-'}</div>
-                <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
-                {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
-              </CardContent>
-            </Card>
-           
-           
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">User</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div className="text-gray-500">Email</div><div className="break-all">{detailData.user?.email || '-'}</div>
-                <div className="text-gray-500">Name</div><div>{detailData.user?.firstName && detailData.user?.lastName ? `${detailData.user.firstName} ${detailData.user.lastName}` : (detailData.user?.firstName || detailData.user?.lastName || '-')}</div>
-                <div className="text-gray-500">Phone</div><div>{detailData.user?.contactNumber || '-'}</div>
-                <div className="text-gray-500">Role</div><div>{detailData.user?.memberType || '-'}</div>
-                <div className="text-gray-500">Booked For</div><div className="break-all">{detailData.booking.bookedForEmails?.join(', ') || '-'}</div>
-                </CardContent>
-            </Card>
-          </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-          {/* Payment + Promo/Package */}
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-          
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Promo / Package</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div className="text-gray-500">Promo Code</div><div>{detailData.promoCode?.code || '-'}</div>
-                <div className="text-gray-500">Package Used</div><div>{detailData.booking.packageUsed ? 'Yes' : 'No'}</div>
-                {detailData.package ? (
-                  <>
-                    <div className="text-gray-500">Plan</div><div>{detailData.package.packageName || (detailData.package.packageId ? 'Count-based Pass' : '-')}</div>
-                    <div className="text-gray-500">Quantity</div><div>{detailData.package.quantity ?? '-'}</div>
-                    <div className="text-gray-500">Active</div><div>{detailData.package.isActive ? 'Yes' : 'No'}</div>
-                    </>
-                ) : (
-                  <>
-                    <div className="text-gray-500">Plan</div><div>-</div>
-                    <div className="text-gray-500">Quantity</div><div>-</div>
-                    <div className="text-gray-500">Active</div><div>-</div>
-                 
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* User Activity + Audit */}
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-            {/* <Card>
+              {/* User Activity + Audit */}
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                {/* <Card>
               <CardHeader>
                 <CardTitle className="text-sm">User Activity</CardTitle>
               </CardHeader>
@@ -1095,331 +1195,201 @@ export function BookingManagement() {
                 </div>
               </CardContent>
             </Card> */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Audit</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Financial Breakdown */}
-                {detailData.auditBreakdown && (
-                  <div className="space-y-3 pb-4 border-b">
-                    <div className="text-xs font-semibold text-gray-700">Financial Breakdown</div>
-                    
-                    {/* Original Price */}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Original Price</span>
-                      <span className="font-medium">${detailData.auditBreakdown.originalPrice.toFixed(2)}</span>
-                    </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Audit</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="text-gray-500">Booked At</div><div>{formatLocalDate(detailData.booking.bookedAt || detailData.booking.createdAt, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}</div>
+                  <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
+                </div> */}
 
-                    {/* Discounts Applied */}
-                    {detailData.auditBreakdown.discounts.total > 0 && (
-                      <div className="space-y-1.5 pl-3 border-l-2 border-green-200">
-                        {detailData.auditBreakdown.discounts.promoCode > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-green-600">Promo Code Discount</span>
-                            <span className="text-green-600 font-medium">-${detailData.auditBreakdown.discounts.promoCode.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {detailData.auditBreakdown.discounts.package > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-green-600">Package Discount</span>
-                            <span className="text-green-600 font-medium">-${detailData.auditBreakdown.discounts.package.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {detailData.auditBreakdown.discounts.credit > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-green-600">Credit Used</span>
-                            <span className="text-green-600 font-medium">-${detailData.auditBreakdown.discounts.credit.toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm font-medium pt-1 border-t border-green-100">
-                          <span className="text-green-700">Total Discounts</span>
-                          <span className="text-green-700">-${detailData.auditBreakdown.discounts.total.toFixed(2)}</span>
+                    {/* Activity Timeline */}
+                    <div className="">
+                      {/* <div className="text-sm font-medium mb-3">Activity Timeline</div> */}
+                      {loadingActivities ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
                         </div>
-                      </div>
-                    )}
-
-                    {/* Subtotal After Discounts */}
-                    <div className="flex justify-between text-sm font-medium">
-                      <span className="text-gray-700">Subtotal</span>
-                      <span>${detailData.auditBreakdown.totalCost.toFixed(2)}</span>
-                    </div>
-
-                    {/* Payment Fees */}
-                    {detailData.auditBreakdown.payments.totalFees > 0 && (
-                      <div className="space-y-1.5 pl-3 border-l-2 border-orange-200">
-                        {detailData.auditBreakdown.payments.cardFee > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-orange-600">Card Transaction Fee (5%)</span>
-                            <span className="text-orange-600 font-medium">+${detailData.auditBreakdown.payments.cardFee.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {detailData.auditBreakdown.payments.payNowFee > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-orange-600">PayNow Fee ($0.20)</span>
-                            <span className="text-orange-600 font-medium">+${detailData.auditBreakdown.payments.payNowFee.toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm font-medium pt-1 border-t border-orange-100">
-                          <span className="text-orange-700">Total Fees</span>
-                          <span className="text-orange-700">+${detailData.auditBreakdown.payments.totalFees.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Final Amount */}
-                    <div className="flex justify-between text-base font-bold pt-2 border-t-2">
-                      <span className="text-gray-900">Total Paid</span>
-                      <span className="text-blue-600">${detailData.auditBreakdown.payments.totalPaid.toFixed(2)}</span>
-                    </div>
-
-                    {/* Individual Payments */}
-                    {detailData.auditBreakdown.paymentBreakdown && detailData.auditBreakdown.paymentBreakdown.length > 0 && (
-                      <div className="mt-3 pt-3 border-t space-y-2">
-                        <div className="text-xs font-semibold text-gray-700">Payment History</div>
-                        {detailData.auditBreakdown.paymentBreakdown.map((payment: any, idx: number) => (
-                          <div key={payment.id} className="bg-gray-50 p-2 rounded text-xs space-y-1">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Payment {idx + 1} ({payment.method})</span>
-                              <span className="font-medium">${payment.amount.toFixed(2)}</span>
-                            </div>
-                            {payment.fee > 0 && (
-                              <div className="flex justify-between text-orange-600">
-                                <span>Transaction Fee</span>
-                                <span>${payment.fee.toFixed(2)}</span>
+                      ) : activities && activities.length > 0 ? (
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {activities.map((activity: any, index: number) => (
+                            <div key={activity.id || index} className="flex gap-3">
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
+                                  {activity.activityType === 'BOOKING_CREATED' && <Calendar className="w-3 h-3 text-blue-500" />}
+                                  {activity.activityType === 'PAYMENT_CONFIRMED' && <DollarSign className="w-3 h-3 text-green-500" />}
+                                  {activity.activityType === 'RESCHEDULE_APPROVED' && <Clock className="w-3 h-3 text-blue-500" />}
+                                  {activity.activityType === 'EXTEND_APPROVED' && <Clock className="w-3 h-3 text-teal-500" />}
+                                  {activity.activityType === 'CREDIT_USED' && <DollarSign className="w-3 h-3 text-orange-500" />}
+                                  {activity.activityType === 'REFUND_APPROVED' && <DollarSign className="w-3 h-3 text-yellow-500" />}
+                                  {!['BOOKING_CREATED', 'PAYMENT_CONFIRMED', 'RESCHEDULE_APPROVED', 'EXTEND_APPROVED', 'CREDIT_USED', 'REFUND_APPROVED'].includes(activity.activityType) && <FileText className="w-3 h-3 text-gray-500" />}
+                                </div>
+                                {index < activities.length - 1 && (
+                                  <div className="w-0.5 h-full bg-gray-200 mt-1 min-h-[40px]"></div>
+                                )}
                               </div>
-                            )}
-                            <div className="flex justify-between font-medium">
-                              <span>Subtotal</span>
-                              <span>${payment.subtotal.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Activity Timeline */}
-                <div className="">
-                  <div className="text-xs font-semibold text-gray-700 mb-3">Activity Timeline</div>
-                  {loadingActivities ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
-                    </div>
-                  ) : activities && activities.length > 0 ? (
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {activities.map((activity: any, index: number) => (
-                        <div key={activity.id || index} className="flex gap-3">
-                          <div className="flex flex-col items-center">
-                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
-                              {activity.activityType === 'BOOKING_CREATED' && <Calendar className="w-3 h-3 text-blue-500" />}
-                              {activity.activityType === 'PAYMENT_CONFIRMED' && <DollarSign className="w-3 h-3 text-green-500" />}
-                              {activity.activityType === 'RESCHEDULE_APPROVED' && <Clock className="w-3 h-3 text-blue-500" />}
-                              {activity.activityType === 'EXTEND_APPROVED' && <Clock className="w-3 h-3 text-teal-500" />}
-                              {activity.activityType === 'CREDIT_USED' && <DollarSign className="w-3 h-3 text-orange-500" />}
-                              {activity.activityType === 'REFUND_APPROVED' && <DollarSign className="w-3 h-3 text-yellow-500" />}
-                              {!['BOOKING_CREATED', 'PAYMENT_CONFIRMED', 'RESCHEDULE_APPROVED', 'EXTEND_APPROVED', 'CREDIT_USED', 'REFUND_APPROVED'].includes(activity.activityType) && <FileText className="w-3 h-3 text-gray-500" />}
-                            </div>
-                            {index < activities.length - 1 && (
-                              <div className="w-0.5 h-full bg-gray-200 mt-1 min-h-[40px]"></div>
-                            )}
-                          </div>
-                          <div className="flex-1 pb-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <p className="font-medium text-xs">{activity.activityTitle}</p>
-                                {activity.activityDescription && (
-                                  <div className="text-xs text-gray-600 mt-0.5">
-                                    {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
-                                      <div className="space-y-1">
-                                        {/* Use metadata first if available (most reliable) */}
-                                        {activity.metadata && (activity.metadata.originalStartAt || activity.metadata.originalEndAt || activity.metadata.newStartAt || activity.metadata.newEndAt) ? (
-                                          <div className="flex flex-col gap-1">
-                                            {/* Old Time */}
-                                            {(activity.metadata.originalStartAt || activity.metadata.originalEndAt) && (
-                                              <div className="flex items-center gap-1">
-                                                <span className="text-gray-500">Old:</span>
-                                                <span className="font-mono text-xs">
-                                                  {activity.metadata.originalStartAt && activity.metadata.originalEndAt
-                                                    ? `${formatSingaporeDate(activity.metadata.originalStartAt)} - ${formatSingaporeDate(activity.metadata.originalEndAt)}`
-                                                    : activity.metadata.originalEndAt
-                                                    ? `End: ${formatSingaporeDate(activity.metadata.originalEndAt)}`
-                                                    : formatSingaporeDate(activity.metadata.originalStartAt)}
-                                                </span>
+                              <div className="flex-1 pb-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <p className="font-medium text-xs">{activity.activityTitle}</p>
+                                    {activity.activityDescription && (
+                                      <div className="text-xs text-gray-600 mt-0.5">
+                                        {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
+                                          <div className="space-y-1">
+                                            {/* Use metadata first if available (most reliable) */}
+                                            {activity.metadata && (activity.metadata.originalStartAt || activity.metadata.originalEndAt || activity.metadata.newStartAt || activity.metadata.newEndAt) ? (
+                                              <div className="flex flex-col gap-1">
+                                                {/* Old Time */}
+                                                {(activity.metadata.originalStartAt || activity.metadata.originalEndAt) && (
+                                                  <div className="flex items-center gap-1">
+                                                    <span className="text-gray-500">Old:</span>
+                                                    <span className="font-mono text-xs">
+                                                      {activity.metadata.originalStartAt && activity.metadata.originalEndAt
+                                                        ? `${formatSingaporeDate(activity.metadata.originalStartAt)} - ${formatSingaporeDate(activity.metadata.originalEndAt)}`
+                                                        : activity.metadata.originalEndAt
+                                                          ? `End: ${formatSingaporeDate(activity.metadata.originalEndAt)}`
+                                                          : formatSingaporeDate(activity.metadata.originalStartAt)}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                                {/* New Time */}
+                                                {(activity.metadata.newStartAt || activity.metadata.newEndAt) && (
+                                                  <div className="flex items-center gap-1">
+                                                    <span className="text-blue-600 font-medium">New:</span>
+                                                    <span className="font-mono text-xs">
+                                                      {activity.metadata.newStartAt && activity.metadata.newEndAt
+                                                        ? `${formatSingaporeDate(activity.metadata.newStartAt)} - ${formatSingaporeDate(activity.metadata.newEndAt)}`
+                                                        : activity.metadata.newEndAt
+                                                          ? `End: ${formatSingaporeDate(activity.metadata.newEndAt)}`
+                                                          : formatSingaporeDate(activity.metadata.newStartAt)}
+                                                    </span>
+                                                  </div>
+                                                )}
                                               </div>
-                                            )}
-                                            {/* New Time */}
-                                            {(activity.metadata.newStartAt || activity.metadata.newEndAt) && (
-                                              <div className="flex items-center gap-1">
-                                                <span className="text-blue-600 font-medium">New:</span>
-                                                <span className="font-mono text-xs">
-                                                  {activity.metadata.newStartAt && activity.metadata.newEndAt
-                                                    ? `${formatSingaporeDate(activity.metadata.newStartAt)} - ${formatSingaporeDate(activity.metadata.newEndAt)}`
-                                                    : activity.metadata.newEndAt
-                                                    ? `End: ${formatSingaporeDate(activity.metadata.newEndAt)}`
-                                                    : formatSingaporeDate(activity.metadata.newStartAt)}
-                                                </span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        ) : activity.oldValue && activity.newValue ? (
-                                          // Fallback to oldValue/newValue if metadata not available
-                                          <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1">
-                                              <span className="text-gray-500">Old:</span>
-                                              <span className="font-mono text-xs">
-                                                {activity.oldValue.includes(' - ') 
-                                                  ? activity.oldValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
-                                                  : formatSingaporeDate(activity.oldValue)}
-                                              </span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                              <span className="text-blue-600 font-medium">New:</span>
-                                              <span className="font-mono text-xs">
-                                                {activity.newValue.includes(' - ') 
-                                                  ? activity.newValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
-                                                  : formatSingaporeDate(activity.newValue)}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        ) : activity.activityDescription.includes('→') ? (
-                                          // Parse description with arrow format
-                                          <div className="flex flex-col gap-1">
-                                            {activity.activityDescription.split('→').map((part: string, idx: number) => (
-                                              <div key={idx} className="flex items-center gap-1">
-                                                <span className={idx === 0 ? 'text-gray-500' : 'text-blue-600 font-medium'}>
-                                                  {idx === 0 ? 'Old:' : 'New:'}
-                                                </span>
-                                                <span className="font-mono text-xs">{part.trim()}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : activity.activityDescription.includes('Old:') && activity.activityDescription.includes('New:') ? (
-                                          // Handle format: "Old: ... New: ..."
-                                          <div className="flex flex-col gap-1">
-                                            {activity.activityDescription.split(/(?=New:)/).map((part: string, idx: number) => {
-                                              const isOld = part.includes('Old:')
-                                              const isNew = part.includes('New:')
-                                              const label = isOld ? 'Old:' : isNew ? 'New:' : ''
-                                              const content = part.replace(/^(Old:|New:)\s*/, '').trim()
-                                              return (
-                                                <div key={idx} className="flex items-center gap-1">
-                                                  <span className={isOld ? 'text-gray-500' : 'text-blue-600 font-medium'}>
-                                                    {label}
+                                            ) : activity.oldValue && activity.newValue ? (
+                                              // Fallback to oldValue/newValue if metadata not available
+                                              <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-1">
+                                                  <span className="text-gray-500">Old:</span>
+                                                  <span className="font-mono text-xs">
+                                                    {activity.oldValue.includes(' - ')
+                                                      ? activity.oldValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
+                                                      : formatSingaporeDate(activity.oldValue)}
                                                   </span>
-                                                  <span className="font-mono text-xs">{content}</span>
                                                 </div>
-                                              )
-                                            })}
-                                          </div>
-                                        ) : activity.activityDescription.includes('from') && activity.activityDescription.includes('to') ? (
-                                          // Handle old format: "Booking rescheduled from X to Y"
-                                          <div className="flex flex-col gap-1">
-                                            {(() => {
-                                              const fromMatch = activity.activityDescription.match(/from\s+(.+?)\s+to\s+(.+?)$/i)
-                                              if (fromMatch) {
-                                                return (
-                                                  <>
-                                                    <div className="flex items-center gap-1">
-                                                      <span className="text-gray-500">Old:</span>
-                                                      <span className="font-mono text-xs">{fromMatch[1].trim()}</span>
+                                                <div className="flex items-center gap-1">
+                                                  <span className="text-blue-600 font-medium">New:</span>
+                                                  <span className="font-mono text-xs">
+                                                    {activity.newValue.includes(' - ')
+                                                      ? activity.newValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
+                                                      : formatSingaporeDate(activity.newValue)}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            ) : activity.activityDescription.includes('→') ? (
+                                              // Parse description with arrow format
+                                              <div className="flex flex-col gap-1">
+                                                {activity.activityDescription.split('→').map((part: string, idx: number) => (
+                                                  <div key={idx} className="flex items-center gap-1">
+                                                    <span className={idx === 0 ? 'text-gray-500' : 'text-blue-600 font-medium'}>
+                                                      {idx === 0 ? 'Old:' : 'New:'}
+                                                    </span>
+                                                    <span className="font-mono text-xs">{part.trim()}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : activity.activityDescription.includes('Old:') && activity.activityDescription.includes('New:') ? (
+                                              // Handle format: "Old: ... New: ..."
+                                              <div className="flex flex-col gap-1">
+                                                {activity.activityDescription.split(/(?=New:)/).map((part: string, idx: number) => {
+                                                  const isOld = part.includes('Old:')
+                                                  const isNew = part.includes('New:')
+                                                  const label = isOld ? 'Old:' : isNew ? 'New:' : ''
+                                                  const content = part.replace(/^(Old:|New:)\s*/, '').trim()
+                                                  return (
+                                                    <div key={idx} className="flex items-center gap-1">
+                                                      <span className={isOld ? 'text-gray-500' : 'text-blue-600 font-medium'}>
+                                                        {label}
+                                                      </span>
+                                                      <span className="font-mono text-xs">{content}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-1">
-                                                      <span className="text-blue-600 font-medium">New:</span>
-                                                      <span className="font-mono text-xs">{fromMatch[2].trim()}</span>
-                                                    </div>
-                                                  </>
-                                                )
-                                              }
-                                              return <p className="text-gray-600">{activity.activityDescription}</p>
-                                            })()}
+                                                  )
+                                                })}
+                                              </div>
+                                            ) : activity.activityDescription.includes('from') && activity.activityDescription.includes('to') ? (
+                                              // Handle old format: "Booking rescheduled from X to Y"
+                                              <div className="flex flex-col gap-1">
+                                                {(() => {
+                                                  const fromMatch = activity.activityDescription.match(/from\s+(.+?)\s+to\s+(.+?)$/i)
+                                                  if (fromMatch) {
+                                                    return (
+                                                      <>
+                                                        <div className="flex items-center gap-1">
+                                                          <span className="text-gray-500">Old:</span>
+                                                          <span className="font-mono text-xs">{fromMatch[1].trim()}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                          <span className="text-blue-600 font-medium">New:</span>
+                                                          <span className="font-mono text-xs">{fromMatch[2].trim()}</span>
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  }
+                                                  return <p className="text-gray-600">{activity.activityDescription}</p>
+                                                })()}
+                                              </div>
+                                            ) : (
+                                              // Fallback for any other format
+                                              <p className="text-gray-600">{activity.activityDescription}</p>
+                                            )}
                                           </div>
                                         ) : (
-                                          // Fallback for any other format
-                                          <p className="text-gray-600">{activity.activityDescription}</p>
+                                          <p>{activity.activityDescription}</p>
                                         )}
                                       </div>
-                                    ) : (
-                                      <p>{activity.activityDescription}</p>
+                                    )}
+                                    {activity.amount && activity.amount > 0 && (
+                                      <p className="text-xs text-green-600 font-medium mt-0.5">
+                                        ${activity.amount.toFixed(2)}
+                                      </p>
                                     )}
                                   </div>
-                                )}
-                                {activity.amount && activity.amount > 0 && (
-                                  <p className="text-xs text-green-600 font-medium mt-0.5">
-                                    ${activity.amount.toFixed(2)}
-                                  </p>
-                                )}
-                                
-                                {/* Payment Details - Show for reschedule/extend activities */}
-                                {activity.metadata && (activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED') && (
-                                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-2 space-y-1 text-xs">
-                                    {activity.metadata.paymentMethod && (
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-600">Payment Method:</span>
-                                        <span className="font-medium">{activity.metadata.paymentMethod}</span>
-                                      </div>
-                                    )}
-                                    {(activity.metadata.additionalCost > 0 || activity.metadata.extensionCost > 0) && (
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-600">{activity.activityType === 'RESCHEDULE_APPROVED' ? 'Reschedule' : 'Extension'} Cost:</span>
-                                        <span className="font-medium">${(activity.metadata.additionalCost || activity.metadata.extensionCost || 0).toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                    {activity.metadata.creditAmount > 0 && (
-                                      <div className="flex justify-between text-green-600">
-                                        <span>Credits Applied:</span>
-                                        <span className="font-medium">-${activity.metadata.creditAmount.toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                    {activity.metadata.subtotal >= 0 && (
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-600">Subtotal:</span>
-                                        <span className="font-medium">${activity.metadata.subtotal.toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                    {activity.metadata.paymentFee > 0 && (
-                                      <div className="flex justify-between text-orange-600">
-                                        <span>Transaction Fee:</span>
-                                        <span className="font-medium">+${activity.metadata.paymentFee.toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                    {activity.metadata.finalAmount >= 0 && (
-                                      <div className="flex justify-between font-semibold border-t pt-1 mt-1">
-                                        <span>Total Paid:</span>
-                                        <span className="text-blue-600">${activity.metadata.finalAmount.toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                                    {formatLocalDate(activity.createdAt, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })}
+                                  </span>
+                                </div>
                               </div>
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
-                                {formatLocalDate(activity.createdAt, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: true
-                                })}
-                              </span>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-xs text-gray-500 text-center py-2">No activities recorded yet</p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 text-center py-2">No activities recorded yet</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ) : (
-        <div className="py-6 text-center text-gray-500">No details found</div>
-      )}
-    </DialogContent>
-  </Dialog>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 text-center text-gray-500">No details found</div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Booking Timeline Modal */}
       <BookingDetailsModal

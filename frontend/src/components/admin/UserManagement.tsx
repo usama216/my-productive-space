@@ -32,7 +32,8 @@ import {
   Download,
   AlertCircle,
   Loader2,
-  UserPlus
+  UserPlus,
+  UserCog
 } from 'lucide-react'
 import {
   User,
@@ -51,6 +52,7 @@ import {
   getVerificationStatusText
 } from '@/lib/userService'
 import { getEffectiveMemberType, getMemberTypeDisplayName } from '@/lib/userProfileService'
+import { changeUserRole } from '@/lib/userManagementService'
 import UserVerificationModal from './UserVerificationModal'
 
 export function UserManagement() {
@@ -79,9 +81,15 @@ export function UserManagement() {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [isCreateAdminDialogOpen, setIsCreateAdminDialogOpen] = useState(false)
+  const [isRoleChangeDialogOpen, setIsRoleChangeDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [selectedUserForReview, setSelectedUserForReview] = useState<User | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [roleChangeData, setRoleChangeData] = useState({
+    newRole: '' as 'ADMIN' | 'STUDENT' | 'MEMBER' | 'TUTOR' | 'null' | '',
+    reason: ''
+  })
+  const [roleChangeWarnings, setRoleChangeWarnings] = useState<string[]>([])
   const [editFormData, setEditFormData] = useState({
     firstName: '',
     lastName: '',
@@ -466,6 +474,72 @@ export function UserManagement() {
     }
   }
 
+  const handleRoleChangeClick = (user: User) => {
+    setSelectedUser(user)
+    setRoleChangeData({
+      newRole: (user.memberType || 'null') as 'ADMIN' | 'STUDENT' | 'MEMBER' | 'TUTOR' | 'null' | '',
+      reason: ''
+    })
+    setRoleChangeWarnings([])
+    setIsRoleChangeDialogOpen(true)
+  }
+
+  const handleRoleChange = async () => {
+    if (!selectedUser) return
+
+    if (!roleChangeData.newRole) {
+      toast({
+        title: "Error",
+        description: "Please select a new role",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const newRoleValue = roleChangeData.newRole === 'null' ? null : roleChangeData.newRole
+
+      const response = await changeUserRole(
+        selectedUser.id,
+        newRoleValue as any,
+        roleChangeData.reason || undefined
+      )
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: response.message,
+          variant: "default",
+        })
+
+        // Show warnings if any
+        if (response.warnings && response.warnings.length > 0) {
+          setRoleChangeWarnings(response.warnings)
+          // Don't close dialog immediately if there are warnings
+          setTimeout(() => {
+            setIsRoleChangeDialogOpen(false)
+            setRoleChangeWarnings([])
+            loadUsers() // Reload to show updated role
+          }, 3000)
+        } else {
+          setIsRoleChangeDialogOpen(false)
+          loadUsers() // Reload to show updated role
+        }
+      }
+    } catch (error: any) {
+      console.error('Error changing user role:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change user role",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+
   const filteredUsers = users.filter(user => {
     const searchMatch = !filters.search ||
       (user.firstName && user.firstName.toLowerCase().includes(filters.search.toLowerCase())) ||
@@ -784,6 +858,17 @@ export function UserManagement() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => handleRoleChangeClick(user)}
+                            disabled={isSubmitting}
+                            className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                          >
+                            <UserCog className="h-4 w-4 mr-1" />
+                            Change Role
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => {
                               setSelectedUser(user)
                               setIsDeleteDialogOpen(true)
@@ -1039,6 +1124,108 @@ export function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Change User Role Dialog */}
+      <Dialog open={isRoleChangeDialogOpen} onOpenChange={setIsRoleChangeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-600">
+              <UserCog className="w-5 h-5" />
+              Change User Role
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedUser && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">User</Label>
+                <div className="text-sm text-gray-700 mt-1">
+                  {selectedUser.firstName} {selectedUser.lastName} ({selectedUser.email})
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">Current Role</Label>
+                <div className="mt-1">
+                  <Badge className={getMemberTypeColor(selectedUser.memberType)}>
+                    {selectedUser.memberType || 'Regular User'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="newRole" className="text-sm font-medium">New Role</Label>
+                <Select
+                  value={roleChangeData.newRole}
+                  onValueChange={(value) => setRoleChangeData(prev => ({ ...prev, newRole: value as any }))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select new role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="STUDENT">Student</SelectItem>
+                    <SelectItem value="TUTOR">Tutor</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="reason" className="text-sm font-medium">Reason (Optional)</Label>
+                <Textarea
+                  id="reason"
+                  value={roleChangeData.reason}
+                  onChange={(e) => setRoleChangeData(prev => ({ ...prev, reason: e.target.value }))}
+                  placeholder="Why are you changing this user's role?"
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+
+              {roleChangeWarnings.length > 0 && (
+                <Alert className="border-yellow-200 bg-yellow-50">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    <ul className="list-disc list-inside space-y-1">
+                      {roleChangeWarnings.map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsRoleChangeDialogOpen(false)
+                    setRoleChangeWarnings([])
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleRoleChange}
+                  disabled={isSubmitting || !roleChangeData.newRole}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Changing...
+                    </>
+                  ) : (
+                    'Change Role'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Rejection Confirmation Dialog */}
       <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>

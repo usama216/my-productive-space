@@ -32,8 +32,10 @@ import {
     formatAnnouncementDate,
     type Announcement,
     type CreateAnnouncementPayload,
-    type UpdateAnnouncementPayload
+    type UpdateAnnouncementPayload,
+    uploadAnnouncementImage
 } from '@/lib/announcementService'
+import { Upload, X } from 'lucide-react'
 
 export function AnnouncementManagement() {
     const { toast } = useToast()
@@ -44,6 +46,8 @@ export function AnnouncementManagement() {
     const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null)
     const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null)
     const [isSaving, setIsSaving] = useState(false)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
     // Form state
     const [formData, setFormData] = useState({
@@ -92,6 +96,8 @@ export function AnnouncementManagement() {
                 order: announcement.order,
                 isActive: announcement.isActive
             })
+            setPreviewUrl(announcement.imageUrl || null)
+            setSelectedFile(null)
         } else {
             setEditingAnnouncement(null)
             setFormData({
@@ -101,6 +107,8 @@ export function AnnouncementManagement() {
                 order: announcements.length + 1,
                 isActive: true
             })
+            setPreviewUrl(null)
+            setSelectedFile(null)
         }
         setIsDialogOpen(true)
     }
@@ -115,6 +123,8 @@ export function AnnouncementManagement() {
             order: 0,
             isActive: true
         })
+        setPreviewUrl(null)
+        setSelectedFile(null)
     }
 
     const handleSaveAnnouncement = async () => {
@@ -129,6 +139,23 @@ export function AnnouncementManagement() {
 
         setIsSaving(true)
         try {
+            let imageUrl = formData.imageUrl
+
+            if (selectedFile) {
+                const uploadResult = await uploadAnnouncementImage(selectedFile)
+                if (uploadResult.success && uploadResult.url) {
+                    imageUrl = uploadResult.url
+                } else {
+                    toast({
+                        title: 'Error',
+                        description: uploadResult.error || 'Failed to upload image',
+                        variant: 'destructive',
+                    })
+                    setIsSaving(false)
+                    return
+                }
+            }
+
             let response
 
             if (editingAnnouncement) {
@@ -136,7 +163,7 @@ export function AnnouncementManagement() {
                 const payload: UpdateAnnouncementPayload = {
                     title: formData.title,
                     description: formData.description || undefined,
-                    imageUrl: formData.imageUrl || undefined,
+                    imageUrl: imageUrl || undefined,
                     order: formData.order,
                     isActive: formData.isActive
                 }
@@ -146,7 +173,7 @@ export function AnnouncementManagement() {
                 const payload: CreateAnnouncementPayload = {
                     title: formData.title,
                     description: formData.description || undefined,
-                    imageUrl: formData.imageUrl || undefined,
+                    imageUrl: imageUrl || undefined,
                     order: formData.order,
                     isActive: formData.isActive
                 }
@@ -410,18 +437,60 @@ export function AnnouncementManagement() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <label htmlFor="imageUrl" className="text-sm font-medium">
-                                Image URL
+                            <label className="text-sm font-medium">
+                                Announcement Image
                             </label>
-                            <Input
-                                id="imageUrl"
-                                value={formData.imageUrl}
-                                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                                placeholder="/mock_img/announcement1.png"
-                            />
-                            <p className="text-xs text-gray-500">
-                                Enter the path to the image (e.g., /mock_img/announcement1.png)
-                            </p>
+                            <div className="flex flex-col gap-4">
+                                {previewUrl && (
+                                    <div className="relative w-full h-48 bg-gray-100 rounded-md overflow-hidden border">
+                                        <img
+                                            src={previewUrl}
+                                            alt="Preview"
+                                            className="w-full h-full object-contain"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                                            onClick={() => {
+                                                setPreviewUrl(null)
+                                                setSelectedFile(null)
+                                                setFormData({ ...formData, imageUrl: '' })
+                                            }}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => document.getElementById('image-upload')?.click()}
+                                    >
+                                        <Upload className="h-4 w-4 mr-2" />
+                                        {previewUrl ? 'Change Image' : 'Upload Image'}
+                                    </Button>
+                                    <input
+                                        id="image-upload"
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                const file = e.target.files[0]
+                                                setSelectedFile(file)
+                                                setPreviewUrl(URL.createObjectURL(file))
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    Supported formats: JPG, PNG, GIF. Max size: 5MB.
+                                </p>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
