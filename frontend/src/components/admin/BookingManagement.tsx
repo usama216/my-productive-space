@@ -748,7 +748,7 @@ export function BookingManagement() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
+                          {/* <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => {
@@ -758,7 +758,7 @@ export function BookingManagement() {
                             title="View Timeline & History"
                           >
                             <Info className="h-4 w-4" />
-                          </Button>
+                          </Button> */}
                         </div>
                       </TableCell>
                       
@@ -998,12 +998,31 @@ export function BookingManagement() {
                 <div className="text-gray-500">Dates</div><div>{formatBookingDateRange(detailData.booking.startAt, detailData.booking.endAt)}</div>
                 <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
                 <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
-                <div className="text-gray-500">Amount Paid</div><div>${detailData.booking.totalAmount}</div>
-                {(detailData.booking.discountAmount && detailData.booking.discountAmount > 0) ? (<><div className="text-gray-500">Discount</div><div>${detailData.booking.discountAmount}</div></>) : null}
+                
+                {/* Payment Breakdown */}
+                {detailData.auditBreakdown ? (
+                  <>
+                    <div className="text-gray-500">Booking Amount</div>
+                    <div className="font-medium">${detailData.auditBreakdown.payments.subtotal.toFixed(2)}</div>
+                    
+                    {detailData.auditBreakdown.payments.totalFees > 0 && (
+                      <>
+                        <div className="text-gray-500">Transaction Fee</div>
+                        <div className="text-orange-600 font-medium">+${detailData.auditBreakdown.payments.totalFees.toFixed(2)}</div>
+                      </>
+                    )}
+                    
+                    <div className="text-gray-500">Total Amount Paid</div>
+                    <div className="font-bold text-blue-600">${detailData.booking.totalAmount}</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-gray-500">Total Amount Paid</div>
+                    <div className="font-bold">${detailData.booking.totalAmount}</div>
+                  </>
+                )}
+                
                 <div className="text-gray-500">Payment Method</div><div>{detailData.payment?.paymentMethod ? detailData.payment.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '-'}</div>
-                {detailData.booking.packageUsed && detailData.packageDiscount && detailData.packageDiscount > 0 ? (<><div className="text-gray-500">Package Discount Applied</div><div>${detailData.packageDiscount.toFixed(2)}</div></>) : null}
-                {detailData.booking.packageUsed && detailData.package?.packageName ? (<><div className="text-gray-500">Package Used</div><div>{detailData.package.packageName}</div></>) : null}
-                {detailData.paymentFee && detailData.paymentFee > 0 ? (<><div className="text-gray-500">Payment Fees</div><div>${detailData.paymentFee.toFixed(2)}</div></>) : null}
                 <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
                 {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
               </CardContent>
@@ -1081,21 +1100,109 @@ export function BookingManagement() {
                 <CardTitle className="text-sm">Audit</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div className="text-gray-500">Booked At</div><div>{formatLocalDate(detailData.booking.bookedAt || detailData.booking.createdAt, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  })}</div>
-                  <div className="text-gray-500">Reschedules</div><div>{detailData.booking.rescheduleCount || 0}</div>
-                </div> */}
+                {/* Financial Breakdown */}
+                {detailData.auditBreakdown && (
+                  <div className="space-y-3 pb-4 border-b">
+                    <div className="text-xs font-semibold text-gray-700">Financial Breakdown</div>
+                    
+                    {/* Original Price */}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Original Price</span>
+                      <span className="font-medium">${detailData.auditBreakdown.originalPrice.toFixed(2)}</span>
+                    </div>
+
+                    {/* Discounts Applied */}
+                    {detailData.auditBreakdown.discounts.total > 0 && (
+                      <div className="space-y-1.5 pl-3 border-l-2 border-green-200">
+                        {detailData.auditBreakdown.discounts.promoCode > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-600">Promo Code Discount</span>
+                            <span className="text-green-600 font-medium">-${detailData.auditBreakdown.discounts.promoCode.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {detailData.auditBreakdown.discounts.package > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-600">Package Discount</span>
+                            <span className="text-green-600 font-medium">-${detailData.auditBreakdown.discounts.package.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {detailData.auditBreakdown.discounts.credit > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-600">Credit Used</span>
+                            <span className="text-green-600 font-medium">-${detailData.auditBreakdown.discounts.credit.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-medium pt-1 border-t border-green-100">
+                          <span className="text-green-700">Total Discounts</span>
+                          <span className="text-green-700">-${detailData.auditBreakdown.discounts.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Subtotal After Discounts */}
+                    <div className="flex justify-between text-sm font-medium">
+                      <span className="text-gray-700">Subtotal</span>
+                      <span>${detailData.auditBreakdown.totalCost.toFixed(2)}</span>
+                    </div>
+
+                    {/* Payment Fees */}
+                    {detailData.auditBreakdown.payments.totalFees > 0 && (
+                      <div className="space-y-1.5 pl-3 border-l-2 border-orange-200">
+                        {detailData.auditBreakdown.payments.cardFee > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-orange-600">Card Transaction Fee (5%)</span>
+                            <span className="text-orange-600 font-medium">+${detailData.auditBreakdown.payments.cardFee.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {detailData.auditBreakdown.payments.payNowFee > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-orange-600">PayNow Fee ($0.20)</span>
+                            <span className="text-orange-600 font-medium">+${detailData.auditBreakdown.payments.payNowFee.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-medium pt-1 border-t border-orange-100">
+                          <span className="text-orange-700">Total Fees</span>
+                          <span className="text-orange-700">+${detailData.auditBreakdown.payments.totalFees.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Final Amount */}
+                    <div className="flex justify-between text-base font-bold pt-2 border-t-2">
+                      <span className="text-gray-900">Total Paid</span>
+                      <span className="text-blue-600">${detailData.auditBreakdown.payments.totalPaid.toFixed(2)}</span>
+                    </div>
+
+                    {/* Individual Payments */}
+                    {detailData.auditBreakdown.paymentBreakdown && detailData.auditBreakdown.paymentBreakdown.length > 0 && (
+                      <div className="mt-3 pt-3 border-t space-y-2">
+                        <div className="text-xs font-semibold text-gray-700">Payment History</div>
+                        {detailData.auditBreakdown.paymentBreakdown.map((payment: any, idx: number) => (
+                          <div key={payment.id} className="bg-gray-50 p-2 rounded text-xs space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Payment {idx + 1} ({payment.method})</span>
+                              <span className="font-medium">${payment.amount.toFixed(2)}</span>
+                            </div>
+                            {payment.fee > 0 && (
+                              <div className="flex justify-between text-orange-600">
+                                <span>Transaction Fee</span>
+                                <span>${payment.fee.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-medium">
+                              <span>Subtotal</span>
+                              <span>${payment.subtotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {/* Activity Timeline */}
                 <div className="">
-                  {/* <div className="text-sm font-medium mb-3">Activity Timeline</div> */}
+                  <div className="text-xs font-semibold text-gray-700 mb-3">Activity Timeline</div>
                   {loadingActivities ? (
                     <div className="flex items-center justify-center py-4">
                       <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
@@ -1242,6 +1349,48 @@ export function BookingManagement() {
                                   <p className="text-xs text-green-600 font-medium mt-0.5">
                                     ${activity.amount.toFixed(2)}
                                   </p>
+                                )}
+                                
+                                {/* Payment Details - Show for reschedule/extend activities */}
+                                {activity.metadata && (activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED') && (
+                                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-2 space-y-1 text-xs">
+                                    {activity.metadata.paymentMethod && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">Payment Method:</span>
+                                        <span className="font-medium">{activity.metadata.paymentMethod}</span>
+                                      </div>
+                                    )}
+                                    {(activity.metadata.additionalCost > 0 || activity.metadata.extensionCost > 0) && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">{activity.activityType === 'RESCHEDULE_APPROVED' ? 'Reschedule' : 'Extension'} Cost:</span>
+                                        <span className="font-medium">${(activity.metadata.additionalCost || activity.metadata.extensionCost || 0).toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {activity.metadata.creditAmount > 0 && (
+                                      <div className="flex justify-between text-green-600">
+                                        <span>Credits Applied:</span>
+                                        <span className="font-medium">-${activity.metadata.creditAmount.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {activity.metadata.subtotal >= 0 && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">Subtotal:</span>
+                                        <span className="font-medium">${activity.metadata.subtotal.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {activity.metadata.paymentFee > 0 && (
+                                      <div className="flex justify-between text-orange-600">
+                                        <span>Transaction Fee:</span>
+                                        <span className="font-medium">+${activity.metadata.paymentFee.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {activity.metadata.finalAmount >= 0 && (
+                                      <div className="flex justify-between font-semibold border-t pt-1 mt-1">
+                                        <span>Total Paid:</span>
+                                        <span className="text-blue-600">${activity.metadata.finalAmount.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                               <span className="text-xs text-gray-500 whitespace-nowrap">
