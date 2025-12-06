@@ -40,6 +40,8 @@ import {
   formatLocalDate
 } from '@/lib/timezoneUtils'
 import { authenticatedFetch } from '@/lib/apiClient'
+import { getOperatingHours, getClosureDates, OperatingHours, ClosureDate } from '@/lib/shopHoursService'
+import { isSameDay, addDays, setHours, setMinutes } from 'date-fns'
 
 export function BookingManagement() {
   const { toast } = useToast()
@@ -69,6 +71,11 @@ export function BookingManagement() {
     specialRequests: '',
     totalAmount: 0
   })
+
+  // Shop hours state
+  const [operatingHours, setOperatingHours] = useState<OperatingHours[]>([])
+  const [closureDates, setClosureDates] = useState<ClosureDate[]>([])
+  const [isLoadingShopHours, setIsLoadingShopHours] = useState(false)
 
   // Cancel Booking State
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
@@ -110,6 +117,78 @@ export function BookingManagement() {
   const formatExact = (date: Date): string => {
     return date.toISOString()
   }
+
+  // Load shop hours
+  const loadShopHours = async (location: string) => {
+    if (!location) return
+    setIsLoadingShopHours(true)
+    try {
+      const [hours, closures] = await Promise.all([
+        getOperatingHours(location),
+        getClosureDates(location)
+      ])
+      setOperatingHours(hours)
+      setClosureDates(closures)
+    } catch (error) {
+      console.error('Error loading shop hours:', error)
+    } finally {
+      setIsLoadingShopHours(false)
+    }
+  }
+
+  // Helper function to get dates that should be excluded (closure dates)
+  const getExcludedDates = (): Date[] => {
+    const excluded: Date[] = []
+    closureDates.forEach(closure => {
+      const start = new Date(closure.startDate)
+      const end = new Date(closure.endDate)
+      // Add all dates in the closure range
+      let current = new Date(start)
+      while (current <= end) {
+        excluded.push(new Date(current))
+        current.setDate(current.getDate() + 1)
+      }
+    })
+    return excluded
+  }
+
+  // Helper to generate available times for a given date based on operating hours
+  const getAvailableTimes = (date: Date | null): Date[] => {
+    if (!date) return [];
+
+    const dayOfWeek = date.getDay();
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive);
+
+    // CRITICAL: Always show times even if hours aren't loaded yet (fallback)
+    if (operatingHours.length === 0 || !dayHours) {
+      const times: Date[] = [];
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      for (let i = 0; i < 24 * 4; i++) {
+        times.push(new Date(start.getTime() + i * 15 * 60 * 1000));
+      }
+      return times;
+    }
+
+    const times: Date[] = [];
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    // Generate 15-min intervals within shop hours
+    for (let i = 0; i < 24 * 4; i++) {
+      const time = new Date(start.getTime() + i * 15 * 60 * 1000);
+      const timeString = time.toTimeString().split(' ')[0].substring(0, 5);
+
+      const openTime = dayHours.openTime.substring(0, 5);
+      const closeTime = dayHours.closeTime.substring(0, 5);
+
+      if (timeString >= openTime && timeString <= closeTime) {
+        times.push(time);
+      }
+    }
+    return times;
+  };
+
 
   // Load dashboard data
   const loadDashboard = async () => {
@@ -271,7 +350,16 @@ export function BookingManagement() {
       totalAmount: booking.totalAmount
     })
     setIsEditDialogOpen(true)
+    // Load shop hours for the booking's location
+    loadShopHours(booking.location)
   }
+
+  // Reload shop hours when location changes in edit form
+  useEffect(() => {
+    if (isEditDialogOpen && editFormData.location) {
+      loadShopHours(editFormData.location)
+    }
+  }, [editFormData.location, isEditDialogOpen])
 
   // Handle cancel booking click
   const handleCancelClick = (booking: Booking) => {
@@ -945,21 +1033,38 @@ export function BookingManagement() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="startAt">Start Time</Label>
-              <Input
-                id="startAt"
-                type="datetime-local"
-                value={editFormData.startAt}
-                onChange={(e) => setEditFormData({ ...editFormData, startAt: e.target.value })}
-              />
+              <div className="relative">
+                <DatePicker
+                  selected={editFormData.startAt ? new Date(editFormData.startAt) : null}
+                  onChange={(date) => setEditFormData({ ...editFormData, startAt: date ? date.toISOString() : '' })}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  placeholderText="Select start time"
+                  className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                  wrapperClassName="w-full"
+                  excludeDates={getExcludedDates()}
+                  includeTimes={getAvailableTimes(editFormData.startAt ? new Date(editFormData.startAt) : null)}
+                />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="endAt">End Time</Label>
-              <Input
-                id="endAt"
-                type="datetime-local"
-                value={editFormData.endAt}
-                onChange={(e) => setEditFormData({ ...editFormData, endAt: e.target.value })}
-              />
+              <div className="relative">
+                <DatePicker
+                  selected={editFormData.endAt ? new Date(editFormData.endAt) : null}
+                  onChange={(date) => setEditFormData({ ...editFormData, endAt: date ? date.toISOString() : '' })}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  placeholderText="Select end time"
+                  className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
+                  wrapperClassName="w-full"
+                  excludeDates={getExcludedDates()}
+                  includeTimes={getAvailableTimes(editFormData.endAt ? new Date(editFormData.endAt) : null)}
+                  minDate={editFormData.startAt ? new Date(editFormData.startAt) : undefined}
+                />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="location">Location</Label>

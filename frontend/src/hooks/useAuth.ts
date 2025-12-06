@@ -35,11 +35,11 @@ export function useAuth() {
     try {
       const storedAuthUser = localStorage.getItem(STORAGE_KEYS.AUTH_USER)
       const storedDatabaseUser = localStorage.getItem(STORAGE_KEYS.DATABASE_USER)
-      
+
       if (storedAuthUser) {
         setUser(JSON.parse(storedAuthUser))
       }
-      
+
       if (storedDatabaseUser) {
         setDatabaseUser(JSON.parse(storedDatabaseUser))
       }
@@ -56,7 +56,7 @@ export function useAuth() {
       } else {
         localStorage.removeItem(STORAGE_KEYS.AUTH_USER)
       }
-      
+
       if (dbUser) {
         localStorage.setItem(STORAGE_KEYS.DATABASE_USER, JSON.stringify(dbUser))
       } else {
@@ -71,7 +71,7 @@ export function useAuth() {
   const createMockDatabaseUser = (authUser: User): DatabaseUser => {
     const fullName = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User'
     const nameParts = fullName.split(' ')
-    
+
     return {
       id: authUser.id, // Use auth ID as database ID for now
       email: authUser.email || '',
@@ -90,7 +90,7 @@ export function useAuth() {
   const fetchDatabaseUser = async (authUser: User): Promise<DatabaseUser> => {
     try {
       console.log('Fetching database user for:', authUser.id)
-      
+
       // Use Promise.race to implement timeout
       const fetchPromise = supabase
         .from('User')
@@ -98,8 +98,8 @@ export function useAuth() {
         .eq('id', authUser.id)
         .single()
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database fetch timeout')), 3000)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Database fetch timeout')), 10000)
       )
 
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
@@ -133,11 +133,11 @@ export function useAuth() {
 
   useEffect(() => {
     let isMounted = true
-    
+
     // Load initial data from storage
     const storedAuthUser = localStorage.getItem(STORAGE_KEYS.AUTH_USER)
     const storedDatabaseUser = localStorage.getItem(STORAGE_KEYS.DATABASE_USER)
-    
+
     if (storedAuthUser && storedDatabaseUser) {
       try {
         setUser(JSON.parse(storedAuthUser))
@@ -148,17 +148,20 @@ export function useAuth() {
         console.error('Error loading from local storage:', error)
       }
     }
-    
+
     // Get initial session and refresh data in background
     const getInitialSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        
+
         if (session?.user && isMounted) {
           const dbUser = await fetchDatabaseUser(session.user)
-          setUser(session.user)
-          setDatabaseUser(dbUser)
-          saveToStorage(session.user, dbUser)
+          // Check if mounted again after async operation
+          if (isMounted) {
+            setUser(session.user)
+            setDatabaseUser(dbUser)
+            saveToStorage(session.user, dbUser)
+          }
         }
       } catch (error) {
         console.error('Error getting session:', error)
@@ -175,9 +178,9 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return
-        
+
         console.log('Auth state change:', event, session?.user?.id)
-        
+
         if (session?.user) {
           // For login events, try to fetch database user
           if (event === 'SIGNED_IN') {
@@ -208,7 +211,7 @@ export function useAuth() {
           setLoading(false)
           return
         }
-        
+
         setLoading(false)
       }
     )
@@ -251,8 +254,8 @@ export function useAuth() {
     }
   }
 
-  return { 
-    user, 
+  return {
+    user,
     databaseUser,
     loading,
     // Provide both IDs for flexibility

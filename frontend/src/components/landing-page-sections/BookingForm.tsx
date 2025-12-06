@@ -99,6 +99,25 @@ export default function BookingForm() {
     return strictDate;
   };
 
+  // Helper function to get dates that should be excluded (closure dates)
+  const getExcludedDates = (): Date[] => {
+    const excluded: Date[] = []
+
+    closureDates.forEach(closure => {
+      const start = new Date(closure.startDate)
+      const end = new Date(closure.endDate)
+
+      // Add all dates in the closure range
+      let current = new Date(start)
+      while (current <= end) {
+        excluded.push(new Date(current))
+        current.setDate(current.getDate() + 1)
+      }
+    })
+
+    return excluded
+  }
+
   // Helper to generate available times for a given date based on operating hours
   const getAvailableTimes = (date: Date | null): Date[] => {
     if (!date) return [];
@@ -509,6 +528,7 @@ export default function BookingForm() {
                     className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
                     minDate={new Date()}
                     maxDate={maxBookingDate}
+                    excludeDates={getExcludedDates()}
                     {...getStartTimeConstraints()}
                   />
                 </div>
@@ -532,6 +552,7 @@ export default function BookingForm() {
                     placeholderText="End"
                     className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
                     disabled={!startDate}
+                    excludeDates={getExcludedDates()}
                     {...endTimeConstraints}
                   />
                 </div>

@@ -33,7 +33,8 @@ import {
     type Announcement,
     type CreateAnnouncementPayload,
     type UpdateAnnouncementPayload,
-    uploadAnnouncementImage
+    uploadAnnouncementImage,
+    updateAnnouncementOrder
 } from '@/lib/announcementService'
 import { Upload, X } from 'lucide-react'
 
@@ -246,10 +247,14 @@ export function AnnouncementManagement() {
     }
 
     const handleMoveUp = async (announcement: Announcement) => {
-        if (announcement.order <= 1) return
+        const currentIndex = announcements.findIndex(a => a.id === announcement.id)
+        if (currentIndex <= 0) return
 
-        const newOrder = announcement.order - 1
-        const response = await updateAnnouncement(announcement.id, { order: newOrder })
+        const prevAnnouncement = announcements[currentIndex - 1]
+        // Target order is the order of the item above us. 
+        // Our backend swap logic will swap us into that slot and the other item out.
+        // We use updateAnnouncementOrder which has the swap logic.
+        const response = await updateAnnouncementOrder(announcement.id, prevAnnouncement.order)
 
         if (response.success) {
             fetchAnnouncements()
@@ -263,8 +268,12 @@ export function AnnouncementManagement() {
     }
 
     const handleMoveDown = async (announcement: Announcement) => {
-        const newOrder = announcement.order + 1
-        const response = await updateAnnouncement(announcement.id, { order: newOrder })
+        const currentIndex = announcements.findIndex(a => a.id === announcement.id)
+        if (currentIndex === -1 || currentIndex >= announcements.length - 1) return
+
+        const nextAnnouncement = announcements[currentIndex + 1]
+        // Target order is the order of the item below us.
+        const response = await updateAnnouncementOrder(announcement.id, nextAnnouncement.order)
 
         if (response.success) {
             fetchAnnouncements()
@@ -333,9 +342,9 @@ export function AnnouncementManagement() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {announcements.map((announcement) => (
+                                    {announcements.map((announcement, index) => (
                                         <TableRow key={announcement.id}>
-                                            <TableCell className="font-medium">{announcement.order}</TableCell>
+                                            <TableCell className="font-medium">{index + 1}</TableCell>
                                             <TableCell className="font-medium">{announcement.title}</TableCell>
                                             <TableCell className="max-w-xs truncate">
                                                 {announcement.description || '-'}
