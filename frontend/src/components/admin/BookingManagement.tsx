@@ -1217,19 +1217,223 @@ export function BookingManagement() {
                   <CardHeader>
                     <CardTitle className="text-sm">Booking</CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-x-2 gap-y-2 text-sm">
-                    <div className="text-gray-500">Location</div><div>{detailData.booking.location}</div>
-                    <div className="text-gray-500">Dates</div><div>{formatBookingDateRange(detailData.booking.startAt, detailData.booking.endAt)}</div>
-                    <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
-                    <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
-                    <div className="text-gray-500">Amount Paid</div><div>${detailData.booking.totalAmount}</div>
-                    {(detailData.booking.discountAmount && detailData.booking.discountAmount > 0) ? (<><div className="text-gray-500">Discount</div><div>${detailData.booking.discountAmount}</div></>) : null}
-                    <div className="text-gray-500">Payment Method</div><div>{detailData.payment?.paymentMethod ? detailData.payment.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '-'}</div>
-                    {detailData.booking.packageUsed && detailData.packageDiscount && detailData.packageDiscount > 0 ? (<><div className="text-gray-500">Package Discount Applied</div><div>${detailData.packageDiscount.toFixed(2)}</div></>) : null}
-                    {detailData.booking.packageUsed && detailData.package?.packageName ? (<><div className="text-gray-500">Package Used</div><div>{detailData.package.packageName}</div></>) : null}
-                    {detailData.paymentFee && detailData.paymentFee > 0 ? (<><div className="text-gray-500">Payment Fees</div><div>${detailData.paymentFee.toFixed(2)}</div></>) : null}
-                    <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
-                    {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
+                  <CardContent className="space-y-4">
+                    {/* Basic Booking Info */}
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-sm">
+                      <div className="text-gray-500">Location</div><div>{detailData.booking.location}</div>
+                      <div className="text-gray-500">Dates</div><div>{formatBookingDateRange(detailData.booking.startAt, detailData.booking.endAt)}</div>
+                      <div className="text-gray-500">Seats</div><div className="break-words">{detailData.booking.seatNumbers?.length ? detailData.booking.seatNumbers.join(', ') : '-'}</div>
+                      <div className="text-gray-500">Pax</div><div>{detailData.booking.pax} (S:{detailData.booking.students} M:{detailData.booking.members} T:{detailData.booking.tutors})</div>
+                      <div className="text-gray-500">Refund Status</div><div>{detailData.booking.refundstatus || 'NONE'}</div>
+                      {detailData.booking.refundreason ? (<><div className="text-gray-500">Refund Reason</div><div>{detailData.booking.refundreason}</div></>) : null}
+                    </div>
+
+                    {/* Payment Breakdown */}
+                    <div className="border-t pt-4 space-y-4">
+                      <h4 className="font-semibold text-sm">Payment Breakdown</h4>
+                      
+                      {/* Original Booking Payment */}
+                      <div className="border-b pb-3">
+                        <h5 className="font-medium text-xs mb-2 text-gray-700">Original Booking</h5>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                          <div className="text-gray-500">Base Cost</div>
+                          <div className="font-medium">${(detailData.booking.totalCost || 0).toFixed(2)}</div>
+                          
+                          {/* Discounts Breakdown */}
+                          {detailData.discountHistory && detailData.discountHistory.length > 0 ? (
+                            <>
+                              {detailData.discountHistory
+                                .filter((d: any) => d.actionType === 'ORIGINAL_BOOKING')
+                                .map((discount: any, idx: number) => (
+                                  <div key={idx} className="col-span-2 grid grid-cols-2 gap-x-4">
+                                    <div className="text-gray-500 pl-4">
+                                      - {discount.discountType === 'PROMO_CODE' ? 'Promo Code' : discount.discountType === 'CREDIT' ? 'Credits' : discount.discountType === 'PASS' ? 'Package/Pass' : 'Discount'}
+                                    </div>
+                                    <div className="text-green-600">-${(parseFloat(discount.discountAmount) || 0).toFixed(2)}</div>
+                                  </div>
+                                ))}
+                            </>
+                          ) : null}
+                          
+                          {detailData.booking.discountAmount && detailData.booking.discountAmount > 0 && (!detailData.discountHistory || detailData.discountHistory.length === 0) ? (
+                            <>
+                              <div className="text-gray-500">Total Discount</div>
+                              <div className="text-green-600">-${(detailData.booking.discountAmount || 0).toFixed(2)}</div>
+                            </>
+                          ) : null}
+                          
+                          {detailData.paymentFee && detailData.paymentFee > 0 ? (
+                            <>
+                              <div className="text-gray-500">Payment Fee</div>
+                              <div className="text-orange-600">+${(detailData.paymentFee || 0).toFixed(2)}</div>
+                            </>
+                          ) : null}
+                          
+                          <div className="text-gray-700 font-semibold pt-1 border-t">Amount Paid</div>
+                          <div className="text-gray-700 font-semibold pt-1 border-t">
+                            ${(() => {
+                              // Calculate actual amount paid: Base Cost - Discounts + Fees
+                              const baseCost = parseFloat(detailData.booking.totalCost || 0);
+                              const totalDiscounts = detailData.discountHistory && detailData.discountHistory.length > 0
+                                ? detailData.discountHistory
+                                    .filter((d: any) => d.actionType === 'ORIGINAL_BOOKING')
+                                    .reduce((sum: number, d: any) => sum + (parseFloat(d.discountAmount) || 0), 0)
+                                : (parseFloat(detailData.booking.discountAmount) || 0);
+                              const paymentFee = parseFloat(detailData.paymentFee || 0);
+                              
+                              // If credits/discounts fully cover the cost, amount paid should be 0
+                              // Formula: Base Cost - Total Discounts + Payment Fees
+                              const amountPaid = Math.max(0, baseCost - totalDiscounts + paymentFee);
+                              
+                              return amountPaid.toFixed(2);
+                            })()}
+                          </div>
+                        </div>
+                        
+                        {(() => {
+                          // Calculate if credits fully covered the booking
+                          const baseCost = parseFloat(detailData.booking.totalCost || 0);
+                          const totalDiscounts = detailData.discountHistory && detailData.discountHistory.length > 0
+                            ? detailData.discountHistory
+                                .filter((d: any) => d.actionType === 'ORIGINAL_BOOKING')
+                                .reduce((sum: number, d: any) => sum + (parseFloat(d.discountAmount) || 0), 0)
+                            : (parseFloat(detailData.booking.discountAmount) || 0);
+                          const paymentFee = parseFloat(detailData.paymentFee || 0);
+                          const amountPaid = Math.max(0, baseCost - totalDiscounts + paymentFee);
+                          
+                          if (amountPaid === 0 && totalDiscounts > 0) {
+                            // Credits fully covered the booking
+                            return (
+                              <div className="mt-2 text-xs text-green-600 font-medium">
+                                Fully paid via Credits/Discounts - No payment required
+                              </div>
+                            );
+                          } else if (detailData.allPayments && detailData.allPayments.length > 0 && detailData.allPayments[0]) {
+                            // Show payment method and date
+                            return (
+                              <div className="mt-2 text-xs text-gray-500">
+                                Paid via {detailData.allPayments[0].paymentMethod?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'N/A'} on{' '}
+                                {formatLocalDate(detailData.allPayments[0].paidAt || detailData.allPayments[0].createdAt, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+
+                      {/* Reschedule Payments */}
+                      {detailData.allPayments && detailData.allPayments.length > 1 ? (
+                        <div className="space-y-3">
+                          <h5 className="font-medium text-xs text-gray-700">Reschedule Payments</h5>
+                          {(detailData.allPayments || []).slice(1).map((payment: any, idx: number) => {
+                            // Find corresponding activity for this payment
+                            const rescheduleActivity = activities.find((a: any) => 
+                              a.activityType === 'RESCHEDULE_APPROVED' && 
+                              a.createdAt && 
+                              Math.abs(new Date(a.createdAt).getTime() - new Date(payment.createdAt).getTime()) < 60000
+                            );
+                            
+                            return (
+                              <div key={payment.id || idx} className="border rounded p-3 bg-gray-50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-medium text-gray-700">Reschedule #{idx + 1}</span>
+                                  <span className="text-xs text-gray-500">
+                                    {formatLocalDate(payment.paidAt || payment.createdAt, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                  <div className="text-gray-500">Additional Amount</div>
+                                  <div className="font-medium text-blue-600">+${(parseFloat(payment.amount) || 0).toFixed(2)}</div>
+                                  
+                                  {/* Reschedule-specific discounts */}
+                                  {detailData.discountHistory && detailData.discountHistory.length > 0 ? (
+                                    <>
+                                      {detailData.discountHistory
+                                        .filter((d: any) => d.actionType === 'RESCHEDULE' && 
+                                          new Date(d.appliedAt).getTime() >= new Date(payment.createdAt).getTime() - 60000 &&
+                                          new Date(d.appliedAt).getTime() <= new Date(payment.createdAt).getTime() + 60000)
+                                        .map((discount: any, discountIdx: number) => (
+                                          <div key={discountIdx} className="col-span-2 grid grid-cols-2 gap-x-4">
+                                            <div className="text-gray-500 pl-4">
+                                              - {discount.discountType === 'CREDIT' ? 'Credits' : discount.discountType === 'PROMO_CODE' ? 'Promo Code' : 'Discount'}
+                                            </div>
+                                            <div className="text-green-600">-${(parseFloat(discount.discountAmount) || 0).toFixed(2)}</div>
+                                          </div>
+                                        ))}
+                                    </>
+                                  ) : null}
+                                  
+                                  <div className="text-gray-700 font-semibold pt-1 border-t">Amount Paid</div>
+                                  <div className="text-gray-700 font-semibold pt-1 border-t">
+                                    ${(parseFloat(payment.amount) || 0).toFixed(2)}
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-xs text-gray-500">
+                                  Via {payment.paymentMethod?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'N/A'}
+                                </div>
+                                {rescheduleActivity && rescheduleActivity.metadata ? (
+                                  <div className="mt-2 text-xs text-gray-600">
+                                    <div>Old: {rescheduleActivity.metadata.originalStartAt ? formatSingaporeDate(rescheduleActivity.metadata.originalStartAt) : 'N/A'}</div>
+                                    <div>New: {rescheduleActivity.metadata.newStartAt ? formatSingaporeDate(rescheduleActivity.metadata.newStartAt) : 'N/A'}</div>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      {/* Total Summary */}
+                      <div className="border-t pt-3">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm font-semibold">
+                          <div className="text-gray-700">Total Base Cost</div>
+                          <div className="text-gray-700">${(detailData.booking.totalCost || 0).toFixed(2)}</div>
+                          
+                          <div className="text-gray-700">Total Discounts</div>
+                          <div className="text-green-600">
+                            -${(detailData.discountHistory && detailData.discountHistory.length > 0
+                              ? detailData.discountHistory.reduce((sum: number, d: any) => sum + (parseFloat(d.discountAmount) || 0), 0)
+                              : detailData.booking.discountAmount || 0).toFixed(2)}
+                          </div>
+                          
+                          <div className="text-gray-700">Total Payment Fees</div>
+                          <div className="text-orange-600">+${(detailData.paymentFee || 0).toFixed(2)}</div>
+                          
+                          <div className="text-base text-gray-900 pt-2 border-t">Total Amount Paid</div>
+                          <div className="text-base text-gray-900 pt-2 border-t">
+                            ${(() => {
+                              // Calculate total amount paid: Base Cost - All Discounts + Fees
+                              // If credits fully covered, this should be 0
+                              const totalBaseCost = parseFloat(detailData.booking.totalCost || 0);
+                              const totalDiscounts = detailData.discountHistory && detailData.discountHistory.length > 0
+                                ? detailData.discountHistory.reduce((sum: number, d: any) => sum + (parseFloat(d.discountAmount) || 0), 0)
+                                : (parseFloat(detailData.booking.discountAmount) || 0);
+                              const totalPaymentFees = parseFloat(detailData.paymentFee || 0);
+                              
+                              // Formula: Base Cost - Total Discounts + Payment Fees
+                              // If discounts fully cover, result will be 0 or less, so show 0
+                              const totalAmountPaid = Math.max(0, totalBaseCost - totalDiscounts + totalPaymentFees);
+                              
+                              return totalAmountPaid.toFixed(2);
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
