@@ -1,7 +1,7 @@
 // src/components/BookingForm.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 
 import Image from 'next/image'
@@ -181,18 +181,21 @@ export default function BookingForm() {
   };
 
   const getAvailableEndTimes = (date: Date | null): Date[] => {
-    const times = getAvailableTimes(date);
-    if (!startDate || !times.length) return times;
+    // If no start date, return empty array
+    if (!startDate) return [];
+
+    // End date must be same day as start date, so always use startDate's date
+    const targetDate = startDate;
+    const times = getAvailableTimes(targetDate);
+    if (!times.length) return times;
 
     // Filter based on start time (must be >= start time + 1 hour)
     const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
 
+    // Since end date is always same day, filter times to be >= start + 1 hour
     return times.filter(time => {
-      // If same day, check time
-      if (date && startDate && date.toDateString() === startDate.toDateString()) {
-        return time >= minEndTime;
-      }
-      return true;
+      // Compare the time portion - time should be >= minEndTime
+      return time.getTime() >= minEndTime.getTime();
     });
   };
 
@@ -235,9 +238,9 @@ export default function BookingForm() {
   const getEndDateConstraints = () => {
     if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
 
-    // End date can be same day or next day
+    // End date must be same day as start date (no next day allowed)
     const minEndDate = startDate
-    const maxEndDate = addDays(startDate, 1) // Allow booking until next day
+    const maxEndDate = endOfDay(startDate) // Same day only, until end of day
 
     return {
       minDate: minEndDate,
@@ -256,27 +259,11 @@ export default function BookingForm() {
     // Minimum end time is start time + 1 hour (60 minutes)
     const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000)
 
-    // If end date is same day as start date
-    if (isSameDay(startDate, endDate)) {
-      return {
-        minTime: minEndTime, // Must be at least 1 hour after start time
-        maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
-      }
-    }
-
-    // If end date is next day
-    const nextDay = addDays(startDate, 1)
-    if (isSameDay(endDate, nextDay)) {
-      return {
-        minTime: setHours(setMinutes(endDate, 0), 0), // From 12:00 AM next day
-        maxTime: setHours(setMinutes(endDate, 0), 12) // Until 12:00 PM next day
-      }
-    }
-
-    // Default fallback
+    // End date must be same day as start date (no next day allowed)
+    // Since end date is always same day, we only need same day logic
     return {
-      minTime: setHours(setMinutes(new Date(), 0), 0),
-      maxTime: setHours(setMinutes(new Date(), 59), 23)
+      minTime: minEndTime, // Must be at least 1 hour after start time
+      maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
     }
   }
 
@@ -369,32 +356,14 @@ export default function BookingForm() {
       return
     }
 
-    // Check if it is a valid cross-day booking
-    const daysDifference = Math.floor(timeDifferenceHours / 24)
-
-    if (daysDifference > 1) {
+    // Check if end date is same day as start date (no next day bookings allowed)
+    if (!isSameDay(startDate, endDate)) {
       toast({
         title: "Invalid Booking Period",
-        description: "Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)",
+        description: "End date must be on the same day as start date. Next day bookings are not allowed.",
         variant: "destructive",
       })
       return
-    }
-
-    // If it's a next-day booking, validate time constraints
-    if (daysDifference === 1) {
-      const startHour = startDate.getHours()
-      const endHour = endDate.getHours()
-
-      // Business rule: Cross-day bookings only allowed from 5 PM to 12 PM next day
-      if (startHour < 17 || endHour > 12) {
-        toast({
-          title: "Invalid Cross-Day Booking",
-          description: "Cross-day bookings are only allowed from 5 PM to 12 PM next day",
-          variant: "destructive",
-        })
-        return
-      }
     }
 
     // Check if user is logged in, redirect to login if not logged in
@@ -462,6 +431,11 @@ export default function BookingForm() {
   }
   const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
   const endTimeConstraints = endDate ? getEndTimeConstraints() : getInitialEndTimeConstraints()
+  
+  // Memoize available end times to avoid recalculation on every render
+  const availableEndTimes = useMemo(() => {
+    return getAvailableEndTimes(endDate)
+  }, [endDate, startDate, operatingHours])
 
   return (
     <section id="BookNow" className="pt-24">
@@ -559,7 +533,7 @@ export default function BookingForm() {
                     maxDate={endMaxDate}
                     showTimeSelect
                     timeIntervals={15}
-                    includeTimes={getAvailableEndTimes(endDate)}
+                    includeTimes={availableEndTimes}
                     dateFormat="MMM d, yyyy h:mm aa"
                     placeholderText="End"
                     className="w-44 pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -656,7 +630,7 @@ export default function BookingForm() {
                     minDate={endMinDate}
                     maxDate={endMaxDate}
                     showTimeSelect
-                    includeTimes={getAvailableEndTimes(endDate)}
+                    includeTimes={availableEndTimes}
                     dateFormat="MMM d, h:mm aa"
                     placeholderText="End"
                     className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -753,7 +727,7 @@ export default function BookingForm() {
                     minDate={endMinDate}
                     maxDate={endMaxDate}
                     showTimeSelect
-                    includeTimes={getAvailableEndTimes(endDate)}
+                    includeTimes={availableEndTimes}
                     dateFormat="MMM d, h:mm aa"
                     placeholderText="End"
                     className="w-full pl-0 border-b border-gray-300 pb-1 focus:outline-none text-black"
@@ -776,10 +750,10 @@ export default function BookingForm() {
             </div>
           </div>
 
-          {/* Helper text for cross-day bookings */}
+          {/* Helper text for bookings */}
           {startDate && (
             <div className="mt-4 text-xs sm:text-sm text-white/80 max-w-md text-center px-4">
-              <p>💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)</p>
+              <p>💡 End time must be on the same day as start time</p>
               <p>Bookings are limited to 2 months in advance</p>
             </div>
           )}

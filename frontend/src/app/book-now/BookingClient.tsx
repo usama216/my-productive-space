@@ -3,7 +3,7 @@
 import { SeatPicker, SeatMeta, OverlayMeta, TableMeta, LabelMeta } from '@/components/book-now-sections/SeatPicker'
 import { EntitlementTabs } from '@/components/book-now-sections/EntitlementTabs'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -736,32 +736,53 @@ export default function BookingClient() {
   const handleEndChange = (date: Date | null) => {
     const validDate = enforceStrict15Minutes(date);
 
-    // If selecting same day as start date and start time is late (after 5 PM)
-    // automatically move to next day to prevent negative duration
-    if (validDate && startDate && isSameDay(validDate, startDate)) {
-      const startHour = startDate.getHours();
+    // Prevent selecting past end times
+    if (validDate && startDate) {
+      const now = new Date();
+      const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000); // Start + 1 hour
 
-      // If start time is after 5 PM (17:00), force next day selection
-      if (startHour >= 17) {
-        const nextDay = addDays(startDate, 1);
-        const nextDayWithTime = new Date(nextDay);
-        // Set time to midnight + 1 hour (minimum gap)
-        nextDayWithTime.setHours(0, 0, 0, 0);
-        const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
-
-        // If the calculated min end time is on next day, use it
-        if (minEndTime > startDate && !isSameDay(minEndTime, startDate)) {
-          setEndDate(minEndTime);
-          toast({
-            title: "End Date Auto-adjusted",
-            description: `Since start time is ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, end date moved to next day.`,
-            variant: "default"
-          });
-          return;
-        }
+      // If selecting today and end time is before current time + 1 hour from start
+      if (isSameDay(validDate, now) && validDate < minEndTime && minEndTime > now) {
+        // Don't allow past times
+        toast({
+          title: "Invalid End Time",
+          description: "End time cannot be in the past. Please select a future time.",
+          variant: "destructive"
+        });
+        return;
       }
-      setEndDate(validDate)
+
+      // Ensure end time is at least 1 hour after start time
+      if (validDate <= startDate) {
+        toast({
+          title: "Invalid End Time",
+          description: "End time must be after start time",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (validDate < minEndTime) {
+        toast({
+          title: "Invalid End Time",
+          description: "End time must be at least 1 hour after start time",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if end date is same day as start date
+      if (!isSameDay(validDate, startDate)) {
+        toast({
+          title: "Invalid End Date",
+          description: "End date must be on the same day as start date. Next day bookings are not allowed.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
+
+    setEndDate(validDate)
   }
 
   // Helper to generate available times for a given date based on operating hours
@@ -803,18 +824,21 @@ export default function BookingClient() {
   };
 
   const getAvailableEndTimes = (date: Date | null): Date[] => {
-    const times = getAvailableTimes(date);
-    if (!startDate || !times.length) return times;
+    // If no start date, return empty array
+    if (!startDate) return [];
+
+    // End date must be same day as start date, so always use startDate's date
+    const targetDate = startDate;
+    const times = getAvailableTimes(targetDate);
+    if (!times.length) return times;
 
     // Filter based on start time (must be >= start time + 1 hour)
     const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
 
+    // Since end date is always same day, filter times to be >= start + 1 hour
     return times.filter(time => {
-      // If same day, check time
-      if (date && startDate && date.toDateString() === startDate.toDateString()) {
-        return time >= minEndTime;
-      }
-      return true;
+      // Compare the time portion - time should be >= minEndTime
+      return time.getTime() >= minEndTime.getTime();
     });
   };
 
@@ -824,16 +848,9 @@ export default function BookingClient() {
   const getEndDateConstraints = () => {
     if (!startDate) return { minDate: new Date(), maxDate: maxBookingDate }
 
-    const startHour = startDate.getHours();
-
-    // If start time is after 5 PM (17:00), minimum end date is next day
-    // This prevents selecting same day which would cause negative duration
-    let minEndDate = startDate;
-    if (startHour >= 17) {
-      minEndDate = addDays(startDate, 1);
-    }
-
-    const maxEndDate = addDays(startDate, 1) // Allow booking until next day
+    // End date must be same day as start date (no next day allowed)
+    const minEndDate = startDate
+    const maxEndDate = endOfDay(startDate) // Same day only, until end of day
 
     return {
       minDate: minEndDate,
@@ -843,7 +860,6 @@ export default function BookingClient() {
 
   // Get time constraints for end time selection
   const getEndTimeConstraints = () => {
-    // return block @start
     if (!startDate || !endDate) {
       return {
         minTime: setHours(setMinutes(new Date(), 0), 0),
@@ -854,26 +870,11 @@ export default function BookingClient() {
     // Minimum end time is start time + 1 hour (60 minutes)
     const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000)
 
-    // If end date is same day as start date
-    if (isSameDay(startDate, endDate)) {
-      return {
-        minTime: minEndTime, // Must be at least 1 hour after start time
-        maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
-      }
-    }
-
-    // If end date is next day
-    const nextDay = addDays(startDate, 1)
-    if (isSameDay(endDate, nextDay)) {
-      return {
-        minTime: setHours(setMinutes(endDate, 0), 0), // From 12:00 AM next day
-        maxTime: setHours(setMinutes(endDate, 0), 12) // Until 12:00 PM next day
-      }
-    }
-
+    // End date must be same day as start date (no next day allowed)
+    // Since end date is always same day, we only need same day logic
     return {
-      minTime: setHours(setMinutes(new Date(), 0), 0),
-      maxTime: setHours(setMinutes(new Date(), 59), 23)
+      minTime: minEndTime, // Must be at least 1 hour after start time
+      maxTime: setHours(setMinutes(endDate, 59), 23) // Until 11:59 PM same day
     }
   }
 
@@ -952,26 +953,11 @@ export default function BookingClient() {
       }
     }
 
-    // Check if it is a valid cross-day booking
-    const daysDifference = Math.floor(timeDifferenceHours / 24)
-
-    if (daysDifference > 1) {
+    // Check if end date is same day as start date (no next day bookings allowed)
+    if (!isSameDay(startDate, endDate)) {
       return {
         isValid: false,
-        message: 'Bookings can only span maximum 2 days from start date to end date (e.g., 11 PM today to 12 PM tomorrow)'
-      }
-    }
-
-    if (daysDifference === 1) {
-      const startHour = startDate.getHours()
-      const endHour = endDate.getHours()
-
-      // Business rule: Cross-day bookings only allowed from 5 PM to 12 PM next day
-      if (startHour < 17 || endHour > 12) {
-        return {
-          isValid: false,
-          message: 'Cross-day bookings are only allowed from 5 PM to 12 PM next day'
-        }
+        message: 'End date must be on the same day as start date. Next day bookings are not allowed.'
       }
     }
 
@@ -1443,6 +1429,11 @@ export default function BookingClient() {
   // Get constraints for the DatePicker components
   const { minDate: endMinDate, maxDate: endMaxDate } = getEndDateConstraints()
   const endTimeConstraints = endDate ? getEndTimeConstraints() : getInitialEndTimeConstraints()
+  
+  // Memoize available end times to avoid recalculation on every render
+  const availableEndTimes = useMemo(() => {
+    return getAvailableEndTimes(endDate)
+  }, [endDate, startDate, operatingHours])
 
   const isFormValid =
     location &&
@@ -1630,7 +1621,7 @@ export default function BookingClient() {
                             maxDate={endMaxDate}
                             showTimeSelect
                             timeIntervals={15}
-                            includeTimes={getAvailableEndTimes(endDate)}
+                            includeTimes={availableEndTimes}
                             excludeDates={getExcludedDates()}
                             dateFormat="MMM d, h:mm aa"
                             placeholderText="Select end time"
@@ -1641,7 +1632,7 @@ export default function BookingClient() {
                           />
                           {/* {startDate && (
                             <p className="text-xs text-gray-500 mt-1">
-                              💡 You can book across days (e.g., 11 PM today to 1 AM tomorrow)
+                              💡 End time must be on the same day as start time
                           )} */}
                         </div>
                       </div>
