@@ -123,11 +123,15 @@ export default function BookingForm() {
     if (!date) return [];
 
     const dayOfWeek = date.getDay();
+    const now = new Date();
+    const isToday = isSameDay(date, now);
 
     // Log for debugging
-    console.log(' Getting available times for:', {
+    console.log('🕐 Getting available times for:', {
       date: date.toDateString(),
       dayOfWeek,
+      isToday,
+      currentTime: now.toLocaleTimeString(),
       operatingHoursLoaded: operatingHours.length,
       isLoadingShopHours
     });
@@ -136,17 +140,21 @@ export default function BookingForm() {
 
     // CRITICAL: Always show times even if hours aren't loaded yet (fallback)
     if (operatingHours.length === 0 || !dayHours) {
-      console.log(' Using fallback times - shop hours not loaded or day closed');
+      console.log('⚠️ Using fallback times - shop hours not loaded or day closed');
       const times: Date[] = [];
       const start = new Date(date);
       start.setHours(0, 0, 0, 0);
       for (let i = 0; i < 24 * 4; i++) {
-        times.push(new Date(start.getTime() + i * 15 * 60 * 1000));
+        const time = new Date(start.getTime() + i * 15 * 60 * 1000);
+        // For same-day bookings, only include future times
+        if (!isToday || time > now) {
+          times.push(time);
+        }
       }
       return times;
     }
 
-    console.log(' Using shop hours:', dayHours);
+    console.log('✅ Using shop hours:', dayHours);
     const times: Date[] = [];
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
@@ -159,12 +167,16 @@ export default function BookingForm() {
       const openTime = dayHours.openTime.substring(0, 5);
       const closeTime = dayHours.closeTime.substring(0, 5);
 
+      // Check if time is within operating hours
       if (timeString >= openTime && timeString <= closeTime) {
-        times.push(time);
+        // For same-day bookings, only include times in the future
+        if (!isToday || time > now) {
+          times.push(time);
+        }
       }
     }
 
-    console.log(` Generated ${times.length} available times for ${date.toDateString()}`);
+    console.log(`📋 Generated ${times.length} available times for ${date.toDateString()}`);
     return times;
   };
 

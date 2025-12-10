@@ -270,7 +270,7 @@ export function PaymentSettingsManagement() {
           </div>
 
           {/* Admin Refund Fee */}
-          <div className="space-y-4 pt-6 border-t">
+          {/* <div className="space-y-4 pt-6 border-t">
             <h3 className="text-lg font-semibold">Refund Settings</h3>
             <div className="space-y-2">
               <Label htmlFor="ADMIN_REFUND_FEE" className="flex items-center gap-2">
@@ -295,7 +295,7 @@ export function PaymentSettingsManagement() {
                 <span className="text-sm text-gray-600">SGD</span>
               </div>
             </div>
-          </div>
+          </div> */}
 
 
           {/* Enable/Disable Settings */}

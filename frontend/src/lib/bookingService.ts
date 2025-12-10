@@ -76,6 +76,9 @@ export interface Booking {
   totalactualcost?: number
   createdAt?: string
   updatedAt?: string
+  cancelledBy?: 'admin' | 'user'
+  cancelledAt?: string
+  cancellationReason?: string
   User?: {
     name: string
     email: string
@@ -170,7 +173,7 @@ export interface UserStatsResponse {
   userId: string
   upcomingBookings: number
   pastBookings: number
-  ongoingBookings:number
+  ongoingBookings: number
 }
 
 // API Base URL
@@ -180,7 +183,7 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive
 const handleResponse = async (response: Response): Promise<BookingResponse> => {
   try {
     const data = await response.json()
-    
+
     if (!response.ok) {
       return {
         success: false,
@@ -188,7 +191,7 @@ const handleResponse = async (response: Response): Promise<BookingResponse> => {
         message: data.message || data.error || `HTTP ${response.status}`
       }
     }
-    
+
     return {
       success: true,
       ...data
@@ -206,13 +209,13 @@ const handleResponse = async (response: Response): Promise<BookingResponse> => {
 // Helper function to build query string
 const buildQueryString = (filters: BookingFilters): string => {
   const params = new URLSearchParams()
-  
+
   Object.entries(filters).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       params.append(key, value.toString())
     }
   })
-  
+
   return params.toString()
 }
 
@@ -223,7 +226,7 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
       method: 'POST',
       body: JSON.stringify(payload),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Create Booking Error:', error)
@@ -253,7 +256,7 @@ export const getUserBookings = async (): Promise<BookingResponse> => {
   try {
     // Get userId from localStorage auth_user
     let userId = '123e4567-e89b-12d3-a456-426614174000' // fallback
-    
+
     try {
       const authUser = localStorage.getItem('auth_user')
       if (authUser) {
@@ -263,12 +266,12 @@ export const getUserBookings = async (): Promise<BookingResponse> => {
     } catch (parseError) {
       console.warn('Failed to parse auth_user from localStorage:', parseError)
     }
-    
+
     const response = await authenticatedFetch(`${API_BASE}/booking/user/bookings`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Get User Bookings Error:', error)
@@ -300,7 +303,7 @@ export const confirmBookingPayment = async (bookingId: string): Promise<BookingR
       method: 'POST',
       body: JSON.stringify({ bookingId }),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Confirm Payment Error:', error)
@@ -318,7 +321,7 @@ export const getBookedSeats = async (location: string, startAt: string, endAt: s
       method: 'POST',
       body: JSON.stringify({ location, startAt, endAt }),
     })
-    
+
     const data = await response.json()
     return data
   } catch (error) {
@@ -333,12 +336,12 @@ export const getUserStats = async (userId: string): Promise<UserStatsResponse> =
       method: 'POST',
       body: JSON.stringify({ userId }),
     })
-    
+
     const data = await response.json()
     return data
   } catch (error) {
     console.error('Get User Stats Error:', error)
-    return { userId, upcomingBookings: 0, pastBookings: 0, ongoingBookings:0 }
+    return { userId, upcomingBookings: 0, pastBookings: 0, ongoingBookings: 0 }
   }
 }
 
@@ -347,7 +350,7 @@ export const getAdminBookings = async (filters: BookingFilters = {}): Promise<Bo
   try {
     const queryString = buildQueryString(filters)
     const url = `${API_BASE}/booking/admin/all${queryString ? `?${queryString}` : ''}`
-    
+
     const response = await authenticatedFetch(url)
     return await handleResponse(response)
   } catch (error) {
@@ -417,7 +420,7 @@ export const updateAdminBooking = async (id: string, payload: UpdateBookingPaylo
       method: 'PUT',
       body: JSON.stringify(payload),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Update Booking Error:', error)
@@ -435,7 +438,7 @@ export const cancelAdminBooking = async (id: string, payload: CancelBookingPaylo
       method: 'DELETE',
       body: JSON.stringify(payload),
     })
-    
+
     return await handleResponse(response)
   } catch (error) {
     console.error('Cancel Booking Error:', error)

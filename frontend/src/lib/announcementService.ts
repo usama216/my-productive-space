@@ -1,4 +1,5 @@
 // src/lib/announcementService.ts - Announcement API service
+import { authenticatedFetch } from './apiClient'
 
 // Types
 export interface Announcement {
@@ -88,7 +89,7 @@ export const getAllAnnouncements = async (): Promise<AnnouncementResponse> => {
 // Admin APIs
 export const getAllAnnouncementsAdmin = async (): Promise<AnnouncementResponse> => {
     try {
-        const response = await fetch(`${API_BASE}/admin/announcements`)
+        const response = await authenticatedFetch(`${API_BASE}/admin/announcements`)
         return await handleResponse(response)
     } catch (error) {
         console.error('Get All Announcements (Admin) Error:', error)
@@ -102,7 +103,7 @@ export const getAllAnnouncementsAdmin = async (): Promise<AnnouncementResponse> 
 
 export const getAnnouncementById = async (id: string): Promise<AnnouncementResponse> => {
     try {
-        const response = await fetch(`${API_BASE}/admin/announcements/${id}`)
+        const response = await authenticatedFetch(`${API_BASE}/admin/announcements/${id}`)
         return await handleResponse(response)
     } catch (error) {
         console.error('Get Announcement Error:', error)
@@ -116,11 +117,8 @@ export const getAnnouncementById = async (id: string): Promise<AnnouncementRespo
 
 export const createAnnouncement = async (payload: CreateAnnouncementPayload): Promise<AnnouncementResponse> => {
     try {
-        const response = await fetch(`${API_BASE}/admin/announcements`, {
+        const response = await authenticatedFetch(`${API_BASE}/admin/announcements`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(payload),
         })
 
@@ -137,11 +135,8 @@ export const createAnnouncement = async (payload: CreateAnnouncementPayload): Pr
 
 export const updateAnnouncement = async (id: string, payload: UpdateAnnouncementPayload): Promise<AnnouncementResponse> => {
     try {
-        const response = await fetch(`${API_BASE}/admin/announcements/${id}`, {
+        const response = await authenticatedFetch(`${API_BASE}/admin/announcements/${id}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(payload),
         })
 
@@ -158,7 +153,7 @@ export const updateAnnouncement = async (id: string, payload: UpdateAnnouncement
 
 export const deleteAnnouncement = async (id: string): Promise<AnnouncementResponse> => {
     try {
-        const response = await fetch(`${API_BASE}/admin/announcements/${id}`, {
+        const response = await authenticatedFetch(`${API_BASE}/admin/announcements/${id}`, {
             method: 'DELETE',
         })
 
@@ -175,11 +170,8 @@ export const deleteAnnouncement = async (id: string): Promise<AnnouncementRespon
 
 export const updateAnnouncementOrder = async (id: string, order: number): Promise<AnnouncementResponse> => {
     try {
-        const response = await fetch(`${API_BASE}/admin/announcements/${id}/order`, {
+        const response = await authenticatedFetch(`${API_BASE}/admin/announcements/${id}/order`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify({ order }),
         })
 

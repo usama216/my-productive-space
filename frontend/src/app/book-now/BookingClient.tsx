@@ -520,7 +520,10 @@ export default function BookingClient() {
   }, [startDate, endDate])
 
   const { minTime, maxTime } = getSingaporeTimeConstraints()
-  const minDate = minTime
+  // minDate should be TODAY (not 30 minutes from now) to allow same-day booking
+  // The 30-minute buffer is enforced by getStartTimeConstraints() for time selection
+  const minDate = new Date() // Allow selecting today's date
+  minDate.setHours(0, 0, 0, 0) // Set to start of day
   const maxBookingDate = maxTime
 
   const isPaymentFailed = useCallback((status: string | null) => {

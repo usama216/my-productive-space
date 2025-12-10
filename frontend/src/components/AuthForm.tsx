@@ -574,8 +574,7 @@ export function AuthForm({ type }: Props) {
               </Link>
             </Label>
           </div>
-        </div>
-
+        </div> 
         <div className="space-y-2">
           <div className="flex justify-center">
             <ReCAPTCHA

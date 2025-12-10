@@ -834,9 +834,16 @@ export function BookingManagement() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(getBookingStatus(booking))}>
-                            {getBookingStatus(booking)}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge className={getStatusColor(getBookingStatus(booking))}>
+                              {getBookingStatus(booking)}
+                            </Badge>
+                            {booking.status === 'cancelled' && booking.cancelledBy === 'admin' && (
+                              <Badge variant="outline" className="bg-purple-100 text-purple-800 text-xs">
+                                Cancelled by Admin
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge
