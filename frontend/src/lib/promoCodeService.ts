@@ -1,4 +1,6 @@
 // Promo Code Service - Based on Backend API Documentation
+import { getAuthHeaders } from './apiClient'
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
 
 // Types based on backend API documentation
@@ -273,11 +275,10 @@ export const createPromoCode = async (promoData: {
   priority?: number;
 }): Promise<{ success: boolean; message: string; promoCode?: PromoCode; error?: string }> => {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_BASE_URL}/promocode/admin/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(promoData),
     });
 
@@ -326,11 +327,10 @@ export const updatePromoCode = async (id: string, promoData: Partial<{
   priority?: number;
 }>): Promise<{ success: boolean; message: string; promoCode?: PromoCode; error?: string }> => {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(promoData),
     });
 
@@ -361,11 +361,10 @@ export const updatePromoCode = async (id: string, promoData: Partial<{
 
 export const deletePromoCode = async (id: string): Promise<{ success: boolean; message: string; error?: string }> => {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     const result = await response.json();
@@ -412,11 +411,10 @@ export const getAllPromoCodes = async (params?: {
 
     const url = `${API_BASE_URL}/promocode/admin/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
+    const headers = await getAuthHeaders()
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     const result = await response.json();
@@ -461,11 +459,10 @@ export const getAllPromoCodes = async (params?: {
 
 export const getPromoCodeDetails = async (id: string): Promise<{ success: boolean; promoCode?: PromoCode; error?: string }> => {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_BASE_URL}/promocode/admin/${id}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     const result = await response.json();
