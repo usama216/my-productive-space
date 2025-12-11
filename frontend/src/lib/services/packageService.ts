@@ -143,7 +143,7 @@ class PackageService {
   async getPackagesByRole(role: string): Promise<{ success: boolean; packages?: NewPackage[]; error?: string }> {
     try {
       console.log(`🔍 Fetching packages for role: ${role}`);
-      const response = await fetch(`${API_BASE_URL}/new-packages/role/${role}`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/role/${role}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Unknown error occurred' }));
@@ -182,7 +182,7 @@ class PackageService {
   // Get specific package by ID
   async getPackageById(packageId: string): Promise<{ success: boolean; package?: NewPackage; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/new-packages/${packageId}`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/${packageId}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch package');
@@ -217,11 +217,8 @@ class PackageService {
         throw new Error('Customer information is required');
       }
       
-      const response = await fetch(`${API_BASE_URL}/new-packages/purchase`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/purchase`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(purchaseData),
       });
       
@@ -262,11 +259,8 @@ class PackageService {
       console.log('🔔 Package Confirmation API Call:', `${API_BASE_URL}/packages/confirm`);
       console.log('📦 Confirmation Data:', confirmationData);
       
-      const response = await fetch(`${API_BASE_URL}/packages/confirm`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/packages/confirm`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(confirmationData),
       });
       
@@ -587,7 +581,7 @@ class PackageService {
     error?: string;
   }> {
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/new-packages/user/${userId}/passes?page=${page}&limit=${limit}`
       );
       if (!response.ok) {
@@ -612,11 +606,8 @@ class PackageService {
   // Use a pass for booking
   async usePass(userId: string, passId: string, bookingId: string, locationId: string, startTime: string, endTime: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/new-packages/passes/use`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/passes/use`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           userId,
           passId,
@@ -645,7 +636,7 @@ class PackageService {
   // Get user's purchase history
   async getUserPurchaseHistory(userId: string): Promise<{ success: boolean; history?: PurchaseHistory[]; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/new-packages/user/${userId}/history`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/user/${userId}/history`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch purchase history');

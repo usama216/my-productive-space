@@ -46,6 +46,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { formatCurrency } from '@/lib/paymentUtils'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
+import { authenticatedFetch } from '@/lib/apiClient'
 
 // Layout and seat configuration (same as extend page)
 const DEMO_LAYOUT: SeatMeta[] = [
@@ -430,11 +431,8 @@ export default function ReschedulePage() {
           
           // Call backend to confirm reschedule payment
           // Use bookingId to lookup payment by bookingRef (same as extend)
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
+          const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
             body: JSON.stringify({
               bookingId: bookingId,
               paymentId: bookingId, // Use bookingId to lookup payment by bookingRef
@@ -572,11 +570,8 @@ export default function ReschedulePage() {
       try {
         setCheckingSeats(true)
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
+        const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({
             location: booking.location,
             startAt: newStartDate.toISOString(),
@@ -766,11 +761,8 @@ export default function ReschedulePage() {
         
         console.log('💳 Sending reschedule data with credits:', rescheduleDataWithCredits);
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
+        const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/confirm-payment`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({
             bookingId,
             paymentId,
@@ -818,11 +810,8 @@ export default function ReschedulePage() {
           creditAmount: dataToUse?.creditAmount || 0
         })
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/booking/${bookingId}`, {
+        const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/booking/${bookingId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({
             startAt: dataToUse?.newStartAt,
             endAt: dataToUse?.newEndAt,
@@ -918,15 +907,12 @@ export default function ReschedulePage() {
 
       // If no payment needed, reschedule directly
       console.log('💰 No payment needed, proceeding with direct reschedule')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/booking/${bookingId}`, {
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/reschedule/booking/${bookingId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
-          startAt: rescheduleData.newStartAt,
-          endAt: rescheduleData.newEndAt,
-          seatNumbers: rescheduleData.seatNumbers,
+            startAt: rescheduleData.newStartAt,
+            endAt: rescheduleData.newEndAt,
+            seatNumbers: rescheduleData.seatNumbers,
           rescheduleCost: costDifference
         })
       })
