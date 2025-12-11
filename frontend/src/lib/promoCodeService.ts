@@ -1,5 +1,5 @@
 // Promo Code Service - Based on Backend API Documentation
-import { getAuthHeaders } from './apiClient'
+import { getAuthHeaders, authenticatedFetch } from './apiClient'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000/api';
 
@@ -137,11 +137,8 @@ export interface AdminPromoCodesResponse {
 // User/Client API Functions
 export const applyPromoCode = async (request: ApplyPromoCodeRequest): Promise<ApplyPromoCodeResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/promocode/apply`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/promocode/apply`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
 
@@ -186,11 +183,8 @@ export const applyPromoCode = async (request: ApplyPromoCodeRequest): Promise<Ap
 
 export const getUserAvailablePromoCodes = async (userId: string): Promise<AvailablePromosResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/promocode/user/${userId}/available`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/promocode/user/${userId}/available`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     const result = await response.json();
@@ -227,11 +221,8 @@ export const getUserAvailablePromoCodes = async (userId: string): Promise<Availa
 
 export const getUserUsedPromoCodes = async (userId: string): Promise<UsedPromosResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/promocode/user/${userId}/used`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/promocode/user/${userId}/used`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     const result = await response.json();

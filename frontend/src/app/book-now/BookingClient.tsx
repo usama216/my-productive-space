@@ -53,6 +53,7 @@ import {
 } from '@/lib/timezoneUtils'
 import { formatCurrency } from '@/lib/paymentUtils'
 import { getOperatingHours, getClosureDates, type OperatingHours, type ClosureDate } from '@/lib/shopHoursService'
+import { authenticatedFetch } from '@/lib/apiClient'
 
 
 const locations = [
@@ -558,11 +559,8 @@ export default function BookingClient() {
         throw new Error('No booking ID found for confirmation')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/confirmBooking`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           bookingId: currentBookingId
         })
@@ -977,11 +975,8 @@ export default function BookingClient() {
     setIsLoadingSeats(true)
     try {
       const locationData = locations.find(loc => loc.id === location)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookedSeats`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           location: locationData?.name || location,
           startAt: startDate.toISOString().replace('T', ' ').replace('Z', ''),
@@ -1290,11 +1285,8 @@ export default function BookingClient() {
 
       // Create booking
       const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(bookingPayload),
       });
 
@@ -1371,11 +1363,8 @@ export default function BookingClient() {
 
       // Create booking
       const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/create`;
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(bookingPayload),
       });
 

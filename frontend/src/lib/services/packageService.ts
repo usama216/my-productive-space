@@ -1,6 +1,8 @@
 // src/lib/services/packageService.ts
 // New Package System Service Layer
 
+import { authenticatedFetch } from '@/lib/apiClient'
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'https://productive-space-backend.vercel.app';
 
 // Types based on new package system
@@ -309,11 +311,8 @@ class PackageService {
     webhookUrl: string;
   }): Promise<{ success: boolean; url?: string; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/new-packages/payment`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/payment`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(paymentData),
       });
       
@@ -356,11 +355,8 @@ class PackageService {
       console.log('Creating package payment:', paymentData);
       console.log('Full API URL:', `${API_BASE_URL}/packages/payment`);
       
-      const response = await fetch(`${API_BASE_URL}/packages/payment`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/packages/payment`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(paymentData),
       });
       
@@ -391,7 +387,7 @@ class PackageService {
   async getUserPackages(userId: string): Promise<{ success: boolean; packages?: UserPackage[]; error?: string }> {
     try {
       console.log(`🔍 Fetching user packages for userId: ${userId}`);
-      const response = await fetch(`${API_BASE_URL}/new-packages/user/${userId}`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/new-packages/user/${userId}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Unknown error occurred' }));

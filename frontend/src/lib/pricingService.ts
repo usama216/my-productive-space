@@ -1,4 +1,6 @@
 // Pricing Service - API calls for pricing configuration
+import { authenticatedFetch } from './apiClient'
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || 'http://localhost:8000';
 
 export interface PricingConfiguration {
@@ -24,7 +26,7 @@ export interface PricingResponse {
 // Get all pricing configurations
 export const getAllPricingConfigurations = async (): Promise<PricingConfiguration[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/pricing`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/pricing`);
     if (!response.ok) {
       throw new Error('Failed to fetch pricing configurations');
     }
@@ -42,7 +44,7 @@ export const getPricingByLocationAndMemberType = async (
   memberType: 'STUDENT' | 'MEMBER' | 'TUTOR'
 ): Promise<PricingConfiguration> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/pricing/${location}/${memberType}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/pricing/${location}/${memberType}`);
     if (!response.ok) {
       throw new Error('Failed to fetch pricing configuration');
     }
@@ -63,11 +65,8 @@ export const upsertPricingConfiguration = async (pricingData: {
   isActive?: boolean;
 }): Promise<PricingConfiguration> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/pricing`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/pricing`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(pricingData),
     });
     
@@ -85,7 +84,7 @@ export const upsertPricingConfiguration = async (pricingData: {
 
 export const deletePricingConfiguration = async (id: string): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/pricing/${id}`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/pricing/${id}`, {
       method: 'DELETE',
     });
     
@@ -108,7 +107,7 @@ export const getAllPricingForLocation = async (
 }> => {
   try {
     console.log('🔍 Making API call to:', `${API_BASE_URL}/pricing/${location}`)
-    const response = await fetch(`${API_BASE_URL}/pricing/${location}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/pricing/${location}`);
     console.log('🔍 API response status:', response.status, response.ok)
     if (!response.ok) {
       throw new Error(`Failed to fetch pricing for ${location}`);

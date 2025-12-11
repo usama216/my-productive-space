@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { CreditCard, QrCode, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/paymentUtils'
+import { authenticatedFetch } from '@/lib/apiClient'
 
 type PaymentMethod = 'payNow' | 'creditCard'
 
@@ -190,9 +191,8 @@ export default function PaymentStep({
         rescheduleData: rescheduleData, // Reschedule details for backend processing
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
+      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/hitpay/create-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       const data = await res.json()

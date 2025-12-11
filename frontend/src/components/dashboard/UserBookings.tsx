@@ -24,6 +24,7 @@ import {
 } from '@/lib/bookingService'
 import { requestRefund } from '@/lib/refundService'
 import { sendDoorAccessLink } from '@/lib/doorService'
+import { authenticatedFetch } from '@/lib/apiClient'
 import {
   formatSingaporeDate,
   formatSingaporeDateOnly,
@@ -150,11 +151,8 @@ export function UserBookings() {
 
     // Calculate actual refund amount
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookingPaymentDetails`, {
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/getBookingPaymentDetails`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           bookingId: booking.id
         })
