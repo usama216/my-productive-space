@@ -122,10 +122,11 @@ export default function Dashboard() {
   // Load user profile data
   const loadUserProfile = async () => {
     if (!authUser?.id) return
-
+console.log('authUser', authUser)
     setIsLoadingProfile(true)
     try {
       const profile = await getUserProfile(authUser.id)
+      console.log('profile', profile)
       if (profile) {
         setUserProfile(profile)
         setEditFormData({
