@@ -15,6 +15,8 @@ interface DatabaseUser {
   studentVerificationImageUrl?: string
   studentVerificationDate?: string
   studentRejectionReason?: string | null
+  disabled?: boolean
+  isDisabled?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -109,6 +111,18 @@ export function useAuth() {
         return createMockDatabaseUser(authUser)
       }
 
+      // Check if user is disabled
+      if (data.disabled === true || data.isDisabled === true) {
+        console.warn('User is disabled, signing out...')
+        // Sign out the user immediately
+        await supabase.auth.signOut()
+        // Clear local storage
+        localStorage.removeItem(STORAGE_KEYS.AUTH_USER)
+        localStorage.removeItem(STORAGE_KEYS.DATABASE_USER)
+        // Return null to indicate user should be logged out
+        throw new Error('Account disabled')
+      }
+
       console.log('Database user fetched successfully')
       return {
         id: data.id,
@@ -122,6 +136,8 @@ export function useAuth() {
         studentVerificationImageUrl: data.studentVerificationImageUrl,
         studentVerificationDate: data.studentVerificationDate,
         studentRejectionReason: data.studentRejectionReason,
+        disabled: data.disabled,
+        isDisabled: data.isDisabled,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt
       }
@@ -155,12 +171,29 @@ export function useAuth() {
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user && isMounted) {
-          const dbUser = await fetchDatabaseUser(session.user)
-          // Check if mounted again after async operation
-          if (isMounted) {
-            setUser(session.user)
-            setDatabaseUser(dbUser)
-            saveToStorage(session.user, dbUser)
+          try {
+            const dbUser = await fetchDatabaseUser(session.user)
+            // Check if mounted again after async operation
+            if (isMounted) {
+              setUser(session.user)
+              setDatabaseUser(dbUser)
+              saveToStorage(session.user, dbUser)
+            }
+          } catch (error: any) {
+            // If user is disabled, clear everything
+            if (error?.message === 'Account disabled') {
+              if (isMounted) {
+                setUser(null)
+                setDatabaseUser(null)
+                saveToStorage(null, null)
+                // Show toast notification (if available)
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('user-disabled'))
+                }
+              }
+            } else {
+              console.error('Error fetching database user:', error)
+            }
           }
         }
       } catch (error) {
@@ -189,18 +222,45 @@ export function useAuth() {
               setUser(session.user)
               setDatabaseUser(dbUser)
               saveToStorage(session.user, dbUser)
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error in auth state change:', error)
-              // Still set the user even if database fetch fails
+              // If user is disabled, clear everything
+              if (error?.message === 'Account disabled') {
+                setUser(null)
+                setDatabaseUser(null)
+                saveToStorage(null, null)
+                // Show toast notification (if available)
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('user-disabled'))
+                }
+                return
+              }
+              // Still set the user even if database fetch fails (for other errors)
               setUser(session.user)
               setDatabaseUser(createMockDatabaseUser(session.user))
               saveToStorage(session.user, createMockDatabaseUser(session.user))
             }
           } else {
-            // For other events, just set the user without database fetch
-            setUser(session.user)
-            setDatabaseUser(createMockDatabaseUser(session.user))
-            saveToStorage(session.user, createMockDatabaseUser(session.user))
+            // For other events, fetch database user to check disabled status
+            try {
+              const dbUser = await fetchDatabaseUser(session.user)
+              setUser(session.user)
+              setDatabaseUser(dbUser)
+              saveToStorage(session.user, dbUser)
+            } catch (error: any) {
+              console.error('Error fetching user in auth state change:', error)
+              // If user is disabled, clear everything
+              if (error?.message === 'Account disabled') {
+                setUser(null)
+                setDatabaseUser(null)
+                saveToStorage(null, null)
+                return
+              }
+              // For other errors, use mock user
+              setUser(session.user)
+              setDatabaseUser(createMockDatabaseUser(session.user))
+              saveToStorage(session.user, createMockDatabaseUser(session.user))
+            }
           }
         } else {
           console.log('No session, clearing user data immediately')

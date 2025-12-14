@@ -41,6 +41,8 @@ import {
   getAllUsers,
   updateUser,
   deleteUser,
+  disableUser,
+  enableUser,
   getUserStats,
   getUserAnalytics,
   updateStudentVerification,
@@ -78,6 +80,7 @@ export function UserManagement() {
   // Dialog states
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDisableDialogOpen, setIsDisableDialogOpen] = useState(false)
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [isCreateAdminDialogOpen, setIsCreateAdminDialogOpen] = useState(false)
@@ -404,6 +407,69 @@ export function UserManagement() {
       toast({
         title: "Error",
         description: "Failed to delete user",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDisable = async () => {
+    if (!selectedUser) return
+
+    try {
+      setIsSubmitting(true)
+      const response = await disableUser(selectedUser.id)
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "User disabled successfully. User will not be able to login or perform any activities.",
+        })
+        setIsDisableDialogOpen(false)
+        loadUsers()
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to disable user",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error disabling user:', error)
+      toast({
+        title: "Error",
+        description: "Failed to disable user",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEnable = async (user: User) => {
+    try {
+      setIsSubmitting(true)
+      const response = await enableUser(user.id)
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "User enabled successfully. User can now login and perform activities.",
+        })
+        loadUsers()
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to enable user",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error enabling user:', error)
+      toast({
+        title: "Error",
+        description: "Failed to enable user",
         variant: "destructive",
       })
     } finally {
@@ -807,9 +873,16 @@ export function UserManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getVerificationStatusColor(user.studentVerificationStatus)}>
-                          {getVerificationStatusText(user.studentVerificationStatus)}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge className={getVerificationStatusColor(user.studentVerificationStatus)}>
+                            {getVerificationStatusText(user.studentVerificationStatus)}
+                          </Badge>
+                          {(user.disabled || user.isDisabled) && (
+                            <Badge className="bg-red-100 text-red-800">
+                              Disabled
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -866,17 +939,32 @@ export function UserManagement() {
                             Change Role
                           </Button>
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user)
-                              setIsDeleteDialogOpen(true)
-                            }}
-                            disabled={isSubmitting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {(user.disabled || user.isDisabled) ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEnable(user)}
+                              disabled={isSubmitting}
+                              className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                            >
+                              <UserCheck className="h-4 w-4 mr-1" />
+                              Enable
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUser(user)
+                                setIsDisableDialogOpen(true)
+                              }}
+                              disabled={isSubmitting}
+                              className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                            >
+                              <UserX className="h-4 w-4 mr-1" />
+                              Disable
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1071,7 +1159,7 @@ export function UserManagement() {
 
       {/* Removed Suspend User Dialog */}
 
-      {/* Delete User Dialog */}
+      {/* Delete User Dialog - Keeping for backward compatibility but hidden */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1119,6 +1207,55 @@ export function UserManagement() {
                 </>
               ) : (
                 'Yes, Permanently Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Disable User Dialog */}
+      <AlertDialog open={isDisableDialogOpen} onOpenChange={setIsDisableDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-orange-600 flex items-center gap-2">
+              <UserX className="w-5 h-5" />
+              Disable User
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p className="font-semibold text-orange-600">
+                ⚠️ This will disable the user account
+              </p>
+              <p>
+                Disabling this user will:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Prevent the user from logging in</li>
+                <li>Block all user activities (bookings, payments, etc.)</li>
+                <li>Preserve all user data (no data will be deleted)</li>
+                <li>Allow you to re-enable the user later if needed</li>
+              </ul>
+              <p className="text-sm text-green-600 font-medium">
+                ✓ Note: All user data will be preserved. You can enable this user again anytime.
+              </p>
+              <p className="font-semibold">
+                Are you sure you want to disable <span className="text-orange-600">{selectedUser?.email}</span>?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDisable} 
+              disabled={isSubmitting}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Disabling...
+                </>
+              ) : (
+                'Yes, Disable User'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

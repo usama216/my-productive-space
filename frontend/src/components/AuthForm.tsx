@@ -124,11 +124,11 @@ export function AuthForm({ type }: Props) {
 
       if (error) throw error
 
-      // Fetch user profile to check memberType
+      // Fetch user profile to check memberType and disabled status
       if (data.user) {
         const { data: userProfile, error: profileError } = await supabase
           .from('User')
-          .select('memberType')
+          .select('memberType, disabled, isDisabled')
           .eq('id', data.user.id)
           .single()
 
@@ -137,6 +137,20 @@ export function AuthForm({ type }: Props) {
           // Fallback to dashboard if we can't fetch profile
           resetCaptcha()
           router.push(`/dashboard`)
+          return
+        }
+
+        // Check if user is disabled
+        if (userProfile?.disabled === true || userProfile?.isDisabled === true) {
+          // Sign out the user immediately
+          await supabase.auth.signOut()
+          
+          toast({
+            title: "Account Disabled",
+            description: "Your account has been disabled. Please contact support for assistance.",
+            variant: "destructive",
+          })
+          resetCaptcha()
           return
         }
 

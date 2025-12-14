@@ -24,6 +24,8 @@ export interface User {
   createdAt: string
   updatedAt: string
   studentVerificationImageUrl: string | null
+  disabled?: boolean
+  isDisabled?: boolean
   stats?: {
     totalBookings: number
     confirmedBookings: number
@@ -232,6 +234,40 @@ export const deleteUser = async (id: string): Promise<UserResponse> => {
       success: false,
       error: 'Failed to delete user',
       message: 'Failed to delete user'
+    }
+  }
+}
+
+export const disableUser = async (id: string): Promise<UserResponse> => {
+  try {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/disable`, {
+      method: 'PUT',
+    })
+
+    return await handleResponse(response)
+  } catch (error) {
+    console.error('Disable User Error:', error)
+    return {
+      success: false,
+      error: 'Failed to disable user',
+      message: 'Failed to disable user'
+    }
+  }
+}
+
+export const enableUser = async (id: string): Promise<UserResponse> => {
+  try {
+    const response = await authenticatedFetch(`${API_BASE}/booking/admin/users/${id}/enable`, {
+      method: 'PUT',
+    })
+
+    return await handleResponse(response)
+  } catch (error) {
+    console.error('Enable User Error:', error)
+    return {
+      success: false,
+      error: 'Failed to enable user',
+      message: 'Failed to enable user'
     }
   }
 }

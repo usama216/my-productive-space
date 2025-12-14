@@ -125,6 +125,87 @@ export function PromoCodeManagement() {
     fetchPromoCodes()
   }, [currentPage, debouncedSearchTerm, filterStatus, filterType, filterGroup])
 
+  // Function to check and update expired promo codes
+  const checkAndUpdateExpiredPromoCodes = async (promoCodes: PromoCode[]) => {
+    const now = new Date()
+    const expiredPromoCodes: PromoCode[] = []
+    
+    // Check each promo code for expiration
+    for (const promo of promoCodes) {
+      const activeto = promo.activeto || promo.activeTo
+      
+      // Skip if no expiry date or already inactive
+      if (!activeto || !promo.isactive && !promo.isActive) {
+        continue
+      }
+      
+      // Parse the expiry date
+      let expiryDate: Date
+      try {
+        // Ensure date is treated as UTC if no timezone info
+        let dateStr = activeto.trim()
+        if (!dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+          dateStr = dateStr + 'Z'
+        }
+        expiryDate = new Date(dateStr)
+        
+        // Check if expired
+        if (expiryDate < now && (promo.isactive || promo.isActive)) {
+          expiredPromoCodes.push(promo)
+        }
+      } catch (error) {
+        console.error('Error parsing expiry date for promo code:', promo.id, error)
+        continue
+      }
+    }
+    
+      // Update expired promo codes
+      if (expiredPromoCodes.length > 0) {
+        const updatePromises = expiredPromoCodes.map(async (promo) => {
+          try {
+            // Get all required fields for update
+            // Handle targetGroup type - only include if it's STUDENT or MEMBER (not TUTOR)
+            const targetGroup = promo.targetGroup === 'STUDENT' || promo.targetGroup === 'MEMBER' 
+              ? promo.targetGroup 
+              : undefined
+            
+            const promoData = {
+              code: promo.code,
+              name: promo.name,
+              description: promo.description || '',
+              discounttype: promo.discounttype || promo.discountType || 'percentage',
+              discountvalue: promo.discountvalue || promo.discountValue || 0,
+              maxDiscountAmount: promo.maxDiscountAmount || promo.maxdiscountamount || 0,
+              minimumamount: promo.minimumamount || promo.minimumAmount || 0,
+              minimum_hours: promo.minimum_hours || promo.minimumhours || promo.minimumHours || 0,
+              activefrom: promo.activefrom || promo.activeFrom || undefined,
+              activeto: promo.activeto || promo.activeTo || undefined,
+              promoType: promo.promoType,
+              targetGroup: targetGroup,
+              targetUserIds: promo.targetUserIds || undefined,
+              maxusageperuser: promo.maxusageperuser || promo.maxUsagePerUser || 1,
+              globalUsageLimit: promo.globalUsageLimit || promo.globalusagelimit || 100,
+              isactive: false, // Set to inactive
+              category: promo.category || undefined,
+              priority: promo.priority || 1
+            }
+            
+            await updatePromoCode(promo.id, promoData)
+          } catch (error) {
+            console.error(`Failed to update expired promo code ${promo.id}:`, error)
+          }
+        })
+      
+      // Wait for all updates to complete
+      await Promise.all(updatePromises)
+      
+      // Refresh the list after updates
+      return true
+    }
+    
+    return false
+  }
+
   const fetchPromoCodes = async () => {
     try {
       setLoading(true)
@@ -152,9 +233,27 @@ export function PromoCodeManagement() {
         targetGroup: targetGroupParam
       })
       
-      setPromoCodes(response.promoCodes)
-      setTotalPages(response.pagination.totalPages)
-      setTotalItems(response.pagination.total)
+      // Check and update expired promo codes
+      const needsRefresh = await checkAndUpdateExpiredPromoCodes(response.promoCodes)
+      
+      // If any promo codes were updated, refresh the list
+      if (needsRefresh) {
+        const refreshedResponse = await getAllPromoCodes({
+          page: currentPage,
+          limit: 20,
+          search: debouncedSearchTerm || undefined,
+          status: filterStatus !== 'all' ? filterStatus : undefined,
+          promoType: promoTypeParam,
+          targetGroup: targetGroupParam
+        })
+        setPromoCodes(refreshedResponse.promoCodes)
+        setTotalPages(refreshedResponse.pagination.totalPages)
+        setTotalItems(refreshedResponse.pagination.total)
+      } else {
+        setPromoCodes(response.promoCodes)
+        setTotalPages(response.pagination.totalPages)
+        setTotalItems(response.pagination.total)
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -262,6 +361,11 @@ export function PromoCodeManagement() {
         activetoUTC = fromDatePickerToUTC(formData.activeto)
       }
       
+      // Handle targetGroup type - only include if it's STUDENT or MEMBER (not TUTOR)
+      const targetGroup: 'STUDENT' | 'MEMBER' | undefined = formData.promoType === 'GROUP_SPECIFIC' && formData.targetGroup 
+        ? (formData.targetGroup === 'STUDENT' || formData.targetGroup === 'MEMBER' ? formData.targetGroup as 'STUDENT' | 'MEMBER' : undefined)
+        : undefined
+      
       const promoData = {
         code: formData.code,
         name: formData.name,
@@ -274,7 +378,7 @@ export function PromoCodeManagement() {
         activefrom: activefromUTC,
         activeto: activetoUTC,
         promoType: formData.promoType,
-        targetGroup: formData.promoType === 'GROUP_SPECIFIC' && formData.targetGroup ? formData.targetGroup : undefined,
+        targetGroup: targetGroup,
         targetUserIds: formData.promoType === 'USER_SPECIFIC' ? formData.targetUserIds : undefined,
         maxusageperuser: formData.maxusageperuser,
         globalUsageLimit: formData.globalUsageLimit,
