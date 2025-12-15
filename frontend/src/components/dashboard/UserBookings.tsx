@@ -300,8 +300,15 @@ export function UserBookings() {
   // Filter bookings by status (using frontend local timezone)
   const now = new Date()
 
+  // Helper: Check if booking is cancelled by admin or refunded
+  const isCancelledOrRefunded = (booking: Booking): boolean => {
+    return booking.cancelledBy === 'admin' || booking.refundstatus === 'APPROVED'
+  }
+
   const upcomingBookings = bookings
     .filter(booking => {
+      // Exclude cancelled by admin or refunded bookings
+      if (isCancelledOrRefunded(booking)) return false
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
 
@@ -312,6 +319,8 @@ export function UserBookings() {
 
   const ongoingBookings = bookings
     .filter(booking => {
+      // Exclude cancelled by admin or refunded bookings
+      if (isCancelledOrRefunded(booking)) return false
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const startAt = new Date(booking.startAt)
       const endAt = new Date(booking.endAt)
@@ -326,6 +335,8 @@ export function UserBookings() {
 
   const pastBookings = bookings
     .filter(booking => {
+      // Exclude cancelled by admin or refunded bookings
+      if (isCancelledOrRefunded(booking)) return false
       if (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') return false
       const endAt = new Date(booking.endAt)
       // Past: end time passed
@@ -333,8 +344,9 @@ export function UserBookings() {
     })
     .sort((a, b) => new Date(b.endAt).getTime() - new Date(a.endAt).getTime()) // Most recent first
 
+  // Cancelled tab: Only show bookings cancelled by admin or refunded
   const cancelledBookings = bookings
-    .filter(booking => booking.status === 'refunded' || booking.refundstatus === 'APPROVED')
+    .filter(booking => booking.cancelledBy === 'admin' || booking.refundstatus === 'APPROVED')
     .sort((a, b) => {
       const aDate = new Date(a.updatedAt || a.createdAt || a.startAt).getTime()
       const bDate = new Date(b.updatedAt || b.createdAt || b.startAt).getTime()
@@ -607,7 +619,7 @@ export function UserBookings() {
             : 'text-gray-600 hover:text-gray-900'
             }`}
         >
-          Cancelled ({bookings.filter(b => b.status === 'refunded' || b.refundstatus === 'APPROVED').length})
+          Cancelled ({cancelledBookings.length})
         </button>
       </div>
 
@@ -977,14 +989,11 @@ export function UserBookings() {
                           </div>
                         )}
 
-                        {activeTab === 'cancelled' && (booking.status === 'refunded' || booking.refundstatus === 'APPROVED') && (
+                        {activeTab === 'cancelled' && (
                           <div className="flex items-center gap-2">
-                            <Badge
-                              className="bg-orange-100 text-orange-800 border-orange-200 text-xs"
-                            >
-                              Refunded
+                            <Badge className={getStatusColor(getBookingStatus(booking))}>
+                              {getBookingStatus(booking)}
                             </Badge>
-
                           </div>
                         )}
 

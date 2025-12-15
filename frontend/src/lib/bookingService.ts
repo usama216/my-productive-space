@@ -469,10 +469,22 @@ export const formatBookingDate = (dateString: string): string => {
 }
 
 export const getBookingStatus = (booking: Booking): string => {
-  // Check refund status first - if APPROVED, show as Refunded
+  // Check refund status first - if refunded by admin, show "Refunded by Admin"
+  if (booking.refundstatus === 'APPROVED' && booking.refundapprovedby === 'admin') {
+    return 'Refunded by Admin'
+  }
+  // Check if cancelled by admin - check cancelledBy field (more reliable)
+  // If cancelledBy exists and is 'admin', booking is cancelled by admin
+  if (booking.cancelledBy === 'admin') {
+    return 'Cancelled by Admin'
+  }
+  // Check if cancelled (by user or other) - check cancelledBy field or status
+  if (booking.cancelledBy || booking.status === 'cancelled') {
+    return 'cancelled'
+  }
+  // Check refund status - if APPROVED (but not by admin), show as Refunded
   if (booking.refundstatus === 'APPROVED') return 'Refunded'
   if (booking.status === 'refunded') return 'refunded'
-  if (booking.status === 'cancelled') return 'cancelled'
   if (booking.isToday) return 'today'
   if (booking.isUpcoming) return 'upcoming'
   if (booking.isOngoing) return 'ongoing'
@@ -486,6 +498,8 @@ export const getStatusColor = (status: string): string => {
     case 'upcoming': return 'bg-green-100 text-green-800'
     case 'ongoing': return 'bg-yellow-100 text-yellow-800'
     case 'completed': return 'bg-gray-100 text-gray-800'
+    case 'Cancelled by Admin': return 'bg-purple-100 text-purple-800'
+    case 'Refunded by Admin': return 'bg-indigo-100 text-indigo-800'
     case 'Refunded': return 'bg-orange-100 text-orange-800'
     case 'refunded': return 'bg-orange-100 text-orange-800'
     case 'cancelled': return 'bg-red-100 text-red-800'
