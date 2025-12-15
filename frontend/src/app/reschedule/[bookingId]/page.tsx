@@ -47,6 +47,9 @@ import { formatCurrency } from '@/lib/paymentUtils'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 import { authenticatedFetch } from '@/lib/apiClient'
+import { getOperatingHours, getClosureDates, OperatingHours, ClosureDate } from '@/lib/shopHoursService'
+import { isSameDay, addMonths, endOfDay } from 'date-fns'
+
 
 // Layout and seat configuration (same as extend page)
 const DEMO_LAYOUT: SeatMeta[] = [
@@ -251,6 +254,185 @@ export default function ReschedulePage() {
     member: { oneHourRate: 4.00, overOneHourRate: 4.00 },
     tutor: { oneHourRate: 5.00, overOneHourRate: 5.00 }
   })
+
+  // Shop hours state
+  const [operatingHours, setOperatingHours] = useState<OperatingHours[]>([])
+  const [closureDates, setClosureDates] = useState<ClosureDate[]>([])
+  const [isLoadingShopHours, setIsLoadingShopHours] = useState(false)
+
+  // Load shop hours on mount
+  useEffect(() => {
+    const loadShopHours = async () => {
+      setIsLoadingShopHours(true)
+      try {
+        // Hardcoded to Kovan as per UI
+        const [hours, closures] = await Promise.all([
+          getOperatingHours('Kovan'),
+          getClosureDates('Kovan')
+        ])
+        setOperatingHours(hours)
+        setClosureDates(closures)
+        console.log('✅ Shop hours loaded for reschedule:', hours)
+      } catch (error) {
+        console.error('Error loading shop hours:', error)
+      } finally {
+        setIsLoadingShopHours(false)
+      }
+    }
+
+    loadShopHours()
+  }, [])
+
+  // Calculate max date (2 months from today)
+  const maxBookingDate = addMonths(new Date(), 2)
+
+  // Helper function to get dates that should be excluded (closure dates)
+  const getExcludedDates = (): Date[] => {
+    const excluded: Date[] = []
+
+    closureDates.forEach(closure => {
+      const start = new Date(closure.startDate)
+      const end = new Date(closure.endDate)
+
+      // Add all dates in the closure range
+      let current = new Date(start)
+      while (current <= end) {
+        excluded.push(new Date(current))
+        current.setDate(current.getDate() + 1)
+      }
+    })
+
+    return excluded
+  }
+
+  // Helper to generate available times for a given date based on operating hours
+  const getAvailableTimes = (date: Date | null): Date[] => {
+    if (!date) return [];
+
+    const dayOfWeek = date.getDay();
+    const now = new Date();
+    const isToday = isSameDay(date, now);
+
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive);
+
+    // If no shop hours found, return empty array
+    if (operatingHours.length === 0 || !dayHours) {
+      return [];
+    }
+
+    const times: Date[] = [];
+    const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number);
+    const [closeHours, closeMinutes] = dayHours.closeTime.split(':').map(Number);
+
+    // Create start and end times for the selected date
+    const openTime = new Date(date);
+    openTime.setHours(openHours, openMinutes, 0, 0);
+    
+    const closeTime = new Date(date);
+    closeTime.setHours(closeHours, closeMinutes, 0, 0);
+
+    // Generate 15-minute intervals
+    let currentTime = new Date(openTime);
+    while (currentTime < closeTime) {
+      // For today, only include future times
+      if (isToday && currentTime <= now) {
+        currentTime.setMinutes(currentTime.getMinutes() + 15);
+        continue;
+      }
+      
+      times.push(new Date(currentTime));
+      currentTime.setMinutes(currentTime.getMinutes() + 15);
+    }
+
+    return times;
+  };
+
+  // Helper function to get available end times based on start date
+  const getAvailableEndTimes = (startDate: Date | null): Date[] => {
+    if (!startDate) return [];
+    
+    const times = getAvailableTimes(startDate);
+    if (!times.length) return times;
+
+    // Filter based on start time (must be >= start time + 1 hour)
+    const minEndTime = new Date(startDate.getTime() + 60 * 60 * 1000);
+    return times.filter(time => time.getTime() >= minEndTime.getTime());
+  };
+
+  // Helper function to round UP to next 15-minute interval
+  const roundUpToNext15Minutes = (date: Date): Date => {
+    const rounded = new Date(date);
+    const minutes = rounded.getMinutes();
+    const remainder = minutes % 15;
+
+    if (remainder !== 0) {
+      const validMinutes = minutes + (15 - remainder);
+      rounded.setMinutes(validMinutes);
+      rounded.setSeconds(0);
+      rounded.setMilliseconds(0);
+    } else {
+      rounded.setSeconds(0);
+      rounded.setMilliseconds(0);
+    }
+
+    return rounded;
+  };
+
+  // Helper function to get optimal start time based on shop hours
+  const getOptimalStartTime = (selectedDate: Date): Date => {
+    const now = new Date()
+    const isToday = isSameDay(selectedDate, now)
+    const dayOfWeek = selectedDate.getDay()
+    
+    // Get shop hours for the selected day
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive)
+    
+    // If no shop hours found
+    if (!dayHours || operatingHours.length === 0) {
+      if (isToday) {
+        return roundUpToNext15Minutes(now)
+      }
+      const defaultTime = new Date(selectedDate)
+      defaultTime.setHours(9, 0, 0, 0)
+      return defaultTime
+    }
+    
+    // Parse shop open time
+    const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number)
+    const openTime = new Date(selectedDate)
+    openTime.setHours(openHours, openMinutes, 0, 0)
+    
+    if (isToday) {
+      const currentRounded = roundUpToNext15Minutes(now)
+      if (currentRounded < openTime) {
+        return openTime
+      }
+      return currentRounded
+    } else {
+      return openTime
+    }
+  }
+
+  // Handler for when user clicks on calendar date
+  const handleDateSelect = (date: Date | null) => {
+    if (!date) return
+    
+    const optimalTime = getOptimalStartTime(date)
+    setNewStartDate(optimalTime)
+    
+    // Auto-set end date based on original duration
+    if (originalDuration > 0) {
+      const calculatedEndDate = new Date(optimalTime.getTime() + (originalDuration * 60 * 60 * 1000))
+      // Ensure end date is on the same day as start date
+      if (!isSameDay(calculatedEndDate, optimalTime)) {
+        // If calculated end date is on a different day, set it to end of start day
+        const endOfStartDay = endOfDay(optimalTime)
+        setNewEndDate(endOfStartDay)
+      } else {
+        setNewEndDate(calculatedEndDate)
+      }
+    }
+  }
 
   // Filter function to only allow 15-minute intervals and disable past hours
   const filterTime = (time: Date): boolean => {
@@ -504,7 +686,14 @@ export default function ReschedulePage() {
   useEffect(() => {
     if (newStartDate && originalDuration > 0) {
       const calculatedEndDate = new Date(newStartDate.getTime() + (originalDuration * 60 * 60 * 1000))
-      setNewEndDate(calculatedEndDate)
+      // Ensure end date is on the same day as start date
+      if (!isSameDay(calculatedEndDate, newStartDate)) {
+        // If calculated end date is on a different day, set it to end of start day
+        const endOfStartDay = endOfDay(newStartDate)
+        setNewEndDate(endOfStartDay)
+      } else {
+        setNewEndDate(calculatedEndDate)
+      }
     }
   }, [newStartDate, originalDuration])
 
@@ -1042,17 +1231,42 @@ export default function ReschedulePage() {
                 <CardContent className="space-y-4 sm:space-y-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div>
-                      <Label htmlFor="newStartDate">New Start Time</Label>
+                      <Label htmlFor="newStartDate" className="flex items-center gap-2">
+                        New Start Time
+                        {isLoadingShopHours && <Loader2 className="h-3 w-3 animate-spin text-orange-500" />}
+                      </Label>
                       <DatePicker
                         id="newStartDate"
                         selected={newStartDate}
-                        onChange={(date) => setNewStartDate(date)}
+                        onChange={(date) => {
+                          setNewStartDate(date)
+                          // Auto-update end date if original duration exists
+                          if (date && originalDuration > 0) {
+                            const calculatedEndDate = new Date(date.getTime() + (originalDuration * 60 * 60 * 1000))
+                            // Ensure end date is on the same day as start date
+                            const startDay = new Date(date)
+                            startDay.setHours(0, 0, 0, 0)
+                            const endDay = new Date(calculatedEndDate)
+                            endDay.setHours(0, 0, 0, 0)
+                            
+                            // If calculated end date is on a different day, set it to end of start day
+                            if (!isSameDay(calculatedEndDate, date)) {
+                              const endOfStartDay = endOfDay(date)
+                              setNewEndDate(endOfStartDay)
+                            } else {
+                              setNewEndDate(calculatedEndDate)
+                            }
+                          }
+                        }}
+                        onSelect={handleDateSelect}
                         showTimeSelect
                         timeFormat="h:mm aa"
                         timeIntervals={15}
                         dateFormat="dd MMM yyyy, h:mm aa"
                         minDate={new Date()}
-                        filterTime={filterTime}
+                        maxDate={maxBookingDate}
+                        excludeDates={getExcludedDates()}
+                        includeTimes={getAvailableTimes(newStartDate)}
                         className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                         wrapperClassName="w-full"
                         placeholderText="Select new start time"
@@ -1064,16 +1278,30 @@ export default function ReschedulePage() {
                       <DatePicker
                         id="newEndDate"
                         selected={newEndDate}
-                        onChange={(date) => setNewEndDate(date)}
+                        onChange={(date) => {
+                          if (!date || !newStartDate) return
+                          
+                          // Ensure end date is on the same day as start date
+                          if (!isSameDay(date, newStartDate)) {
+                            // If user tries to select a different day, set to end of start day
+                            const endOfStartDay = endOfDay(newStartDate)
+                            setNewEndDate(endOfStartDay)
+                          } else {
+                            setNewEndDate(date)
+                          }
+                        }}
                         showTimeSelect
                         timeFormat="h:mm aa"
                         timeIntervals={15}
                         dateFormat="dd MMM yyyy, h:mm aa"
                         minDate={newStartDate || undefined}
-                        filterTime={filterTime}
+                        maxDate={newStartDate ? endOfDay(newStartDate) : undefined}
+                        excludeDates={getExcludedDates()}
+                        includeTimes={getAvailableEndTimes(newStartDate)}
                         className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                         wrapperClassName="w-full"
                         placeholderText="Select new end time"
+                        disabled={!newStartDate}
                       />
                     </div>
                   </div>

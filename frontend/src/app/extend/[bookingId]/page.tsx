@@ -32,6 +32,7 @@ import { EntitlementTabs } from '@/components/book-now-sections/EntitlementTabs'
 import { useAuth } from '@/hooks/useAuth'
 import { getAllPricingForLocation } from '@/lib/pricingService'
 import { getClosureDates, getOperatingHours, type ClosureDate, type OperatingHours } from '@/lib/shopHoursService'
+import { isSameDay, endOfDay } from 'date-fns'
 import {
   toLocalTime,
   toSingaporeTime,
@@ -254,6 +255,52 @@ export default function ExtendBookingPage() {
 
     return excluded
   }
+
+  // Helper to generate available times for a given date based on operating hours
+  const getAvailableTimes = (date: Date | null): Date[] => {
+    if (!date || !originalEndDate) return [];
+
+    const dayOfWeek = date.getDay();
+
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive);
+
+    // If no shop hours found, return empty array
+    if (operatingHours.length === 0 || !dayHours) {
+      return [];
+    }
+
+    const times: Date[] = [];
+    const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number);
+    const [closeHours, closeMinutes] = dayHours.closeTime.split(':').map(Number);
+
+    // Create start and end times for the selected date
+    const openTime = new Date(date);
+    openTime.setHours(openHours, openMinutes, 0, 0);
+    
+    const closeTime = new Date(date);
+    closeTime.setHours(closeHours, closeMinutes, 0, 0);
+
+    // Generate 15-minute intervals
+    let currentTime = new Date(openTime);
+    
+    // If same day as original end date, start from original end time
+    if (isSameDay(date, originalEndDate)) {
+      currentTime = new Date(originalEndDate);
+      // Round up to next 15-minute interval
+      const minutes = currentTime.getMinutes();
+      const remainder = minutes % 15;
+      if (remainder !== 0) {
+        currentTime.setMinutes(minutes + (15 - remainder));
+      }
+    }
+    
+    while (currentTime < closeTime) {
+      times.push(new Date(currentTime));
+      currentTime.setMinutes(currentTime.getMinutes() + 15);
+    }
+
+    return times;
+  };
 
   // Filter function to only allow 15-minute intervals and times after original end time
   const filterTime = (time: Date): boolean => {
@@ -910,27 +957,31 @@ export default function ExtendBookingPage() {
                         <Label>New End Time *</Label>
                         <DatePicker
                           selected={newEndDate}
-                          onChange={setNewEndDate}
+                          onChange={(date) => {
+                            if (!date || !originalEndDate) return
+                            
+                            // Ensure end date is on the same day as original end date
+                            if (!isSameDay(date, originalEndDate)) {
+                              // If user tries to select a different day, set to end of original end day
+                              const endOfOriginalDay = endOfDay(originalEndDate)
+                              setNewEndDate(endOfOriginalDay)
+                            } else {
+                              setNewEndDate(date)
+                            }
+                          }}
                           showTimeSelect
                           timeIntervals={15}
-                          filterTime={filterTime}
                           dateFormat="MMM d, h:mm aa"
                           placeholderText="Select new end time"
                           className="w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors"
                           wrapperClassName="w-full"
                           minDate={originalEndDate || new Date()}
-                          maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)}
+                          maxDate={originalEndDate ? endOfDay(originalEndDate) : undefined}
                           excludeDates={getExcludedDates()}
-                          minTime={
-                            newEndDate && originalEndDate &&
-                              newEndDate.toDateString() === originalEndDate.toDateString()
-                              ? originalEndDate  // Same day: start from original end time
-                              : new Date(new Date().setHours(0, 0, 0, 0))  // Different day: start from midnight
-                          }
-                          maxTime={new Date(new Date().setHours(23, 45, 0, 0))}
+                          includeTimes={getAvailableTimes(newEndDate)}
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          You can only select times after the current end time
+                          You can only extend on the same day. Select a time after the current end time.
                         </p>
                       </div>
                     </div>

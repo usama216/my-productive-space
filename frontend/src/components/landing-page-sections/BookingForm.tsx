@@ -199,8 +199,107 @@ export default function BookingForm() {
     });
   };
 
+  // Helper function to round UP to next 15-minute interval
+  const roundUpToNext15Minutes = (date: Date): Date => {
+    const rounded = new Date(date);
+    const minutes = rounded.getMinutes();
+    const remainder = minutes % 15;
+
+    if (remainder !== 0) {
+      // Round UP to next 15-minute mark
+      const validMinutes = minutes + (15 - remainder);
+      rounded.setMinutes(validMinutes);
+      rounded.setSeconds(0);
+      rounded.setMilliseconds(0);
+    } else {
+      // Already on 15-minute boundary, just clear seconds/milliseconds
+      rounded.setSeconds(0);
+      rounded.setMilliseconds(0);
+    }
+
+    return rounded;
+  };
+
+  // Helper function to get optimal start time based on shop hours
+  const getOptimalStartTime = (selectedDate: Date): Date => {
+    const now = new Date()
+    const isToday = isSameDay(selectedDate, now)
+    const dayOfWeek = selectedDate.getDay()
+    
+    // Get shop hours for the selected day
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive)
+    
+    // If no shop hours found
+    if (!dayHours || operatingHours.length === 0) {
+      if (isToday) {
+        // For today: round current time UP to next 15-minute interval
+        return roundUpToNext15Minutes(now)
+      }
+      // For future dates without shop hours: use 9 AM as default
+      const defaultTime = new Date(selectedDate)
+      defaultTime.setHours(9, 0, 0, 0)
+      return defaultTime
+    }
+    
+    // Parse shop open time
+    const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number)
+    const openTime = new Date(selectedDate)
+    openTime.setHours(openHours, openMinutes, 0, 0)
+    
+    if (isToday) {
+      // For today: compare current time with shop open time
+      const currentRounded = roundUpToNext15Minutes(now)
+      
+      // If current time is before shop open time, use shop open time
+      if (currentRounded < openTime) {
+        return openTime
+      }
+      
+      // If current time is after or equal to shop open time, use current time
+      return currentRounded
+    } else {
+      // For future dates: use shop open time
+      return openTime
+    }
+  }
+
+  // Handler for when user clicks on calendar date (onSelect event)
+  // This fires specifically when user clicks on a date in the calendar
+  const handleDateSelect = (date: Date | null) => {
+    if (!date) return
+    
+    // When user clicks on calendar date, set optimal time based on shop hours
+    const optimalTime = getOptimalStartTime(date)
+    const validDate = enforceStrict15Minutes(optimalTime)
+    setStartDate(validDate)
+    setEndDate(null) // Clear end date to force user to select
+  }
+
+  // Handler for when date/time changes (onChange event)
+  // This fires when user manually changes time or when onSelect updates the date
   const handleStartChange = (date: Date | null) => {
-    const validDate = enforceStrict15Minutes(date);
+    if (!date) {
+      setStartDate(null)
+      setEndDate(null)
+      return
+    }
+
+    // Check if this is a date-only selection (time is 00:00:00)
+    // This handles cases where onSelect might not fire or when date is set programmatically
+    const isDateOnlySelection = date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0
+    
+    let finalDate: Date
+    
+    if (isDateOnlySelection) {
+      // Date-only selection - set optimal time based on shop hours
+      const optimalTime = getOptimalStartTime(date)
+      finalDate = optimalTime
+    } else {
+      // User manually selected time - use the selected date/time as is
+      finalDate = date
+    }
+    
+    const validDate = enforceStrict15Minutes(finalDate)
     setStartDate(validDate)
     setEndDate(null) // Clear end date to force user to select
   }
@@ -502,6 +601,7 @@ export default function BookingForm() {
                   <DatePicker
                     selected={startDate}
                     onChange={handleStartChange}
+                    onSelect={handleDateSelect}
                     onChangeRaw={(e) => e?.preventDefault()}
                     selectsStart
                     startDate={startDate}
@@ -603,6 +703,7 @@ export default function BookingForm() {
                   <DatePicker
                     selected={startDate}
                     onChange={handleStartChange}
+                    onSelect={handleDateSelect}
                     onChangeRaw={(e) => e?.preventDefault()}
                     selectsStart
                     startDate={startDate}
@@ -700,6 +801,7 @@ export default function BookingForm() {
                   <DatePicker
                     selected={startDate}
                     onChange={handleStartChange}
+                    onSelect={handleDateSelect}
                     onChangeRaw={(e) => e?.preventDefault()}
                     selectsStart
                     startDate={startDate}
