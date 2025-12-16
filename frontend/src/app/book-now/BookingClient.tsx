@@ -724,8 +724,62 @@ export default function BookingClient() {
     return strictDate;
   };
 
+  // Helper function to get optimal start time based on shop hours
+  const getOptimalStartTime = (selectedDate: Date): Date => {
+    const dayOfWeek = selectedDate.getDay()
+    
+    // Get shop hours for the selected day
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive)
+    
+    // If shop hours found, use open time
+    if (dayHours && operatingHours.length > 0) {
+      const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number)
+      const openTime = new Date(selectedDate)
+      openTime.setHours(openHours, openMinutes, 0, 0)
+      openTime.setSeconds(0)
+      openTime.setMilliseconds(0)
+      return openTime
+    }
+    
+    // If no shop hours found, use 9 AM as default
+    const defaultTime = new Date(selectedDate)
+    defaultTime.setHours(9, 0, 0, 0)
+    defaultTime.setSeconds(0)
+    defaultTime.setMilliseconds(0)
+    return defaultTime
+  }
+
+  // Handler for when user clicks on calendar date (onSelect event)
+  const handleDateSelect = (date: Date | null) => {
+    if (!date) return
+    
+    // When user clicks on calendar date, set shop open time
+    const optimalTime = getOptimalStartTime(date)
+    setStartDate(optimalTime)
+    setEndDate(null) // Clear end date to force user to select
+  }
+
   const handleStartChange = (date: Date | null) => {
-    const validDate = enforceStrict15Minutes(date);
+    if (!date) {
+      setStartDate(null)
+      setEndDate(null)
+      return
+    }
+
+    // Check if this is a date-only selection (time is 00:00:00)
+    const isDateOnlySelection = date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0
+    
+    let finalDate: Date
+    
+    if (isDateOnlySelection) {
+      // Date-only selection - set shop open time
+      finalDate = getOptimalStartTime(date)
+    } else {
+      // User manually selected time - use the selected date/time as is
+      finalDate = date
+    }
+    
+    const validDate = enforceStrict15Minutes(finalDate)
     setStartDate(validDate)
     // Clear end date when start date changes to force reselection
     setEndDate(null)
@@ -1577,6 +1631,7 @@ export default function BookingClient() {
                           <DatePicker
                             selected={startDate}
                             onChange={handleStartChange}
+                            onSelect={handleDateSelect}
                             onChangeRaw={(e) => e?.preventDefault()}
                             selectsStart
                             startDate={startDate}

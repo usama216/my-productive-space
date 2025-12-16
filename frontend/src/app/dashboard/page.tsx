@@ -122,7 +122,7 @@ export default function Dashboard() {
   // Load user profile data
   const loadUserProfile = async () => {
     if (!authUser?.id) return
-console.log('authUser', authUser)
+    console.log('authUser', authUser)
     setIsLoadingProfile(true)
     try {
       const profile = await getUserProfile(authUser.id)
@@ -164,22 +164,22 @@ console.log('authUser', authUser)
     try {
       const response = await fetch(`https://productive-space-backend.vercel.app/api/verification-history/${userId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setVerificationHistory(data.history || [])
         console.log('📋 Verification history loaded:', data.history)
-        
+
         // Check if there are any unread notifications
         // Show orange dot if there are status changes (VERIFIED or REJECTED)
         const hasStatusChanges = (data.history || []).some((h: any) => h.newStatus === 'REJECTED' || h.newStatus === 'VERIFIED')
-        
+
         // Check localStorage to see if user has viewed notifications
         const lastViewedTimestamp = localStorage.getItem('notificationLastViewed')
         if (!lastViewedTimestamp && hasStatusChanges) {
           setHasUnreadNotifications(true)
         } else if (lastViewedTimestamp && hasStatusChanges) {
           // Check if there are new notifications after last viewed time
-          const hasNewNotifications = (data.history || []).some((h: any) => 
+          const hasNewNotifications = (data.history || []).some((h: any) =>
             new Date(h.changedAt).getTime() > parseInt(lastViewedTimestamp)
           )
           setHasUnreadNotifications(hasNewNotifications)
@@ -288,12 +288,12 @@ console.log('authUser', authUser)
       const response = await getUserBookings()
       if (response.success && response.bookings) {
         // Filter for upcoming and ongoing bookings
-        const upcomingAndOngoing = response.bookings.filter(booking => 
-          (booking.isUpcoming && booking.status === 'upcoming') || 
+        const upcomingAndOngoing = response.bookings.filter(booking =>
+          (booking.isUpcoming && booking.status === 'upcoming') ||
           (booking.isOngoing && booking.status === 'ongoing')
         )
         // Sort by startAt date (most recent first) and get the most recent 2 bookings
-        const sortedBookings = upcomingAndOngoing.sort((a, b) => 
+        const sortedBookings = upcomingAndOngoing.sort((a, b) =>
           new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
         )
         setUpcomingBookings(sortedBookings.slice(0, 2))
@@ -457,9 +457,9 @@ console.log('authUser', authUser)
                   Welcome back, {databaseUser?.name || 'User'}!
                 </p>
               </div>
-             
+
             </div>
-          </div> 
+          </div>
 
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -474,7 +474,7 @@ console.log('authUser', authUser)
               {/* <TabsTrigger value="refunds">Refund Requests</TabsTrigger> */}
             </TabsList>
 
-       
+
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Quick Stats Card - Now on LEFT */}
@@ -557,14 +557,14 @@ console.log('authUser', authUser)
                       {(userProfile?.memberType || databaseUser?.memberType) === 'STUDENT' && (() => {
                         // ONLY show notification if there's verification history
                         if (verificationHistory.length === 0) return null;
-                        
-                     
-                        
+
+
+
                         const formatDate = (dateString: string) => {
                           const date = new Date(dateString);
                           return `${date.getMonth() + 1}/${date.getDate()}`;
                         };
-                        
+
                         const getStatusIcon = (status: string) => {
                           switch (status) {
                             case 'REJECTED':
@@ -577,7 +577,7 @@ console.log('authUser', authUser)
                               return <AlertCircle className="h-4 w-4 text-gray-600" />;
                           }
                         };
-                        
+
                         const getStatusColor = (status: string) => {
                           switch (status) {
                             case 'REJECTED':
@@ -590,7 +590,7 @@ console.log('authUser', authUser)
                               return 'text-gray-800';
                           }
                         };
-                        
+
                         const getStatusText = (status: string) => {
                           switch (status) {
                             case 'REJECTED':
@@ -603,19 +603,19 @@ console.log('authUser', authUser)
                               return 'changed';
                           }
                         };
-                        
+
                         // Check for verification expiry
                         const verifiedAt = userProfile?.studentVerifiedAt || userProfile?.studentVerificationDate
                         const daysRemaining = getDaysUntilVerificationExpiry(verifiedAt)
                         const expired = isVerificationExpired(verifiedAt)
                         const expiringSoon = isVerificationExpiringSoon(verifiedAt)
-                        
+
                         // Show notification if there are any status changes in history OR verification is expiring/expired
                         const hasStatusChanges = verificationHistory.some(h => h.newStatus === 'REJECTED' || h.newStatus === 'VERIFIED');
                         const hasExpiryWarning = expired || expiringSoon;
-                        
+
                         if (!hasStatusChanges && !hasExpiryWarning) return null;
-                        
+
                         return (
                           <Popover onOpenChange={(open) => {
                             if (open) {
@@ -638,7 +638,7 @@ console.log('authUser', authUser)
                                   <Bell className="h-4 w-4 text-orange-600" />
                                   <h4 className="font-semibold text-orange-600">Notifications</h4>
                                 </div>
-                                
+
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                   {/* Verification Expiry Warning */}
                                   {hasExpiryWarning && (
@@ -654,14 +654,14 @@ console.log('authUser', authUser)
                                         </span>
                                       </div>
                                       <div className={`text-xs ${expired ? 'text-red-600' : 'text-orange-600'} mt-1`}>
-                                        {expired 
+                                        {expired
                                           ? 'Your student verification has expired. Please verify again to maintain student status.'
                                           : `Your verification will expire in ${daysRemaining} days.`
                                         }
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {/* Verification History */}
                                   {verificationHistory.map((history, index) => (
                                     <div key={history.id} className="border-l-2 border-gray-200 pl-3 py-2">
@@ -677,8 +677,8 @@ console.log('authUser', authUser)
                                     </div>
                                   ))}
                                 </div>
-                                
-                             
+
+
                               </div>
                             </PopoverContent>
                           </Popover>
@@ -695,7 +695,7 @@ console.log('authUser', authUser)
                     ) : upcomingBookings.length > 0 ? (
                       <div className="space-y-4">
                         {/* Show most recent 2 bookings */}
-                        {upcomingBookings.map((booking, index) => (
+                        {upcomingBookings.filter(booking => booking.cancelledBy !== "admin",).map((booking, index) => (
                           <div key={booking.id} className="border rounded-lg p-4 bg-gray-50">
                             <div className="flex justify-between items-start mb-2">
                               <div>
@@ -706,7 +706,7 @@ console.log('authUser', authUser)
                                 {getBookingStatus(booking)}
                               </Badge>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div className="flex items-center">
                                 <Calendar className="w-3 h-3 mr-1 text-gray-400" />
@@ -737,13 +737,13 @@ console.log('authUser', authUser)
                                 </span>
                               </div>
                             </div>
-                            
+
                             <div className="mt-2 pt-2 border-t flex justify-between items-center">
                               <span className="font-semibold text-sm">${booking.totalAmount}</span>
                               {index === upcomingBookings.length - 1 && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => setActiveTab('mybookings')}
                                   className="text-xs"
                                 >
@@ -812,12 +812,12 @@ console.log('authUser', authUser)
                         <p className="text-gray-600">{userProfile?.email || authUser?.email || sampleUserData.email}</p>
                         <div className="flex items-center space-x-4 mt-2">
                           <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                            {userProfile 
+                            {userProfile
                               ? getMemberTypeDisplayName(userProfile.memberType, userProfile.studentVerificationStatus)
                               : getMemberTypeDisplayName(
-                                  databaseUser?.memberType || sampleUserData.memberType,
-                                  databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus
-                                )
+                                databaseUser?.memberType || sampleUserData.memberType,
+                                databaseUser?.studentVerificationStatus || sampleUserData.studentVerificationStatus
+                              )
                             }
                           </Badge>
                           {(userProfile?.memberType || databaseUser?.memberType || sampleUserData.memberType) === 'STUDENT' && (() => {
@@ -858,15 +858,15 @@ console.log('authUser', authUser)
                             return (
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className={badgeClass}>
-                                  {status === 'PENDING' 
+                                  {status === 'PENDING'
                                     ? 'Student status verification Pending - Please check back in a few days.'
                                     : status === 'VERIFIED'
-                                    ? expired
-                                      ? 'Student Verification - Expired'
-                                      : expiringSoon
-                                        ? `Expires in ${daysRemaining} days`
-                                        : 'Student Verification - Verified'
-                                    : `Student Verification Status - ${statusText}`
+                                      ? expired
+                                        ? 'Student Verification - Expired'
+                                        : expiringSoon
+                                          ? `Expires in ${daysRemaining} days`
+                                          : 'Student Verification - Verified'
+                                      : `Student Verification Status - ${statusText}`
                                   }
                                 </Badge>
                                 {status === 'VERIFIED' && expiringSoon && (
@@ -987,14 +987,14 @@ console.log('authUser', authUser)
                               const expired = isVerificationExpired(verifiedAt)
                               const expiringSoon = isVerificationExpiringSoon(verifiedAt)
                               const expiryMessage = getVerificationExpiryMessage(verifiedAt)
-                              
+
                               // Determine colors based on status
                               const bgColor = expired ? 'bg-red-100' : expiringSoon ? 'bg-orange-100' : 'bg-green-100'
                               const textColor = expired ? 'text-red-800' : expiringSoon ? 'text-orange-800' : 'text-green-800'
                               const borderColor = expired ? 'border-red-200' : expiringSoon ? 'border-orange-200' : 'border-green-200'
                               const iconBg = expired ? 'bg-red-100' : expiringSoon ? 'bg-orange-100' : 'bg-green-100'
                               const iconColor = expired ? 'text-red-600' : expiringSoon ? 'text-orange-600' : 'text-green-600'
-                              
+
                               return (
                                 <div className={`${bgColor} ${textColor} ${borderColor} border rounded-lg p-4`}>
                                   <div className="flex items-start gap-3">
@@ -1016,7 +1016,7 @@ console.log('authUser', authUser)
                                       </p>
                                       {(expired || expiringSoon) && (
                                         <p className="text-sm mt-2 font-medium">
-Please click 'Edit profile' and upload a new verification document to maintain your student status.
+                                          Please click 'Edit profile' and upload a new verification document to maintain your student status.
                                         </p>
                                       )}
                                     </div>
@@ -1079,7 +1079,7 @@ Please click 'Edit profile' and upload a new verification document to maintain y
                       </div>
                     )}
 
-                   
+
                   </CardContent>
                 </Card>
 

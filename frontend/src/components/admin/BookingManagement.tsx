@@ -861,9 +861,23 @@ export function BookingManagement() {
                               size="sm"
                               onClick={() => handleCancelClick(booking)}
                               title="Cancel Booking"
-                              disabled={booking.status === 'cancelled' || booking.status === 'completed'}
+                              disabled={
+                                booking.status === 'cancelled' || 
+                                booking.status === 'completed' ||
+                                booking.status === 'Cancelled by Admin' ||
+                                booking.cancelledBy === 'admin' ||
+                                (booking.refundstatus && booking.refundstatus !== 'NONE')
+                              }
                             >
-                              <Trash2 className={`h-4 w-4 ${booking.status === 'cancelled' || booking.status === 'completed' ? 'text-gray-300' : 'text-red-600'}`} />
+                              <Trash2 className={`h-4 w-4 ${
+                                booking.status === 'cancelled' || 
+                                booking.status === 'completed' ||
+                                booking.status === 'Cancelled by Admin' ||
+                                booking.cancelledBy === 'admin' ||
+                                (booking.refundstatus && booking.refundstatus !== 'NONE')
+                                  ? 'text-gray-300' 
+                                  : 'text-red-600'
+                              }`} />
                             </Button>
                             <Button
                               variant="ghost"
@@ -903,7 +917,7 @@ export function BookingManagement() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button
+                            {/* <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
@@ -913,7 +927,7 @@ export function BookingManagement() {
                               title="View Timeline & History"
                             >
                               <Info className="h-4 w-4" />
-                            </Button>
+                            </Button> */}
                           </div>
                         </TableCell>
 
