@@ -1530,161 +1530,298 @@ export function BookingManagement() {
                         </div>
                       ) : activities && activities.length > 0 ? (
                         <div className="space-y-3 max-h-96 overflow-y-auto">
-                          {activities.map((activity: any, index: number) => (
-                            <div key={activity.id || index} className="flex gap-3">
-                              <div className="flex flex-col items-center">
-                                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
-                                  {activity.activityType === 'BOOKING_CREATED' && <Calendar className="w-3 h-3 text-blue-500" />}
-                                  {activity.activityType === 'PAYMENT_CONFIRMED' && <DollarSign className="w-3 h-3 text-green-500" />}
-                                  {activity.activityType === 'RESCHEDULE_APPROVED' && <Clock className="w-3 h-3 text-blue-500" />}
-                                  {activity.activityType === 'EXTEND_APPROVED' && <Clock className="w-3 h-3 text-teal-500" />}
-                                  {activity.activityType === 'CREDIT_USED' && <DollarSign className="w-3 h-3 text-orange-500" />}
-                                  {activity.activityType === 'REFUND_APPROVED' && <DollarSign className="w-3 h-3 text-yellow-500" />}
-                                  {!['BOOKING_CREATED', 'PAYMENT_CONFIRMED', 'RESCHEDULE_APPROVED', 'EXTEND_APPROVED', 'CREDIT_USED', 'REFUND_APPROVED'].includes(activity.activityType) && <FileText className="w-3 h-3 text-gray-500" />}
+                          {activities.map((activity: any, index: number) => {
+                            // Helper function to calculate transaction fee based on payment method and amount
+                            const calculateTransactionFee = (amount: number, paymentMethod?: string): number => {
+                              if (!amount || amount <= 0) return 0;
+                              
+                              if (!paymentMethod) return 0;
+                              
+                              const method = paymentMethod.toLowerCase();
+                              
+                              // PayNow: $0.20 for amounts < $10, $0 for >= $10
+                              if (method.includes('paynow') || method.includes('pay_now')) {
+                                return amount < 10 ? 0.20 : 0;
+                              }
+                              
+                              // Credit Card: Typically 5% (or configured percentage)
+                              if (method.includes('card') || method.includes('credit')) {
+                                // Default 5%, but could be from settings
+                                const cardFeePercentage = 5.0;
+                                return (amount * cardFeePercentage) / 100;
+                              }
+                              
+                              return 0;
+                            };
+
+                            // Match activity with payment based on timestamp
+                            const findMatchingPayment = (): any => {
+                              if (!detailData?.allPayments || !activity.createdAt) return null;
+                              
+                              return detailData.allPayments.find((payment: any) => {
+                                if (!payment.createdAt && !payment.paidAt) return false;
+                                
+                                const activityTime = new Date(activity.createdAt).getTime();
+                                const paymentTime = new Date(payment.paidAt || payment.createdAt).getTime();
+                                
+                                // Match if within 2 minutes (120000ms)
+                                return Math.abs(activityTime - paymentTime) < 120000;
+                              });
+                            };
+
+                            // For BOOKING_CREATED, use first payment (original booking payment)
+                            let matchedPayment: any = null;
+                            if (activity.activityType === 'BOOKING_CREATED' || activity.activityType === 'PACKAGE_USED' || activity.activityType === 'CREDIT_USED') {
+                              matchedPayment = detailData?.allPayments?.[0] || null;
+                            } else {
+                              matchedPayment = findMatchingPayment();
+                            }
+
+                            // Get payment details - check multiple possible field names
+                            const paymentAmount = matchedPayment?.amount ? parseFloat(matchedPayment.amount) : 
+                                                  matchedPayment?.totalAmount ? parseFloat(matchedPayment.totalAmount) :
+                                                  (activity.amount || null);
+                            const paymentMethod = matchedPayment?.paymentMethod || matchedPayment?.paymentmethod || null;
+                            const transactionFee = paymentAmount && paymentMethod ? calculateTransactionFee(paymentAmount, paymentMethod) : null;
+
+                            return (
+                              <div key={activity.id || index} className="flex gap-3">
+                                <div className="flex flex-col items-center">
+                                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
+                                    {activity.activityType === 'BOOKING_CREATED' && <Calendar className="w-3 h-3 text-blue-500" />}
+                                    {activity.activityType === 'PAYMENT_CONFIRMED' && <DollarSign className="w-3 h-3 text-green-500" />}
+                                    {activity.activityType === 'RESCHEDULE_APPROVED' && <Clock className="w-3 h-3 text-blue-500" />}
+                                    {activity.activityType === 'EXTEND_APPROVED' && <Clock className="w-3 h-3 text-teal-500" />}
+                                    {activity.activityType === 'CREDIT_USED' && <DollarSign className="w-3 h-3 text-orange-500" />}
+                                    {activity.activityType === 'PACKAGE_USED' && <DollarSign className="w-3 h-3 text-purple-500" />}
+                                    {activity.activityType === 'REFUND_APPROVED' && <DollarSign className="w-3 h-3 text-yellow-500" />}
+                                    {!['BOOKING_CREATED', 'PAYMENT_CONFIRMED', 'RESCHEDULE_APPROVED', 'EXTEND_APPROVED', 'CREDIT_USED', 'PACKAGE_USED', 'REFUND_APPROVED'].includes(activity.activityType) && <FileText className="w-3 h-3 text-gray-500" />}
+                                  </div>
+                                  {index < activities.length - 1 && (
+                                    <div className="w-0.5 h-full bg-gray-200 mt-1 min-h-[40px]"></div>
+                                  )}
                                 </div>
-                                {index < activities.length - 1 && (
-                                  <div className="w-0.5 h-full bg-gray-200 mt-1 min-h-[40px]"></div>
-                                )}
-                              </div>
-                              <div className="flex-1 pb-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1">
-                                    <p className="font-medium text-xs">{activity.activityTitle}</p>
-                                    {activity.activityDescription && (
-                                      <div className="text-xs text-gray-600 mt-0.5">
-                                        {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
-                                          <div className="space-y-1">
-                                            {/* Use metadata first if available (most reliable) */}
-                                            {activity.metadata && (activity.metadata.originalStartAt || activity.metadata.originalEndAt || activity.metadata.newStartAt || activity.metadata.newEndAt) ? (
-                                              <div className="flex flex-col gap-1">
-                                                {/* Old Time */}
-                                                {(activity.metadata.originalStartAt || activity.metadata.originalEndAt) && (
+                                <div className="flex-1 pb-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-xs">{activity.activityTitle}</p>
+                                      {activity.activityDescription && (
+                                        <div className="text-xs text-gray-600 mt-0.5 space-y-1">
+                                          {activity.activityType === 'RESCHEDULE_APPROVED' || activity.activityType === 'EXTEND_APPROVED' ? (
+                                            <div className="space-y-1">
+                                              {/* Use metadata first if available (most reliable) */}
+                                              {activity.metadata && (activity.metadata.originalStartAt || activity.metadata.originalEndAt || activity.metadata.newStartAt || activity.metadata.newEndAt) ? (
+                                                <div className="flex flex-col gap-1">
+                                                  {/* Old Time */}
+                                                  {(activity.metadata.originalStartAt || activity.metadata.originalEndAt) && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Old:</span>
+                                                      <span className="font-mono text-xs">
+                                                        {activity.metadata.originalStartAt && activity.metadata.originalEndAt
+                                                          ? `${formatSingaporeDate(activity.metadata.originalStartAt)} - ${formatSingaporeDate(activity.metadata.originalEndAt)}`
+                                                          : activity.metadata.originalEndAt
+                                                            ? `End: ${formatSingaporeDate(activity.metadata.originalEndAt)}`
+                                                            : formatSingaporeDate(activity.metadata.originalStartAt)}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                  {/* New Time */}
+                                                  {(activity.metadata.newStartAt || activity.metadata.newEndAt) && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-blue-600 font-medium">New:</span>
+                                                      <span className="font-mono text-xs">
+                                                        {activity.metadata.newStartAt && activity.metadata.newEndAt
+                                                          ? `${formatSingaporeDate(activity.metadata.newStartAt)} - ${formatSingaporeDate(activity.metadata.newEndAt)}`
+                                                          : activity.metadata.newEndAt
+                                                            ? `End: ${formatSingaporeDate(activity.metadata.newEndAt)}`
+                                                            : formatSingaporeDate(activity.metadata.newStartAt)}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              ) : activity.oldValue && activity.newValue ? (
+                                                // Fallback to oldValue/newValue if metadata not available
+                                                <div className="flex flex-col gap-1">
                                                   <div className="flex items-center gap-1">
                                                     <span className="text-gray-500">Old:</span>
                                                     <span className="font-mono text-xs">
-                                                      {activity.metadata.originalStartAt && activity.metadata.originalEndAt
-                                                        ? `${formatSingaporeDate(activity.metadata.originalStartAt)} - ${formatSingaporeDate(activity.metadata.originalEndAt)}`
-                                                        : activity.metadata.originalEndAt
-                                                          ? `End: ${formatSingaporeDate(activity.metadata.originalEndAt)}`
-                                                          : formatSingaporeDate(activity.metadata.originalStartAt)}
+                                                      {activity.oldValue.includes(' - ')
+                                                        ? activity.oldValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
+                                                        : formatSingaporeDate(activity.oldValue)}
                                                     </span>
                                                   </div>
-                                                )}
-                                                {/* New Time */}
-                                                {(activity.metadata.newStartAt || activity.metadata.newEndAt) && (
                                                   <div className="flex items-center gap-1">
                                                     <span className="text-blue-600 font-medium">New:</span>
                                                     <span className="font-mono text-xs">
-                                                      {activity.metadata.newStartAt && activity.metadata.newEndAt
-                                                        ? `${formatSingaporeDate(activity.metadata.newStartAt)} - ${formatSingaporeDate(activity.metadata.newEndAt)}`
-                                                        : activity.metadata.newEndAt
-                                                          ? `End: ${formatSingaporeDate(activity.metadata.newEndAt)}`
-                                                          : formatSingaporeDate(activity.metadata.newStartAt)}
+                                                      {activity.newValue.includes(' - ')
+                                                        ? activity.newValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
+                                                        : formatSingaporeDate(activity.newValue)}
                                                     </span>
                                                   </div>
-                                                )}
-                                              </div>
-                                            ) : activity.oldValue && activity.newValue ? (
-                                              // Fallback to oldValue/newValue if metadata not available
-                                              <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-1">
-                                                  <span className="text-gray-500">Old:</span>
-                                                  <span className="font-mono text-xs">
-                                                    {activity.oldValue.includes(' - ')
-                                                      ? activity.oldValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
-                                                      : formatSingaporeDate(activity.oldValue)}
-                                                  </span>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                  <span className="text-blue-600 font-medium">New:</span>
-                                                  <span className="font-mono text-xs">
-                                                    {activity.newValue.includes(' - ')
-                                                      ? activity.newValue.split(' - ').map((time: string) => formatSingaporeDate(time.trim())).join(' - ')
-                                                      : formatSingaporeDate(activity.newValue)}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            ) : activity.activityDescription.includes('→') ? (
-                                              // Parse description with arrow format
-                                              <div className="flex flex-col gap-1">
-                                                {activity.activityDescription.split('→').map((part: string, idx: number) => (
-                                                  <div key={idx} className="flex items-center gap-1">
-                                                    <span className={idx === 0 ? 'text-gray-500' : 'text-blue-600 font-medium'}>
-                                                      {idx === 0 ? 'Old:' : 'New:'}
-                                                    </span>
-                                                    <span className="font-mono text-xs">{part.trim()}</span>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            ) : activity.activityDescription.includes('Old:') && activity.activityDescription.includes('New:') ? (
-                                              // Handle format: "Old: ... New: ..."
-                                              <div className="flex flex-col gap-1">
-                                                {activity.activityDescription.split(/(?=New:)/).map((part: string, idx: number) => {
-                                                  const isOld = part.includes('Old:')
-                                                  const isNew = part.includes('New:')
-                                                  const label = isOld ? 'Old:' : isNew ? 'New:' : ''
-                                                  const content = part.replace(/^(Old:|New:)\s*/, '').trim()
-                                                  return (
+                                              ) : activity.activityDescription.includes('→') ? (
+                                                // Parse description with arrow format
+                                                <div className="flex flex-col gap-1">
+                                                  {activity.activityDescription.split('→').map((part: string, idx: number) => (
                                                     <div key={idx} className="flex items-center gap-1">
-                                                      <span className={isOld ? 'text-gray-500' : 'text-blue-600 font-medium'}>
-                                                        {label}
+                                                      <span className={idx === 0 ? 'text-gray-500' : 'text-blue-600 font-medium'}>
+                                                        {idx === 0 ? 'Old:' : 'New:'}
                                                       </span>
-                                                      <span className="font-mono text-xs">{content}</span>
+                                                      <span className="font-mono text-xs">{part.trim()}</span>
                                                     </div>
-                                                  )
-                                                })}
-                                              </div>
-                                            ) : activity.activityDescription.includes('from') && activity.activityDescription.includes('to') ? (
-                                              // Handle old format: "Booking rescheduled from X to Y"
-                                              <div className="flex flex-col gap-1">
-                                                {(() => {
-                                                  const fromMatch = activity.activityDescription.match(/from\s+(.+?)\s+to\s+(.+?)$/i)
-                                                  if (fromMatch) {
+                                                  ))}
+                                                </div>
+                                              ) : activity.activityDescription.includes('Old:') && activity.activityDescription.includes('New:') ? (
+                                                // Handle format: "Old: ... New: ..."
+                                                <div className="flex flex-col gap-1">
+                                                  {activity.activityDescription.split(/(?=New:)/).map((part: string, idx: number) => {
+                                                    const isOld = part.includes('Old:')
+                                                    const isNew = part.includes('New:')
+                                                    const label = isOld ? 'Old:' : isNew ? 'New:' : ''
+                                                    const content = part.replace(/^(Old:|New:)\s*/, '').trim()
                                                     return (
-                                                      <>
-                                                        <div className="flex items-center gap-1">
-                                                          <span className="text-gray-500">Old:</span>
-                                                          <span className="font-mono text-xs">{fromMatch[1].trim()}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                          <span className="text-blue-600 font-medium">New:</span>
-                                                          <span className="font-mono text-xs">{fromMatch[2].trim()}</span>
-                                                        </div>
-                                                      </>
+                                                      <div key={idx} className="flex items-center gap-1">
+                                                        <span className={isOld ? 'text-gray-500' : 'text-blue-600 font-medium'}>
+                                                          {label}
+                                                        </span>
+                                                        <span className="font-mono text-xs">{content}</span>
+                                                      </div>
                                                     )
-                                                  }
-                                                  return <p className="text-gray-600">{activity.activityDescription}</p>
-                                                })()}
-                                              </div>
-                                            ) : (
-                                              // Fallback for any other format
+                                                  })}
+                                                </div>
+                                              ) : activity.activityDescription.includes('from') && activity.activityDescription.includes('to') ? (
+                                                // Handle old format: "Booking rescheduled from X to Y"
+                                                <div className="flex flex-col gap-1">
+                                                  {(() => {
+                                                    const fromMatch = activity.activityDescription.match(/from\s+(.+?)\s+to\s+(.+?)$/i)
+                                                    if (fromMatch) {
+                                                      return (
+                                                        <>
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="text-gray-500">Old:</span>
+                                                            <span className="font-mono text-xs">{fromMatch[1].trim()}</span>
+                                                          </div>
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="text-blue-600 font-medium">New:</span>
+                                                            <span className="font-mono text-xs">{fromMatch[2].trim()}</span>
+                                                          </div>
+                                                        </>
+                                                      )
+                                                    }
+                                                    return <p className="text-gray-600">{activity.activityDescription}</p>
+                                                  })()}
+                                                </div>
+                                              ) : (
+                                                // Fallback for any other format
+                                                <p className="text-gray-600">{activity.activityDescription}</p>
+                                              )}
+
+                                              {/* Payment Information for Reschedule/Extend */}
+                                              {(paymentAmount || paymentMethod) && (
+                                                <div className="flex flex-col gap-1 mt-1 pt-1 border-t border-gray-200">
+                                                  {paymentMethod && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Payment mode:</span>
+                                                      <span className="text-xs font-medium">{paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
+                                                    </div>
+                                                  )}
+                                                  {paymentAmount && paymentAmount > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Payment amount:</span>
+                                                      <span className="text-xs text-green-600 font-medium">${paymentAmount.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {transactionFee !== null && transactionFee > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Transaction fee incurred:</span>
+                                                      <span className="text-xs text-orange-600">${transactionFee.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : activity.activityType === 'PACKAGE_USED' || activity.activityType === 'CREDIT_USED' ? (
+                                            <div className="space-y-1">
                                               <p className="text-gray-600">{activity.activityDescription}</p>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <p>{activity.activityDescription}</p>
-                                        )}
-                                      </div>
-                                    )}
-                                    {activity.amount && activity.amount > 0 && (
-                                      <p className="text-xs text-green-600 font-medium mt-0.5">
-                                        ${activity.amount.toFixed(2)}
-                                      </p>
-                                    )}
+                                              
+                                              {/* Payment Information for Package/Credit Usage */}
+                                              {(paymentAmount || paymentMethod) && (
+                                                <div className="flex flex-col gap-1 mt-1 pt-1 border-t border-gray-200">
+                                                  {paymentMethod && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Payment mode:</span>
+                                                      <span className="text-xs font-medium">{paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
+                                                    </div>
+                                                  )}
+                                                  {paymentAmount && paymentAmount > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Payment amount:</span>
+                                                      <span className="text-xs text-green-600 font-medium">${paymentAmount.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {transactionFee !== null && transactionFee > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Transaction fee incurred:</span>
+                                                      <span className="text-xs text-orange-600">${transactionFee.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : activity.activityType === 'BOOKING_CREATED' ? (
+                                            <div className="space-y-1">
+                                              <p>{activity.activityDescription}</p>
+                                              
+                                              {/* Payment Information for Booking Creation */}
+                                              {(paymentAmount || paymentMethod) && (
+                                                <div className="flex flex-col gap-1 mt-1 pt-1 border-t border-gray-200">
+                                                  {paymentMethod && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Payment mode:</span>
+                                                      <span className="text-xs font-medium">{paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
+                                                    </div>
+                                                  )}
+                                                  {paymentAmount && paymentAmount > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Payment amount:</span>
+                                                      <span className="text-xs text-green-600 font-medium">${paymentAmount.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {transactionFee !== null && transactionFee > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-gray-500">Transaction fee incurred:</span>
+                                                      <span className="text-xs text-orange-600">${transactionFee.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <p>{activity.activityDescription}</p>
+                                          )}
+                                        </div>
+                                      )}
+                                      {/* Show amount if no payment details found */}
+                                      {activity.amount && activity.amount > 0 && !paymentAmount && (
+                                        <p className="text-xs text-green-600 font-medium mt-0.5">
+                                          ${activity.amount.toFixed(2)}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                                      {formatLocalDate(activity.createdAt, {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: true
+                                      })}
+                                    </span>
                                   </div>
-                                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                                    {formatLocalDate(activity.createdAt, {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    })}
-                                  </span>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-xs text-gray-500 text-center py-2">No activities recorded yet</p>

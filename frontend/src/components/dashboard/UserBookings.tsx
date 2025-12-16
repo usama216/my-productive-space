@@ -679,7 +679,7 @@ export function UserBookings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentTabBookings.map((booking) => (
+                {currentTabBookings.filter(booking => booking.confirmedPayment).map((booking) => (
                   <TableRow key={booking.id}>
                     <TableCell>
                       <div className="font-mono font-bold">{booking.bookingRef}</div>
