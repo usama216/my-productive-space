@@ -100,18 +100,51 @@ export default function BookingForm() {
   };
 
   // Helper function to get dates that should be excluded (closure dates)
+  // Only exclude dates where closure completely covers operating hours
   const getExcludedDates = (): Date[] => {
     const excluded: Date[] = []
 
     closureDates.forEach(closure => {
-      const start = new Date(closure.startDate)
-      const end = new Date(closure.endDate)
+      // Convert UTC dates to local timezone
+      const closureStart = new Date(closure.startDate)
+      const closureEnd = new Date(closure.endDate)
 
-      // Add all dates in the closure range
-      let current = new Date(start)
-      while (current <= end) {
-        excluded.push(new Date(current))
-        current.setDate(current.getDate() + 1)
+      // Get local date components (date only, without time)
+      const closureStartDate = new Date(closureStart.getFullYear(), closureStart.getMonth(), closureStart.getDate())
+      const closureEndDate = new Date(closureEnd.getFullYear(), closureEnd.getMonth(), closureEnd.getDate())
+
+      // Get time components in local timezone
+      const closureStartTime = closureStart.getHours() * 60 + closureStart.getMinutes() // Minutes since midnight
+      const closureEndTime = closureEnd.getHours() * 60 + closureEnd.getMinutes()
+
+      // Check each date in the closure range
+      let currentDate = new Date(closureStartDate)
+      while (currentDate <= closureEndDate) {
+        const dayOfWeek = currentDate.getDay()
+        const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive)
+
+        if (dayHours) {
+          // Parse operating hours
+          const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number)
+          const [closeHours, closeMinutes] = dayHours.closeTime.split(':').map(Number)
+          const operatingStartTime = openHours * 60 + openMinutes
+          const operatingEndTime = closeHours * 60 + closeMinutes
+
+          // Check if closure completely covers operating hours for this date
+          // Closure must start before/at operating start AND end after/at operating end
+          const isFullDayClosure = closureStartTime <= operatingStartTime && closureEndTime >= operatingEndTime
+
+          if (isFullDayClosure) {
+            excluded.push(new Date(currentDate))
+          }
+        } else {
+          // If no operating hours for this day, exclude it if closure covers full day (00:00 to 23:59)
+          if (closureStartTime === 0 && closureEndTime >= 1439) {
+            excluded.push(new Date(currentDate))
+          }
+        }
+
+        currentDate.setDate(currentDate.getDate() + 1)
       }
     })
 
@@ -169,9 +202,22 @@ export default function BookingForm() {
 
       // Check if time is within operating hours
       if (timeString >= openTime && timeString <= closeTime) {
-        // For same-day bookings, only include times in the future
-        if (!isToday || time > now) {
-          times.push(time);
+        // Check if this time slot falls within any closure period
+        const isInClosure = closureDates.some(closure => {
+          const closureStart = new Date(closure.startDate) // UTC -> local timezone
+          const closureEnd = new Date(closure.endDate) // UTC -> local timezone
+          
+          // Check if currentTime falls within the closure period
+          return time.getTime() >= closureStart.getTime() && 
+                 time.getTime() < closureEnd.getTime()
+        })
+        
+        // Only add time if it's NOT in a closure period
+        if (!isInClosure) {
+          // For same-day bookings, only include times in the future
+          if (!isToday || time > now) {
+            times.push(time);
+          }
         }
       }
     }
@@ -537,19 +583,19 @@ export default function BookingForm() {
   }, [endDate, startDate, operatingHours])
 
   return (
-    <section id="BookNow" className="pt-24">
-      <div className="relative h-[600px] md:h-[700px]">
+    <section id="BookNow" className="pt-16 overflow-x-hidden w-full">
+      <div className="relative h-[600px] md:h-[700px] w-full overflow-hidden">
         <Image src="/mock_img/hero-image.jpg" alt="Hero" fill className="object-cover" />
-        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif leading-tight">
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4 w-full">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif leading-tight max-w-full px-2">
             Start your unforgettable co-working journey with us.
           </h1>
-          <p className="mt-4 text-sm sm:text-base md:text-lg">Where Community meets Productivity</p>
+          <p className="mt-4 text-sm sm:text-base md:text-lg max-w-full px-2">Where Community meets Productivity</p>
 
           {/*  THE WHITE BAR - RESPONSIVE  */}
-          <div className="mt-6 md:mt-8 bg-white p-4 md:p-6 rounded-lg w-full max-w-4xl mx-auto">
+          <div className="mt-6 md:mt-8 bg-white p-4 md:p-6 rounded-lg w-full max-w-5xl mx-auto overflow-x-hidden px-2 sm:px-4">
             {/* Desktop Layout */}
-            <div className="hidden lg:flex space-x-6 items-end">
+            <div className="hidden lg:flex space-x-4 xl:space-x-6 items-end flex-wrap gap-4">
 
               {/* LOCATION */}
               <div className="flex flex-col">
