@@ -27,6 +27,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
 
 import { PeopleSelector } from '@/components/PeopleSelector'
+import { DateTimeRangePicker } from '@/components/DateTimeRangePicker'
 import Navbar from '@/components/Navbar'
 import { FooterSection } from '@/components/landing-page-sections/FooterSection'
 
@@ -502,13 +503,99 @@ export default function BookingClient() {
     }
   }, [searchParams, userPackages, selectedPackage, toast])
 
+  // Helper function to get closure periods that overlap with booking time
+  const getOverlappingClosures = (startTime: Date, endTime: Date): ClosureDate[] => {
+    if (!startTime || !endTime || endTime <= startTime) {
+      return []
+    }
+
+    const overlapping: ClosureDate[] = []
+    
+    closureDates.forEach(closure => {
+      const closureStart = new Date(closure.startDate) // UTC -> local timezone
+      const closureEnd = new Date(closure.endDate) // UTC -> local timezone
+      
+      // Check if closure overlaps with our time range
+      if (closureStart.getTime() < endTime.getTime() && closureEnd.getTime() > startTime.getTime()) {
+        overlapping.push(closure)
+      }
+    })
+    
+    return overlapping
+  }
+
+  // Helper function to calculate actual operating hours between two times, excluding closures
+  const calculateActualOperatingHours = (startTime: Date, endTime: Date): number => {
+    if (!startTime || !endTime || endTime <= startTime) {
+      return 0
+    }
+
+    // Bookings are same-day only, so we can check the day's operating hours
+    if (!isSameDay(startTime, endTime)) {
+      // This shouldn't happen for valid bookings, but return 0 if dates differ
+      return 0
+    }
+
+    const dayOfWeek = startTime.getDay()
+    const dayHours = operatingHours.find(h => h.dayOfWeek === dayOfWeek && h.isActive)
+
+    if (!dayHours) {
+      return 0
+    }
+
+    // Get operating hours for the day
+    const [openHours, openMinutes] = dayHours.openTime.split(':').map(Number)
+    const [closeHours, closeMinutes] = dayHours.closeTime.split(':').map(Number)
+
+    const openTime = new Date(startTime)
+    openTime.setHours(openHours, openMinutes, 0, 0)
+
+    const closeTime = new Date(startTime)
+    closeTime.setHours(closeHours, closeMinutes, 0, 0)
+
+    // Clamp start and end times to operating hours
+    const actualStart = startTime.getTime() > openTime.getTime() ? startTime.getTime() : openTime.getTime()
+    const actualEnd = endTime.getTime() < closeTime.getTime() ? endTime.getTime() : closeTime.getTime()
+
+    if (actualStart >= actualEnd) {
+      return 0
+    }
+
+    // Calculate total time within operating hours
+    let totalMs = actualEnd - actualStart
+
+    // Subtract any closure periods that overlap with our time range
+    closureDates.forEach(closure => {
+      const closureStart = new Date(closure.startDate) // UTC -> local timezone
+      const closureEnd = new Date(closure.endDate) // UTC -> local timezone
+
+      // Check if closure overlaps with our time range
+      // Closure overlaps if: closureStart < actualEnd AND closureEnd > actualStart
+      // Note: closureEnd is exclusive (shop reopens at closureEnd, so that time is chargeable)
+      if (closureStart.getTime() < actualEnd && closureEnd.getTime() > actualStart) {
+        // Calculate overlap period
+        // overlapStart is the later of closureStart and actualStart
+        const overlapStart = closureStart.getTime() > actualStart ? closureStart.getTime() : actualStart
+        // overlapEnd is the earlier of closureEnd and actualEnd, but closureEnd is exclusive
+        const overlapEnd = closureEnd.getTime() <= actualEnd ? closureEnd.getTime() : actualEnd
+        const overlapMs = Math.max(0, overlapEnd - overlapStart)
+
+        // Subtract closure overlap from total time
+        totalMs -= overlapMs
+      }
+    })
+
+    // Convert to hours and ensure non-negative
+    return Math.max(0, totalMs / (1000 * 60 * 60))
+  }
+
   useEffect(() => {
     if (startDate && endDate) {
       // Convert local time to UTC for database storage
       const startAt = fromDatePickerToUTC(startDate);
       const endAt = fromDatePickerToUTC(endDate);
-      const durationMs = endDate.getTime() - startDate.getTime();
-      const durationHours = durationMs / (1000 * 60 * 60);
+      // Calculate actual operating hours, excluding closures
+      const durationHours = calculateActualOperatingHours(startDate, endDate);
 
       setBookingDuration({
         startAt,
@@ -518,7 +605,7 @@ export default function BookingClient() {
     } else {
       setBookingDuration(undefined);
     }
-  }, [startDate, endDate])
+  }, [startDate, endDate, closureDates, operatingHours])
 
   const { minTime, maxTime } = getSingaporeTimeConstraints()
   // minDate should be TODAY (not 30 minutes from now) to allow same-day booking
@@ -599,19 +686,52 @@ export default function BookingClient() {
 
   }, [searchParams, bookingId])
 
+  // Delete unpaid booking when payment is cancelled
+  const deleteUnpaidBooking = useCallback(async (bookingIdToDelete: string) => {
+    try {
+      
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/booking/deleteUnpaidBooking`, {
+        method: 'POST',
+        body: JSON.stringify({
+          bookingId: bookingIdToDelete
+        })
+      })
+
+      if (response.ok) {
+        
+        localStorage.removeItem('currentBooking')
+      } else {
+        const errorData = await response.json()
+       
+      }
+    } catch (error) {
+      console.error('Error deleting unpaid booking:', error)
+      // Don't show error to user - booking will be cleaned up by cron job
+    }
+  }, [])
+
   // Handle booking confirmation when step 3 loads
   useEffect(() => {
     if (bookingStep === 3) {
       // Check if payment was canceled or failed before attempting confirmation
       const paymentStatus = searchParams.get('status')
+      const urlBookingId = searchParams.get('bookingId')
+      const currentBookingId = urlBookingId || bookingId
+      
       if (isPaymentFailed(paymentStatus)) {
         setConfirmationStatus('error')
         setConfirmationError('Payment was not completed. Your booking has not been confirmed.')
+        
+        // Immediately delete the unpaid booking when payment is cancelled
+        if (currentBookingId) {
+          deleteUnpaidBooking(currentBookingId)
+        }
+        
         return
       }
       confirmBooking()
     }
-  }, [bookingStep, searchParams, bookingId])
+  }, [bookingStep, searchParams, bookingId, deleteUnpaidBooking])
 
 
 
@@ -869,7 +989,20 @@ export default function BookingClient() {
       const closeTime = dayHours.closeTime.substring(0, 5);
 
       if (timeString >= openTime && timeString <= closeTime) {
-        times.push(time);
+        // Check if this time slot falls within any closure period
+        const isInClosure = closureDates.some(closure => {
+          const closureStart = new Date(closure.startDate) // UTC -> local timezone
+          const closureEnd = new Date(closure.endDate) // UTC -> local timezone
+          
+          // Check if currentTime falls within the closure period
+          return time.getTime() >= closureStart.getTime() && 
+                 time.getTime() < closureEnd.getTime()
+        })
+        
+        // Only add time if it's NOT in a closure period
+        if (!isInClosure) {
+          times.push(time);
+        }
       }
     }
     return times;
@@ -1476,7 +1609,7 @@ export default function BookingClient() {
   // Memoize available end times to avoid recalculation on every render
   const availableEndTimes = useMemo(() => {
     return getAvailableEndTimes(endDate)
-  }, [endDate, startDate, operatingHours])
+  }, [endDate, startDate, operatingHours, closureDates])
 
   const isFormValid =
     location &&
@@ -1620,65 +1753,20 @@ export default function BookingClient() {
 
                       {/* Date & Time Selection */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                        <div>
-                          <Label className="flex items-center gap-2">
-                            Start Date & Time
-                            {(isLoadingShopHours || isLoadingSeats) && (
-                              <Loader2 className="h-3 w-3 animate-spin text-orange-500" />
-                            )}
-                          </Label>
-                          {/* Get minimum start time constraints */}
-                          <DatePicker
-                            selected={startDate}
-                            onChange={handleStartChange}
-                            onSelect={handleDateSelect}
-                            onChangeRaw={(e) => e?.preventDefault()}
-                            selectsStart
-                            startDate={startDate}
-                            endDate={endDate}
-                            showTimeSelect
-                            timeIntervals={15}
-                            dateFormat="MMM d, h:mm aa"
-                            placeholderText="Select start time"
-                            className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
-                            wrapperClassName="w-full"
-                            minDate={minDate}
-                            maxDate={maxBookingDate}
-                            excludeDates={getExcludedDates()}
-                            includeTimes={getAvailableTimes(startDate)}
-                            {...getStartTimeConstraints()}
-                            disabled={!user}
-                          />
-                        </div>
-
-                        <div>
-                          <Label>End Date & Time</Label>
-                          {/* Get end time constraints */}
-                          <DatePicker
-                            selected={endDate}
-                            onChange={handleEndChange}
-                            onChangeRaw={(e) => e?.preventDefault()}
-                            selectsEnd
-                            startDate={startDate}
-                            endDate={endDate}
-                            minDate={endMinDate}
-                            maxDate={endMaxDate}
-                            showTimeSelect
-                            timeIntervals={15}
-                            includeTimes={availableEndTimes}
-                            excludeDates={getExcludedDates()}
-                            dateFormat="MMM d, h:mm aa"
-                            placeholderText="Select end time"
-                            className={`w-full h-10 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:outline-none transition-colors ${!user ? "bg-gray-50" : ""}`}
-                            wrapperClassName="w-full"
-                            {...getEndTimeConstraints()}
-                            disabled={!user || !startDate}
-                          />
-                          {/* {startDate && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              💡 End time must be on the same day as start time
-                          )} */}
-                        </div>
+                        <DateTimeRangePicker
+                          startDate={startDate}
+                          endDate={endDate}
+                          onStartDateChange={setStartDate}
+                          onEndDateChange={setEndDate}
+                          location={locations.find(loc => loc.id === location)?.name || 'Kovan'}
+                          dateFormat="MMM d, h:mm aa"
+                          placeholderStart="Select start time"
+                          placeholderEnd="Select end time"
+                          disabled={!user}
+                          showLoader={true}
+                          fullWidth={true}
+                          className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"
+                        />
                       </div>
 
 
@@ -2393,6 +2481,48 @@ export default function BookingClient() {
                         <span>Duration</span>
                         <span>{bookingDuration ? bookingDuration.durationHours.toFixed(2) : totalHours} hours</span>
                       </div>
+                      
+                      {/* Show closure exclusion notice if closures exist in booking period */}
+                      {(() => {
+                        if (!startDate || !endDate || !bookingDuration) return null;
+                        const overlappingClosures = getOverlappingClosures(startDate, endDate);
+                        const simpleHoursDiff = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+                        const closureHours = simpleHoursDiff - bookingDuration.durationHours;
+                        
+                        // Show message if closures exist and some hours were excluded (difference > 0.1 to account for rounding)
+                        if (overlappingClosures.length > 0 && closureHours > 0.1) {
+                          return (
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <div className="text-orange-700 font-medium mb-1 flex items-center gap-1 text-xs">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                Shop Closure Periods Excluded
+                              </div>
+                              <div className="text-xs text-gray-600 space-y-1">
+                                <div>
+                                  Shop closure periods ({closureHours.toFixed(2)} hours) have been excluded from the booking calculation because the shop is closed during this time.
+                                </div>
+                                <div className="font-medium mt-1">Closure periods in this booking:</div>
+                                <ul className="list-disc list-inside ml-2 space-y-0.5">
+                                  {overlappingClosures.map((closure, idx) => {
+                                    const closureStart = new Date(closure.startDate);
+                                    const closureEnd = new Date(closure.endDate);
+                                    return (
+                                      <li key={idx}>
+                                        {formatSingaporeDate(closureStart)} - {formatSingaporeDate(closureEnd)}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                                <div className="text-blue-700 mt-1 font-medium">
+                                  ✓ You are only charged for operating hours, not closure periods.
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      
                       <div className="flex justify-between">
                         <span>People</span>
                         <span>{people}</span>
